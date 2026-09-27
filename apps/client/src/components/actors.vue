@@ -1271,29 +1271,31 @@ export default {
       });
     },
 
-    async fillMissingImages(list) {
+    // Photos for the people that have none, chosen by tv-srvr the same way as
+    // every other image (images.js). season and episode make them guests.
+    async fillMissingImages(list, season, episode) {
       // list items may use personName/name (actors) or just name (crew)
-      await Promise.all(
-        list.map(async (item) => {
-          if (item.image || item.personImgURL) return;
-          const name = item.personName || item.name;
-          const cached = tvdb.getPersonImageFromCache(name);
-          if (cached) {
-            item.image = cached;
-            if ("personImgURL" in item) item.personImgURL = cached;
-            return;
-          }
-          try {
-            const tmdbImage = await srvr.searchTmdbPerson({ name });
-            if (tmdbImage) {
-              item.image = tmdbImage;
-              if ("personImgURL" in item) item.personImgURL = tmdbImage;
-            }
-          } catch (_) {
-            // no image available
-          }
-        }),
-      );
+      const missing = list.filter((item) => !item.image && !item.personImgURL);
+      if (!missing.length) return;
+      try {
+        const urls = await srvr.getPersonImages({
+          showName: this.showName,
+          season,
+          episode,
+          people: missing.map((item) => ({
+            name: item.personName || item.name,
+            tmdbPersonId: item.tmdbPersonId,
+            tvdbPeopleId: item.tvdbPeopleId,
+          })),
+        });
+        missing.forEach((item, i) => {
+          if (!urls?.[i]) return;
+          item.image = urls[i];
+          if ("personImgURL" in item) item.personImgURL = urls[i];
+        });
+      } catch (e) {
+        logHere({ lvl: "error" }, `photo lookup failed for ${this.showName}: ${e.message}`);
+      }
     },
 
     normPersonName(name) {
@@ -1551,15 +1553,15 @@ export default {
         );
       } else if (Array.isArray(tmdbGuests) && tmdbGuests.length) {
         tmdbList = tmdbGuests.map((actor) => {
-          const imageUrl = actor.profile_path
-            ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
-            : null;
+          // The photo tv-srvr chose (images.js).
+          const imageUrl = actor.image || null;
 
           return {
             name: actor.character,
             personName: actor.name,
             image: imageUrl,
             personImgURL: imageUrl,
+            tmdbPersonId: actor.id,
             url: null,
             sort: actor.order,
             isFeatured: false,
@@ -1604,8 +1606,7 @@ export default {
       const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
       this.actors = this.dedupeByPersonName(mergeResult.output);
 
-      // Fill in missing images via cache then TMDB person search
-      await this.fillMissingImages(this.actors);
+      await this.fillMissingImages(this.actors, season, episode);
 
       if (this.actors.length === 0) {
         this.errorMessage = "No guest stars found";
@@ -2029,15 +2030,12 @@ export default {
             });
 
             tmdbList = regularsOnly.map((actor) => {
-              const imageUrl = actor.profile_path
-                ? `https://image.tmdb.org/t/p/w185${actor.profile_path}`
-                : null;
-
               return {
                 name: actor.character || actor.roles?.[0]?.character,
                 personName: actor.name,
-                image: imageUrl,
-                personImgURL: imageUrl,
+                image: null,
+                personImgURL: null,
+                tmdbPersonId: actor.id,
                 url: null,
                 sort: actor.order,
                 isFeatured: false,
@@ -2050,6 +2048,10 @@ export default {
       } catch (error) {
         // Silent error handling
       }
+
+      // TMDB's regulars get their photos from tv-srvr before the merge, which
+      // weighs who has one, and the write-back below, which keeps them.
+      await this.fillMissingImages(tmdbList);
 
       // Merge TMDB and TVDB lists
       const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);

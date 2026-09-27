@@ -14,11 +14,11 @@ import org.json.JSONObject;
  * The landscape image a show-list card wants, which the tvdb record does not
  * have: its own image is a portrait poster, the wrong shape for a card.
  *
- * tv-srvr finds one in fanart.tv's thumbs, else in TVDB's backgrounds, else in
- * TMDB's backdrops, and caches its own answers
- * -- so this asks once per show and remembers what it was told. An empty url is
- * neither having anything, and is cached as readily as a real one: the caller falls
- * back to the poster and must not ask again on every scroll.
+ * tv-srvr chooses it the same way as every other image (its images.js), and
+ * caches its own answers -- so this asks once per show and remembers what it
+ * was told. An empty url is no provider having anything, and is cached as
+ * readily as a real one: the caller falls back to the poster and must not ask
+ * again on every scroll.
  */
 class Backdrops {
 
@@ -62,10 +62,12 @@ class Backdrops {
 
   private static String fetch(Shows.Show show) {
     try {
+      // Its ids to look it up by; the name only for a search once they fail.
       String query =
-          (show.tmdbId.isEmpty()
-                  ? "?showName=" + URLEncoder.encode(show.name, "UTF-8")
-                  : "?tmdbId=" + URLEncoder.encode(show.tmdbId, "UTF-8"))
+          "?showName="
+              + URLEncoder.encode(show.name, "UTF-8")
+              + "&tmdbId="
+              + URLEncoder.encode(show.tmdbId, "UTF-8")
               + "&tvdbId="
               + URLEncoder.encode(show.id, "UTF-8");
       JSONObject rec = new JSONObject(Http.get(BACKDROP_URL + query));

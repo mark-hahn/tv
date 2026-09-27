@@ -125,7 +125,8 @@ export default {
       this.error = null;
       this.providers = [];
       try {
-        const params = { showName: name };
+        // The tvdb id lets tv-srvr find the show without a search by name.
+        const params = { showName: name, tvdbId: this.show?.tvdbId || this.show?.id };
         if (this.show?.firstAired) {
           const y = String(this.show.firstAired).slice(0, 4);
           if (y.length === 4) params.year = y;

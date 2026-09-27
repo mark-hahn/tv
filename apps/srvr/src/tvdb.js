@@ -22,6 +22,13 @@ import {
 } from "./tvdbDb.js";
 import { MovieDb } from "moviedb-promise";
 import { getTvmazeIdByTvdbId } from "../../api/src/tvmaze.js";
+import { getToken, clearToken } from "./tvdbToken.js";
+import {
+  recordIds,
+  showImage,
+  personImage,
+  tmdbShowId,
+} from "./images.js";
 const { log, start, end } = util.getLog("tvdb");
 const TVDB_TEMPLATE_PATH = path.join(SRVR_DATA_DIR, "tvdbTemplate.json");
 
@@ -42,10 +49,6 @@ const TVDB_TIMESTAMP_RESOLUTION = {
   "last-downloaded": "sec",
 };
 
-// TVDB API Credentials
-const TVDB_APIKEY = "d7fa8c90-36e3-4335-a7c0-6cbb7b0320df";
-const TVDB_PIN = "HXEVSDFF";
-
 // Wikipedia button verification: load the page and confirm it is really
 // about the show before returning the button. Similarity is
 // 1 - (levenshtein / max-length) after collapsing to lower-case alpha chars.
@@ -53,48 +56,6 @@ const WIKI_SIMILARITY_MIN = 0.8; // wikipedia button kept if similarity > this
 const VERIFY_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
-
-// cache token relative to file scope
-let cachedToken = null;
-let cachedAtMs = 0;
-
-async function fetchJson(url, init) {
-  const res = await fetch(url, init);
-  const text = await res.text();
-  let json;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
-  return { res, text, json };
-}
-
-async function getToken() {
-  const now = Date.now();
-  if (cachedToken && now - cachedAtMs < 20 * 60 * 60 * 1000) return cachedToken;
-
-  const { res, json, text } = await fetchJson(
-    "https://api4.thetvdb.com/v4/login",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apikey: TVDB_APIKEY, pin: TVDB_PIN }),
-    },
-  );
-
-  if (!res.ok) {
-    throw new Error(
-      `TVDB login failed: ${res.status} ${text?.slice(0, 200) || ""}`.trim(),
-    );
-  }
-
-  const token = json?.data?.token;
-  if (!token) throw new Error("TVDB login failed: missing token");
-  cachedToken = token;
-  cachedAtMs = now;
-  return token;
-}
 
 function buildTvdbUrl(tvdbPath, query) {
   const safePath = String(tvdbPath || "").replace(/^\/+/, "");
@@ -1523,75 +1484,22 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   return { remotes, urls: flatUrls };
 };
 
-// A show-list card's landscape image when TMDB has none: TVDB's own series
-// backgrounds, which Emby drew on too. Textless first, then the best scored.
-export async function getTvdbBackground(tvdbId) {
-  const token = await getToken();
-  const { json } = await fetchJson(
-    `https://api4.thetvdb.com/v4/series/${tvdbId}/artworks?type=3`,
-    { headers: { Authorization: "Bearer " + token } },
-  );
-  const arts = json?.data?.artworks || [];
-  if (arts.length === 0) return "";
-  const textless = arts.filter((a) => !a.language);
-  const pick = (textless.length ? textless : arts).reduce((best, a) =>
-    (a.score || 0) > (best.score || 0) ? a : best,
-  );
-  return pick.image || "";
-}
-
-// A map episode card's still when TMDB has none: TVDB's own episode image.
-export async function getTvdbEpisodeImage(showName, season, episode) {
-  const tvdbId = allTvdb[showName]?.id;
-  if (!tvdbId) return null;
-  const token = await getToken();
-  const { json } = await fetchJson(
-    `https://api4.thetvdb.com/v4/series/${tvdbId}/episodes/default` +
-      `?page=0&season=${season}&episodeNumber=${episode}`,
-    { headers: { Authorization: "Bearer " + token } },
-  );
-  return json?.data?.episodes?.[0]?.image || null;
-}
-
-function getTvdbImageUrl(extResObj) {
-  // Try to find first English poster in artworks array
-  const artworks = extResObj?.data?.artworks;
-  if (artworks && Array.isArray(artworks)) {
-    const englishPoster = artworks.find(
-      (art) => art.language === "eng" && art.type === 2 && art.image,
-    );
-    if (englishPoster) {
-      return englishPoster.image;
-    }
-  }
-
-  // Fallback to main image
-  return extResObj?.data?.image || "";
-}
-
-// Upcoming/in-development shows often have no extended artwork, but the TVDB
-// search index can still carry a real poster thumbnail for them.
-async function getTvdbSearchThumbnail(name, tvdbId, token) {
-  try {
-    const url = `https://api4.thetvdb.com/v4/search?type=series&query=${encodeURIComponent(name)}`;
-    const res = await fetch(url, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + token,
-      },
-    });
-    if (!res.ok) return "";
-    const obj = await res.json();
-    const match = (obj?.data || []).find(
-      (d) => String(d.tvdb_id) === String(tvdbId),
-    );
-    const thumb = match?.thumbnail || "";
-    if (!thumb || thumb.includes("/images/missing/")) return "";
-    return thumb;
-  } catch (e) {
-    unilog(1263, `search thumbnail fetch failed for ${name}: ${e.message}`);
-    return "";
-  }
+/**
+ * The ids of the show a request names, for the image and TMDB lookups: its
+ * record's when there is one, by name or by tvdb id, else whatever ids the
+ * request itself carries.
+ */
+export function showIdsFor({ showName, name, tvdbId, tmdbId, imdbId } = {}) {
+  const rec =
+    allTvdb[showName || name] ??
+    (tvdbId ? Object.values(allTvdb).find((r) => String(r.id) === String(tvdbId)) : null);
+  const ids = recordIds(rec);
+  return {
+    tvdbId: ids.tvdbId || String(tvdbId || ""),
+    tmdbId: ids.tmdbId || String(tmdbId || ""),
+    imdbId: ids.imdbId || String(imdbId || ""),
+    tvmazeId: ids.tvmazeId,
+  };
 }
 
 function getTvdbCharacters(extResObj) {
@@ -1617,7 +1525,6 @@ const TMDB_REMOTE_TYPE = 12;
 // the ones with the most episodes behind them are kept -- the nearest thing a
 // show without regulars has to them.
 const TMDB_CAST_MAX = 20;
-const TMDB_PROFILE_BASE = "https://image.tmdb.org/t/p/w500";
 
 /**
  * The cast for a show TVDB has none for. TVDB keeps an anthology's cast on its
@@ -1690,26 +1597,29 @@ function keepTmdbCharacters(characters, existingCharacters) {
   return kept.length ? [...characters, ...kept] : characters;
 }
 
-async function getTmdbCast(remoteIds, name) {
+async function getTmdbCast(remoteIds, name, ids) {
   try {
     const cast = await getTmdbAggregateCast(remoteIds);
-    return cast
+    const top = cast
       .filter((actor) => actor.profile_path)
       .sort(
         (a, b) =>
           (b.total_episode_count ?? 0) - (a.total_episode_count ?? 0) ||
           (a.order ?? 0) - (b.order ?? 0),
       )
-      .slice(0, TMDB_CAST_MAX)
-      .map((actor, i) => ({
+      .slice(0, TMDB_CAST_MAX);
+    return Promise.all(
+      top.map(async (actor, i) => ({
         character: actor.roles?.[0]?.character ?? "",
         actor: actor.name,
-        image: `${TMDB_PROFILE_BASE}${actor.profile_path}`,
+        image:
+          (await personImage(ids, name, { name: actor.name, tmdbPersonId: actor.id })) || null,
         tvdbUrl: null,
         sortOrder: i,
         isFeatured: true,
         source: "tmdb",
-      }));
+      })),
+    );
   } catch (e) {
     unilog(1926, `tmdb cast fallback failed for ${name}: ${e.message}`);
     return [];
@@ -1723,7 +1633,9 @@ const TVMAZE_CREW_TYPES = [
   "Writer",
 ];
 
-async function getTvmazeCrew(tvdbId) {
+// The crew list comes from TVmaze; each member's photo is chosen like any other
+// (see images.js), TVmaze's own only when the providers before it have none.
+async function getTvmazeCrew(tvdbId, showName) {
   if (!tvdbId) return [];
   try {
     const tvmazeId = getTvmazeIdByTvdbId(tvdbId);
@@ -1732,14 +1644,17 @@ async function getTvmazeCrew(tvdbId) {
     if (!res.ok) return [];
     const data = await res.json();
     if (!Array.isArray(data)) return [];
-    return data
+    const ids = showIdsFor({ showName, tvdbId });
+    const crew = data
       .filter((c) => TVMAZE_CREW_TYPES.includes(c.type))
-      .map((c) => ({
-        name: c.person?.name ?? "",
-        type: c.type,
-        image: c.person?.image?.medium ?? c.person?.image?.original ?? null,
-      }))
+      .map((c) => ({ name: c.person?.name ?? "", type: c.type }))
       .filter((c) => c.name);
+    return Promise.all(
+      crew.map(async (c) => ({
+        ...c,
+        image: (await personImage(ids, showName, { name: c.name })) || null,
+      })),
+    );
   } catch {
     return [];
   }
@@ -1766,16 +1681,16 @@ function getByPath(obj, path) {
 }
 
 // Helper to get TMDB data as fallback for missing TVDB fields
-async function getTmdbFallback(showName) {
+// The show by its own ids first; a search by name only when they find none.
+async function getTmdbFallback(showName, ids) {
   if (!tvdbTemplate) return null;
 
   try {
-    const res = await moviedb.searchTv({ query: showName });
-    const match = res.results?.[0];
-    if (!match) return null;
+    const tmdbId = await tmdbShowId(ids, showName);
+    if (!tmdbId) return null;
 
     // Get detailed show info
-    const details = await moviedb.tvInfo({ id: match.id });
+    const details = await moviedb.tvInfo({ id: tmdbId });
 
     const result = {};
     const IMAGE_BASE = "https://image.tmdb.org/t/p/original";
@@ -2092,13 +2007,28 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     trailers: trailersIn,
     genres: genresIn,
   } = extResObj.data;
-  const image = getTvdbImageUrl(extResObj);
+  const ids = recordIds({
+    id: tvdbId,
+    remote_ids: remoteIds,
+    tvmazeId: paramObj.tvmazeId || allTvdb[name]?.tvmazeId,
+  });
+  const image = await showImage("poster", ids, name);
   let characters = getTvdbCharacters(extResObj);
-  if (!characters.length) characters = await getTmdbCast(remoteIds, name);
-  else
+  if (!characters.length) characters = await getTmdbCast(remoteIds, name, ids);
+  else {
     characters = await fillMissingCharacterNames(characters, remoteIds, name);
+    // TVDB's own photo is already the first choice there is (see images.js);
+    // an actor TVDB has none of gets the next provider's.
+    await Promise.all(
+      characters
+        .filter((char) => !char.image)
+        .map(async (char) => {
+          char.image = (await personImage(ids, name, { name: char.actor })) || char.image;
+        }),
+    );
+  }
   characters = keepTmdbCharacters(characters, allTvdb[name]?.characters);
-  const crew = await getTvmazeCrew(tvdbId);
+  const crew = await getTvmazeCrew(tvdbId, name);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? "";
   let nextAired = nextAiredIn ?? "";
@@ -2191,18 +2121,11 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   }
 
   // Check if we need TMDB fallback for missing fields
-  const needsTmdb = !image || !overview || !firstAired || !status;
+  const needsTmdb = !overview || !firstAired || !status;
   let tmdbData = null;
   if (needsTmdb) {
     unilog(740, "Fetching TMDB fallback for", name);
-    tmdbData = await getTmdbFallback(name);
-  }
-
-  // Last-resort poster: TVDB search thumbnail (upcoming shows often have one
-  // even when extended artwork and TMDB are empty).
-  let searchThumb = "";
-  if (!image && !existing.image && !tmdbData?.image) {
-    searchThumb = await getTvdbSearchThumbnail(name, tvdbId, token);
+    tmdbData = await getTmdbFallback(name, ids);
   }
 
   const preserve = (newVal, existingVal, tmdbVal) => {
@@ -2225,7 +2148,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
     seasonCount: finalSeasonCount,
     episodeCount: finalEpisodeCount,
     watchedCount: finalWatchedCount,
-    image: preserve(image, existing.image, tmdbData?.image || searchThumb),
+    image: preserve(image, existing.image),
     overview: preserve(overview, existing.overview, tmdbData?.overview),
     firstAired: preserve(firstAired, existing.firstAired, tmdbData?.firstAired),
     lastAired: preserve(lastAired, existing.lastAired, tmdbData?.lastAired),
@@ -2830,7 +2753,7 @@ const tryLocalGetTvdb = async () => {
     const rec = allTvdb[processRecord.name];
     if (!Array.isArray(rec.crew)) {
       try {
-        const tvmazeCrew = await getTvmazeCrew(processRecord.tvdbId);
+        const tvmazeCrew = await getTvmazeCrew(processRecord.tvdbId, processRecord.name);
         rec.crew = tvmazeCrew;
         saveShow(processRecord.name, rec);
         unilog(
@@ -3321,13 +3244,17 @@ export const searchTvdbByImdbId = async (params) => {
     }
 
     // Build a tvdb-like object from the API response
-    const image = getTvdbImageUrl(extResObj);
+    const image = await showImage(
+      "poster",
+      recordIds({ id: tvdbId, remote_ids: extData.remoteIds, imdbId }),
+      extData.name || series.name || "",
+    );
     const characters = await fillMissingCharacterNames(
       getTvdbCharacters(extResObj),
       extData.remoteIds,
       extData.name || series.name || "",
     );
-    const crew = await getTvmazeCrew(tvdbId);
+    const crew = await getTvmazeCrew(tvdbId, extData.name || series.name || "");
     const firstAired = extData.firstAired || "";
     const lastAired = extData.lastAired || firstAired || "";
     const nextAired = extData.nextAired || "";
@@ -3559,59 +3486,16 @@ export const saveSeasonIntro = async (record, season, field, value) => {
 
 export const getTvmazeCrew_cmd = async (params) => {
   const tvdbId = params?.tvdbId;
-  return getTvmazeCrew(tvdbId);
+  return getTvmazeCrew(tvdbId, params?.showName);
 };
 
-// The poster for a show, for callers that only have a TVDB search result.
-// Search results carry the missing-image placeholder for plenty of shows whose
-// poster is really there in the extended artwork, in TMDB, or in the search
-// thumbnail -- so walk the same chain getTvdbData does when it fills in
-// tvdbData.image, which is what the info pane ends up showing.
+// The poster for a show, for callers that only have a TVDB search result,
+// chosen exactly as getTvdbData chooses tvdbData.image (see images.js).
 export const getPoster = async (params) => {
   const tvdbId = String(params?.tvdbId || "").trim();
-  const nameIn = String(params?.name || "").trim();
-  if (!tvdbId && !nameIn) return { image: "" };
-
-  let extResObj = null;
-  if (tvdbId) {
-    try {
-      const token = await getToken();
-      const res = await fetch(
-        `https://api4.thetvdb.com/v4/series/${tvdbId}/extended`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-        },
-      );
-      if (res.ok) extResObj = await res.json();
-    } catch (e) {
-      unilog(
-        2174,
-        `getPoster extended fetch failed for ${nameIn || tvdbId}: ${e.message}`,
-      );
-    }
-  }
-
-  const tvdbImage = getTvdbImageUrl(extResObj);
-  if (tvdbImage && !tvdbImage.includes("/images/missing/")) {
-    return { image: tvdbImage };
-  }
-
-  const name = nameIn || extResObj?.data?.name || "";
-  if (!name) return { image: "" };
-
-  const tmdbData = await getTmdbFallback(name);
-  if (tmdbData?.image) return { image: tmdbData.image };
-
-  if (tvdbId) {
-    const token = await getToken();
-    const thumb = await getTvdbSearchThumbnail(name, tvdbId, token);
-    if (thumb) return { image: thumb };
-  }
-
-  return { image: "" };
+  const name = String(params?.name || "").trim();
+  if (!tvdbId && !name) return { image: "" };
+  return { image: await showImage("poster", showIdsFor({ name, tvdbId }), name) };
 };
 
 export const accessTvdb = async (params) => {
@@ -3636,7 +3520,7 @@ export const accessTvdb = async (params) => {
 
     if (upstream.status === 401) {
       unilog(127, "accessTvdb: 401, refreshing token");
-      cachedToken = null;
+      clearToken();
       token = await getToken();
       upstream = await fetch(url, {
         method: "GET",

@@ -83,10 +83,6 @@ export default {
       type: [String, Number],
       default: null,
     },
-    fallbackImage: {
-      type: String,
-      default: null,
-    },
     explicitList: {
       type: Array,
       default: null,
@@ -164,59 +160,9 @@ export default {
       emit("preview", tvdb);
     };
 
-    const TVDB_MISSING_HASH =
-      "4c59074535f4937221fd78e87a672ad0116a8aa9fb8202fc81dc2d00ab3f3683";
-
-    const hashBlob = async (blob) => {
-      try {
-        const arrayBuffer = await blob.arrayBuffer();
-        const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-        return hashHex;
-      } catch (e) {
-        return "";
-      }
-    };
-
-    const checkImages = async (items) => {
-      if (!props.fallbackImage) return;
-
-      // Only check the top image card
-      for (let i = 0; i < items.length && i < 1; i++) {
-        const item = items[i];
-        const url = getImageUrl(item);
-        if (!url || url === props.fallbackImage) continue;
-
-        try {
-          const res = await fetch(url);
-          if (!res.ok) continue;
-          const blob = await res.blob();
-          const hash = await hashBlob(blob);
-
-          if (hash === TVDB_MISSING_HASH) {
-            // Force update with Vue reactivity
-            const description = item.overview || item.overviewText || "";
-            const updatedItem = {
-              ...item,
-              image_url: props.fallbackImage,
-              thumbnail: props.fallbackImage,
-              overview: description + " [USED FALLBACK IMAGE]",
-            };
-            tvdbList.value.splice(i, 1, updatedItem);
-          }
-        } catch (e) {
-          // Log errors for debugging
-          unilog(1032, "checkImages error:", e);
-        }
-      }
-    };
-
-    // Search results can hold the missing-image placeholder even when a poster
-    // exists in the extended artwork or TMDB (that is why the info pane can
-    // show one while the card says "No Image").  Ask tv-srvr for those.
+    // Every card's poster is the one tv-srvr chooses (images.js), the same
+    // one the info pane shows; the search result's own image stands until it
+    // answers, and when it has none.
     // `items` is the raw array behind tvdbList; tvdbList.value hands back a
     // reactive proxy of it, so compare against toRaw to tell whether the list
     // has since been replaced.
@@ -224,15 +170,14 @@ export default {
       for (let i = 0; i < items.length; i++) {
         if (toRaw(tvdbList.value) !== items) return; // list replaced under us
         const item = tvdbList.value[i];
-        if (!item || getImageUrl(item)) continue;
+        if (!item) continue;
         const tvdbId = String(item.tvdb_id || item.tvdbId || "").trim();
         const name = String(item.name || "").trim();
         if (!tvdbId && !name) continue;
         const image = await getPosterByTvdbId(tvdbId, name);
         if (toRaw(tvdbList.value) !== items) return;
         if (!image) continue;
-        if (tvdbList.value[i] !== item) continue; // replaced by checkImages
-        tvdbList.value.splice(i, 1, { ...item, image });
+        tvdbList.value.splice(i, 1, { ...item, image_url: image, thumbnail: image, image });
       }
     };
 
@@ -268,7 +213,6 @@ export default {
             }
           }
           tvdbList.value = sorted;
-          void checkImages(sorted);
           void fillMissingImages(sorted);
           await nextTick();
           if (galleryPane.value) {

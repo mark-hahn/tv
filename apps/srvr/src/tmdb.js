@@ -1,35 +1,12 @@
-import { smartTitleMatch, unilog, logHere } from "@tv/share"
+import { unilog, logHere } from "@tv/share"
 import { MovieDb } from "moviedb-promise";
-import { getTvdbBackground, getTvdbEpisodeImage } from "./tvdb.js";
-import { readFile } from "fs/promises";
+import { showIdsFor } from "./tvdb.js";
+import { showImage, episodeImage, personImage, tmdbShowId } from "./images.js";
 const moviedb = new MovieDb("327192a334da700f65b882c7a69cb927");
-const FANART_KEY_FILE = "/root/dev/apps/tv/fanart.key";
-const FANART_KEY = (await readFile(FANART_KEY_FILE, "utf8")).trim();
 
 // A getTmdb call slower than this gets logged with a per-round-trip breakdown,
 // so a slow map/actors pane load names the TMDB call that caused it.
 const SLOW_TMDB_MS = 1000;
-
-// A library name can carry a year to tell it from another show of the same
-// name -- "Save Me (2018)". TMDB's search finds nothing at all for that, so the
-// year comes off the query and stands in as the year to match on instead.
-const TITLE_YEAR_RE = /^(.*?)\s*\((\d{4})\)\s*$/;
-
-function splitTitleYear(showName) {
-  const match = TITLE_YEAR_RE.exec(String(showName ?? ""));
-  return match ? { title: match[1], year: match[2] } : { title: showName, year: null };
-}
-
-function candidateYear(show) {
-  return String(show?.first_air_date ?? "").slice(0, 4);
-}
-
-// The search result smartTitleMatch's title names -- several shows can share
-// it, which is why the library name carried a year, so the year picks.
-function pickNamed(results, title, year) {
-  const named = results.filter((s) => s.name === title || s.original_name === title);
-  return (year && named.find((s) => candidateYear(s) === String(year))) || named[0];
-}
 
 /**
  * Get TMDB data for a TV show
@@ -41,7 +18,7 @@ function pickNamed(results, title, year) {
 export async function getTmdb(params) {
   try {
     const data = params;
-    const { showName, year, season, episode, credits, seriesId, imdbId } = data;
+    const { showName, season, episode, credits, seriesId, imdbId } = data;
 
     // If requesting series-level cast/credits data
     if (credits === true && seriesId) {
@@ -70,51 +47,38 @@ export async function getTmdb(params) {
       }
     }
 
-    const { title, year: titleYear } = splitTitleYear(showName);
-    const wantYear = year ?? titleYear;
-
+    // The show by its own ids first; a search by name only when they find none.
     const startedAt = Date.now();
-    const res = await moviedb.searchTv({ query: title });
+    const ids = showIdsFor({ showName, imdbId });
+    const showId = await tmdbShowId(ids, showName);
     const searchMs = Date.now() - startedAt;
 
-    // Find show with matching original_name, optionally prioritizing year
-    const matchingTitle = smartTitleMatch(
-      title,
-      res.results || [],
-      wantYear,
-      false,
-    );
-
-    // Find the actual show object that matches the title. The title alone is
-    // what came back, so with several shows under it -- which is why the name
-    // carried a year in the first place -- the year picks between them.
-    const named = matchingTitle
-      ? (res.results || []).filter(
-          (show) =>
-            show.name === matchingTitle || show.original_name === matchingTitle,
-        )
-      : [];
-    const matchingShow =
-      (wantYear && named.find((show) => candidateYear(show) === String(wantYear))) ||
-      named[0];
-
-    const showId = matchingShow?.id;
-
-    if (!showId || !season || !episode) {
+    if (!season || !episode) {
       if (Date.now() - startedAt >= SLOW_TMDB_MS) {
         unilog(1446, `slow getTmdb series ${showName}: ${Date.now() - startedAt}ms (searchTv ${searchMs}ms)`);
       }
-      return matchingShow || null;
+      return showId ? { id: Number(showId) } : null;
     }
 
     // Get episode information. guest_stars comes back inside this one response,
-    // so guests cost no extra round trip.
+    // so guests cost no extra round trip. An episode TMDB lacks still has its
+    // still from the other providers.
     const episodeStartedAt = Date.now();
-    const episodeInfo = await moviedb.episodeInfo({
-      id: showId,
-      season_number: parseInt(season),
-      episode_number: parseInt(episode),
-    });
+    let episodeInfo = {};
+    if (showId) {
+      try {
+        episodeInfo = await moviedb.episodeInfo({
+          id: showId,
+          season_number: parseInt(season),
+          episode_number: parseInt(episode),
+        });
+      } catch (error) {
+        if (error.status !== 404) throw error;
+        const s = String(season).padStart(2, "0");
+        const e = String(episode).padStart(2, "0");
+        unilog(1795, `tmdb 404, episode not found: ${showName} S${s}E${e}`);
+      }
+    }
     const episodeMs = Date.now() - episodeStartedAt;
 
     // Get guest actors (filter by known_for_department === "Acting")
@@ -123,26 +87,30 @@ export async function getTmdb(params) {
         (actor) => actor.known_for_department === "Acting",
       ) || [];
 
+    const [image, guests] = await Promise.all([
+      episodeImage(ids, showName, season, episode),
+      Promise.all(
+        guestActorList.map(async (guest) => ({
+          ...guest,
+          image: await personImage(ids, showName, {
+            name: guest.name,
+            season,
+            episode,
+            tmdbPersonId: guest.id,
+          }),
+        })),
+      ),
+    ]);
+
     const totalMs = Date.now() - startedAt;
     if (totalMs >= SLOW_TMDB_MS) {
       unilog(1447, `slow getTmdb ${showName} S${season}E${episode}: ${totalMs}ms ` +
           `(searchTv ${searchMs}ms, episodeInfo ${episodeMs}ms, ${guestActorList.length} guests)`);
     }
 
-    let image = episodeInfo.still_path
-      ? `https://image.tmdb.org/t/p/w300${episodeInfo.still_path}`
-      : null;
-    if (!image) {
-      try {
-        image = await getTvdbEpisodeImage(showName, season, episode);
-      } catch (e) {
-        unilog(2590, `tvdb episode image lookup failed for ${showName} S${season}E${episode}: ${e.message}`);
-      }
-    }
-
     return {
-      guests: guestActorList,
-      image,
+      guests,
+      image: image || null,
       overview: episodeInfo.overview ?? null,
       name: episodeInfo.name ?? null,
       aired: episodeInfo.air_date ?? null,
@@ -152,7 +120,7 @@ export async function getTmdb(params) {
     if (error.status === 404) {
       const s = String(season).padStart(2, "0");
       const e = String(episode).padStart(2, "0");
-      unilog(1795, `tmdb 404, episode not found: ${showName} S${s}E${e}`);
+      unilog(2607, `tmdb 404, episode not found: ${showName} S${s}E${e}`);
     } else {
       unilog(1796, `getTmdb error: ${error.message}`);
     }
@@ -160,152 +128,36 @@ export async function getTmdb(params) {
   }
 }
 
-// The tv app's show-list cards want a landscape image, which a poster is not.
-// TMDB's backdrops are 16:9; w780 is wider than any card and small enough that
-// a screenful of them decodes without trouble on the tv.
-const BACKDROP_BASE = "https://image.tmdb.org/t/p/w780";
-// The answer never changes and there are a couple of thousand shows to scroll
-// past, so each is looked up once per srvr run. Misses are cached too -- a show
-// TMDB has no backdrop for must not be asked about again on every scroll.
-const backdropCache = new Map();
-
 /**
- * The landscape image for one show, best source first: fanart.tv's tvthumb (the
- * title card Emby used to hand out), then TVDB's backgrounds, then TMDB's
- * backdrops -- by TMDB id when the record carries one in its remote_ids, else by
- * its tvdb id, else by name search. url is empty when none has one, which is
- * the caller's cue to go on showing the poster.
+ * The landscape image for a tvapp show card (see images.js for the order it is
+ * chosen in). url is empty when no provider has one, which is the caller's cue
+ * to go on showing the poster.
  */
 export async function getBackdrop(params) {
-  const { tmdbId, tvdbId, showName } = params;
-  const id = String(tmdbId || "").trim();
-  const key = id || `name:${String(showName || "").toLowerCase()}`;
-  if (backdropCache.has(key)) return { url: backdropCache.get(key) };
-  let url = "";
-  if (tvdbId) {
-    try {
-      url = await getFanartThumb(tvdbId);
-    } catch (e) {
-      unilog(2605, `fanart thumb lookup failed for ${showName}: ${e.message}`);
-    }
-  }
-  if (!url && tvdbId) {
-    try {
-      url = await getTvdbBackground(tvdbId);
-    } catch (e) {
-      unilog(2583, `tvdb background lookup failed for ${showName}: ${e.message}`);
-    }
-  }
-  if (!url) {
-    try {
-      url = await findBackdrop(id, tvdbId, showName);
-    } catch (e) {
-      unilog(1916, `backdrop lookup failed for ${showName}: ${e.message}`);
-    }
-  }
-  backdropCache.set(key, url);
-  return { url };
+  const { showName } = params;
+  return { url: await showImage("thumb", showIdsFor(params), showName) };
 }
 
-// fanart.tv lists a show's thumbs most liked first; an English one, since a
-// thumb carries the show's title art.
-async function getFanartThumb(tvdbId) {
-  const res = await fetch(`https://webservice.fanart.tv/v3/tv/${tvdbId}?api_key=${FANART_KEY}`);
-  if (!res.ok) throw new Error(`fanart.tv ${res.status}`);
-  const thumbs = (await res.json()).tvthumb || [];
-  return (thumbs.find((t) => t.lang === "en") || thumbs[0])?.url || "";
-}
-
-async function findBackdrop(tmdbId, tvdbId, showName) {
-  let id = tmdbId;
-  // The record's own tvdb id names the show exactly, as Emby's match did; the
-  // name search below is only for shows TMDB has no tvdb mapping for.
-  if (!id && tvdbId) {
-    const found = await moviedb.find({ id: tvdbId, external_source: "tvdb_id" });
-    id = found.tv_results?.[0]?.id;
-  }
-  if (!id) {
-    if (!showName) return "";
-    // A trailing (YYYY) is this library's way of telling two shows of the same
-    // name apart; TMDB has never heard of it, and takes the year separately.
-    // Same handling as getStreamProviders below.
-    let query = showName;
-    let year = null;
-    const yearMatch = query.match(/\s*\((\d{4})\)$/);
-    if (yearMatch) {
-      year = yearMatch[1];
-      query = query.slice(0, query.length - yearMatch[0].length).trim();
-    }
-    const res = await moviedb.searchTv({ query });
-    const results = res.results || [];
-    const title = smartTitleMatch(query, results, year, false);
-    const match = title ? pickNamed(results, title, year) : null;
-    if (!match?.id) return "";
-    id = match.id;
-  }
-  const images = await moviedb.tvImages({ id });
-  const backdrops = images.backdrops || [];
-  if (backdrops.length === 0) return "";
-  // A textless backdrop first -- one with a language on it carries the show's
-  // own title art, which the card already has in its name beside the image --
-  // and the most voted of whichever set that leaves.
-  const textless = backdrops.filter((b) => !b.iso_639_1);
-  const pick = (textless.length ? textless : backdrops).reduce((best, b) =>
-    (b.vote_average || 0) > (best.vote_average || 0) ? b : best,
+/**
+ * Photos of people in one show, all chosen the same way (see images.js).
+ * people is [{name, tvdbPeopleId?, tmdbPersonId?}]; season and episode, when
+ * given, make them that episode's guests. Answers "" for anyone with no photo.
+ */
+export async function getPersonImages(params) {
+  const { showName, season, episode, people } = params;
+  const ids = showIdsFor(params);
+  return Promise.all(
+    (people ?? []).map((person) => personImage(ids, showName, { ...person, season, episode })),
   );
-  return pick.file_path ? BACKDROP_BASE + pick.file_path : "";
-}
-
-export async function searchPerson(params) {
-  const { name } = params;
-  if (!name) return null;
-  try {
-    const res = await moviedb.searchPerson({ query: name });
-    const person = res.results?.[0];
-    if (!person?.profile_path) return null;
-    return `https://image.tmdb.org/t/p/w185${person.profile_path}`;
-  } catch (error) {
-    unilog(712, "searchPerson error:", error.message);
-    return null;
-  }
 }
 
 export async function getStreamProviders(params) {
-  let { showName, year } = params;
-
-  // Strip trailing (YYYY) from show name and use as year if not already provided
-  const yearMatch = String(showName || "").match(/\s*\((\d{4})\)$/);
-  if (yearMatch) {
-    if (!year) year = yearMatch[1];
-    showName = showName.slice(0, showName.length - yearMatch[0].length).trim();
-  }
-
-  const searchRes = await moviedb.searchTv({ query: showName });
-
-  // smartTitleMatch returns a string (the title), not the object
-  let matchingTitle = smartTitleMatch(
-    showName,
-    searchRes.results || [],
-    year,
-    false,
-  );
-  if (!matchingTitle && year) {
-    matchingTitle = smartTitleMatch(
-      showName,
-      searchRes.results || [],
-      null,
-      false,
-    );
-  }
-  if (!matchingTitle) {
+  // The show by its own ids first; a search by name only when they find none.
+  const tmdbId = await tmdbShowId(showIdsFor(params), params.showName);
+  if (!tmdbId) {
     return { providers: [], error: "show not found" };
   }
-
-  // Find the actual show object that matches the title
-  const match = pickNamed(searchRes.results, matchingTitle, year);
-  if (!match?.id) {
-    return { providers: [], error: "show not found" };
-  }
+  const match = { id: Number(tmdbId) };
 
   const COUNTRIES = ["US", "GB", "AU"];
   const wpRes = await moviedb.tvWatchProviders({ id: match.id });

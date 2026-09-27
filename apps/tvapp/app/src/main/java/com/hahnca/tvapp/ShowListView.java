@@ -2123,12 +2123,12 @@ class ShowListView extends ScrollView {
     photo.setBackgroundColor(MEDIA_PLACEHOLDER_BG);
     card.addView(photo, new LinearLayout.LayoutParams(photoWidth, ViewGroup.LayoutParams.MATCH_PARENT));
     if (actor.image.isEmpty()) {
-      // Nothing in the record, so the strip asks TMDB by name, the same way the
-      // web client's Actors pane fills in the ones it is missing. Straight into
+      // Nothing in the record, so the strip asks tv-srvr, the same way the web
+      // client's Actors pane fills in the ones it is missing. Straight into
       // the view rather than through mediaRequests: the answer arrives when it
       // arrives, long after the pass that decides what is worth fetching.
       ActorPhotos.get(
-          actor.name,
+          actor,
           url -> {
             if (!url.isEmpty()) Images.into(photo, url, photo);
           });

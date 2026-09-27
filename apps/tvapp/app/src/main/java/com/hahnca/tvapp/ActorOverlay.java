@@ -141,10 +141,10 @@ abstract class ActorOverlay extends ScrollView {
     photo.setBackgroundColor(PHOTO_PLACEHOLDER_BG);
     card.addView(photo, new LinearLayout.LayoutParams(photoWidth, photoHeight));
     if (actor.image.isEmpty()) {
-      // The same TMDB lookup the cast strip does for the actors tvdb has no
+      // The same lookup the cast strip does for the actors the record has no
       // picture of, so a face here is as likely as a face there.
       ActorPhotos.get(
-          actor.name,
+          actor,
           url -> {
             if (!url.isEmpty()) Images.into(photo, url, photo);
           });

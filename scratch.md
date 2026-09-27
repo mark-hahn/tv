@@ -1,11 +1,33 @@
 
-in tvapp the tv show `The Knights of Prosperity` has a thumb image different than what it had before removing emby -- it is not as good -- find all possible sources of images for the show and show all the images to me with where you got each from
+- these 2 downloads are only 30 secs apart:
+`American.Hostage.S01E03.Magic.Ticket.Sweepstakes.1080p.AMZN.WEB-DL.DDP5.1.H.264-RAWR.mkv
+1/3 - 1080p  09/26.22:15:20  3.456 GB  92 Mb  100%  4:38  Finished` and
+`American Hostage S01E03 Magic Ticket Sweepstakes 2160p AMZN WEB-DL DDP5 1 H 265-RAWR.mkv
+1/3 - 2160p  09/26.22:45:22  5.792 GB  86 Mb  100%  8:10  Finished`
+  so they must have come from one list of usb files. 
+- on flex when 2 files of same episode appear in one list only the best is used
+  - the down cycle should also only use the best of matching episodes
 
+why are you scoping Actor Photos per show?
 
 ????????????????
 don't browse `In Development`
 manage upcoming shows
 =================
+
+# one consistent image choice logic
+for all images use these providers in order:
+  - fanart
+  - tvdb
+  - tmdb
+  - tvmaze
+- always include score when choosing from a list
+- use searches by name only after trying every possibilty with id
+- refactor where possible to share logic
+- cache everything since app loaded
+- if any code needs some id that isn't easy to get when needed let me know
+
+in tvapp the tv show `The Knights of Prosperity` has a thumb image different than what it had before removing emby -- it is not as good -- find all possible sources of images for the show and show all the images to me with where you got each from
 
 1190797
 error: tvdb no results: fname: BEEF.S01E03.I.Am.Inhabited.by.a.Cry.2160p.NF.WEB-DL.DDP5.1.Atmos.H.265-FLUX.mkv | url: https://api4.thetvdb.com/v4/search?type=series&q=BEEF

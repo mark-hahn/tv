@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -15,15 +16,16 @@ import org.json.JSONObject;
  * is what lets this app show the whole cast it shows -- a show like Angel has
  * fifteen in the record and only three of them carry an image.
  *
- * Looked up by the person's name, which is all TMDB needs, and remembered for
- * the life of the app: the same cast is rebuilt every time cardMisc comes round
- * to it. An empty answer is remembered as readily as a real one, so an actor
- * TMDB has no photo of is asked about once.
+ * tv-srvr chooses it, the same way as every other image (its images.js), from
+ * the person's name within their show. Remembered for the life of the app: the
+ * same cast is rebuilt every time cardMisc comes round to it. An empty answer
+ * is remembered as readily as a real one, so an actor no provider has a photo
+ * of is asked about once.
  */
 class ActorPhotos {
 
   private static final String TAG = "tvapp";
-  private static final String PERSON_URL = "https://hahnca.com/tv-srvr/api/searchTmdbPerson";
+  private static final String PERSON_URL = "https://hahnca.com/tv-srvr/api/getPersonImages";
   // A cast at a time, and only the one cardMisc is showing, so a few threads
   // fill a strip without opening a connection per actor at once.
   private static final int LOOKUP_THREADS = 3;
@@ -33,18 +35,19 @@ class ActorPhotos {
   private static final Map<String, String> CACHE = new HashMap<>();
 
   interface Ready {
-    /** On the ui thread. Empty when TMDB has no photo of this person. */
+    /** On the ui thread. Empty when no provider has a photo of this person. */
     void onPhoto(String url);
   }
 
-  static void get(String personName, Ready ready) {
-    if (personName == null || personName.isEmpty()) {
+  static void get(Shows.Actor actor, Ready ready) {
+    if (actor.name.isEmpty()) {
       ready.onPhoto("");
       return;
     }
+    String key = actor.showName + "\n" + actor.name;
     String cached;
     synchronized (CACHE) {
-      cached = CACHE.get(personName);
+      cached = CACHE.get(key);
     }
     if (cached != null) {
       ready.onPhoto(cached);
@@ -52,27 +55,25 @@ class ActorPhotos {
     }
     POOL.execute(
         () -> {
-          String url = fetch(personName);
+          String url = fetch(actor);
           synchronized (CACHE) {
-            CACHE.put(personName, url);
+            CACHE.put(key, url);
           }
           UI.post(() -> ready.onPhoto(url));
         });
   }
 
-  /** The reply is the url as a bare json string, or null for nothing found. */
-  private static String fetch(String personName) {
+  /** The reply is a json array of urls, one per person asked about. */
+  private static String fetch(Shows.Actor actor) {
     try {
+      JSONObject person = new JSONObject();
+      person.put("name", actor.name);
       JSONObject body = new JSONObject();
-      body.put("name", personName);
-      String reply = Http.postJson(PERSON_URL, body.toString()).trim();
-      if (reply.isEmpty() || "null".equals(reply)) return "";
-      if (reply.startsWith("\"") && reply.endsWith("\"")) {
-        return new JSONObject("{\"u\":" + reply + "}").optString("u", "");
-      }
-      return "";
+      body.put("showName", actor.showName);
+      body.put("people", new JSONArray().put(person));
+      return new JSONArray(Http.postJson(PERSON_URL, body.toString())).optString(0, "");
     } catch (Exception e) {
-      Log.e(TAG, "actor photo lookup failed for " + personName + ": " + e);
+      Log.e(TAG, "actor photo lookup failed for " + actor.name + " in " + actor.showName + ": " + e);
       return "";
     }
   }

@@ -37,8 +37,11 @@ class Shows {
     // tvdb's billing order, which is what the web client's Actors pane puts the
     // cast in. Absent is last, not first.
     final int sortOrder;
+    // The show whose record this came from, which a photo lookup is scoped to.
+    final String showName;
 
-    Actor(JSONObject rec) {
+    Actor(JSONObject rec, String showName) {
+      this.showName = showName;
       name = str(rec, "actor");
       character = str(rec, "character");
       image = str(rec, "image");
@@ -164,7 +167,7 @@ class Shows {
       JSONArray castNodes = rec.optJSONArray("characters");
       for (int i = 0; castNodes != null && i < castNodes.length(); i++) {
         JSONObject node = castNodes.optJSONObject(i);
-        if (node != null) characters.add(new Actor(node));
+        if (node != null) characters.add(new Actor(node, name));
       }
       trailers = new ArrayList<>();
       JSONArray trailerNodes = rec.optJSONArray("trailers");

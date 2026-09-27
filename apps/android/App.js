@@ -265,6 +265,7 @@ export default function App() {
   const [followPlaying, setFollowPlaying] = useState(false);
   const [activeTab, setActiveTab] = useState("List");
   const [guestActors, setGuestActors] = useState([]);
+  const [castPhotos, setCastPhotos] = useState({});
   const [episodeInfo, setEpisodeInfo] = useState(null);
   const [showSearch, setShowSearch] = useState("");
   const [sortOrder, setSortOrder] = useState("viewed");
@@ -803,12 +804,11 @@ export default function App() {
         const data = await res.json();
         if (cancelled) return;
         const guestList = Array.isArray(data) ? data : (data?.guests ?? []);
+        // Each guest's photo is the one tv-srvr chose (images.js).
         const guests = guestList.map((g) => ({
           personName: g.name,
           name: g.character,
-          image: g.profile_path
-            ? `https://image.tmdb.org/t/p/w185${g.profile_path}`
-            : null,
+          image: g.image || null,
         }));
         setGuestActors(guests);
         setEpisodeInfo({
@@ -833,6 +833,45 @@ export default function App() {
       cancelled = true;
     };
   }, [selectedShow?.name, selectedSE?.s, selectedSE?.e]);
+
+  // Photos for the cast and crew the record has none of, chosen by tv-srvr
+  // like every other image (images.js). By person name.
+  useEffect(() => {
+    setCastPhotos({});
+    if (!selectedShow) return;
+    const names = [
+      ...(selectedShow.characters ?? [])
+        .filter((c) => !c.image && !c.personImgURL)
+        .map((c) => c.actor ?? c.personName),
+      ...(selectedShow.crew ?? []).filter((m) => !m.image).map((m) => m.name),
+    ].filter(Boolean);
+    if (names.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getPersonImages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            showName: selectedShow.name,
+            people: names.map((name) => ({ name })),
+          }),
+        });
+        const urls = await res.json();
+        if (cancelled || !Array.isArray(urls)) return;
+        setCastPhotos(
+          Object.fromEntries(
+            names.map((name, i) => [name, urls[i]]).filter(([, url]) => url),
+          ),
+        );
+      } catch (e) {
+        console.warn("cast photo lookup failed", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedShow?.name]);
 
   useEffect(() => {
     if (
@@ -2521,9 +2560,16 @@ export default function App() {
           style={showsStyles.actorCard}
           onPress={() => openActorImdb(actor)}
         >
-          {actor.image || actor.personImgURL ? (
+          {actor.image ||
+          actor.personImgURL ||
+          castPhotos[actor.actor ?? actor.personName] ? (
             <Image
-              source={{ uri: actor.image ?? actor.personImgURL }}
+              source={{
+                uri:
+                  actor.image ||
+                  actor.personImgURL ||
+                  castPhotos[actor.actor ?? actor.personName],
+              }}
               style={showsStyles.actorImg}
               resizeMode="cover"
             />
@@ -2572,9 +2618,9 @@ export default function App() {
                     style={showsStyles.actorCard}
                     onPress={() => openActorImdb({ actor: member.name })}
                   >
-                    {member.image ? (
+                    {member.image || castPhotos[member.name] ? (
                       <Image
-                        source={{ uri: member.image }}
+                        source={{ uri: member.image || castPhotos[member.name] }}
                         style={showsStyles.actorImg}
                         resizeMode="cover"
                       />

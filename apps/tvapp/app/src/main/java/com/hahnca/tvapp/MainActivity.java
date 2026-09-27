@@ -217,6 +217,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   private boolean videoPausedForCam;
   private int pendingPlayEpisode;
   private long showsLoadedAt;
+  // The first load gave up -- tvapp was started with no network, as it is
+  // while the set sleeps -- so the next reload is a first load again.
+  private boolean firstLoadFailed;
   // The show tvapp stepped aside to play, so the next foreground turn can put
   // it where the Watched sort is about to put it anyway.
   private Shows.Show playedShow;
@@ -277,7 +280,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
             // leaves the list that is already up, which is the better of the
             // two things to be looking at.
             if (!showWait) return;
-            ui.post(() -> startShowsLoading(SHOWS_FAILED_LABEL));
+            ui.post(
+                () -> {
+                  firstLoadFailed = true;
+                  startShowsLoading(SHOWS_FAILED_LABEL);
+                });
           }
         });
   }
@@ -319,7 +326,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     // Every return from the background: the records may have changed
     // meanwhile, and tv-srvr's word of it went out while the updates socket
     // below was not listening.
-    if (showsLoadedAt != 0) reloadShows();
+    if (showsLoadedAt != 0 || firstLoadFailed) reloadShows();
     // Only while on screen: a socket held open behind another app would reload a list
     // nobody is looking at, and tv-srvr would keep a client it cannot reach.
     updates = new Updates(this::reloadShows);
@@ -342,6 +349,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
 
   /** Re-reads the list, keeping the selection on whatever show it is on. */
   private void reloadShows() {
+    // Redone as the first load, label and all, so the list that lands takes
+    // the failure label down.
+    if (firstLoadFailed) {
+      firstLoadFailed = false;
+      loadShows(prefs().getString(KEY_SELECTED_SHOW, null), true);
+      return;
+    }
     Shows.Show selected = showList.getSelected();
     Log.i(TAG, "sel trace: reloadShows started on " + (selected == null ? null : selected.name));
     loadShows(null, false);

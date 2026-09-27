@@ -30,7 +30,6 @@
         :srchStr="srchStr"
         :imdbid="curImdbId"
         :tvdbid="curTvdbId"
-        :fallbackImage="manualSearchQuery ? null : curFallbackImage"
         :explicitList="
           creditShowList !== null
             ? creditShowList
@@ -1714,14 +1713,6 @@ export default {
       return item?.data || null;
     });
 
-    const curFallbackImage = computed(() => {
-      const item = parsedTitles.value[selectedTitleIdx.value];
-      if (item?.data?.image?.original) {
-        return item.data.image.original;
-      }
-      return null;
-    });
-
     // Format info line from curTvdb
     const infoLine = computed(() => {
       if (!curTvdb.value) return "";
@@ -1791,7 +1782,8 @@ export default {
       // Pre-fetch providers before switching panes
       let providers = [];
       try {
-        const params = { showName: name };
+        // The tvdb id lets tv-srvr find the show without a search by name.
+        const params = { showName: name, tvdbId: t?.tvdb_id || t?.tvdbId };
         const res = await srvr.getStreamProviders(params);
         providers = res?.providers || [];
       } catch (e) {
@@ -2169,7 +2161,6 @@ export default {
       manualSearchQuery,
       handleManualSearch,
       existingShowMatch,
-      curFallbackImage,
       curTvmazeMeta,
       snoozeList,
       isCurrentSnoozed,

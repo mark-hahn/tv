@@ -1701,7 +1701,7 @@ app.post(
 );
 app.post("/api/searchActorsOutsideLibrary", apiWrapper(tvdb.searchActorsOutsideLibrary));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));
-app.post("/api/searchTmdbPerson", apiWrapper(tmdb.searchPerson));
+app.post("/api/getPersonImages", apiWrapper(tmdb.getPersonImages));
 app.post("/api/getStreamProviders", apiWrapper(tmdb.getStreamProviders));
 // A GET, unlike the other tmdb calls: the tv app asks for one card's image at
 // a time as the list is scrolled.

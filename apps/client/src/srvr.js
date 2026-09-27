@@ -1049,8 +1049,9 @@ export function getTmdb(params) {
   return httpCall("/api/getTmdb", params, "POST");
 }
 
-export function searchTmdbPerson(params) {
-  return httpCall("/api/searchTmdbPerson", params, "POST");
+// Photos of people in one show, chosen by tv-srvr (images.js).
+export function getPersonImages(params) {
+  return httpCall("/api/getPersonImages", params, "POST");
 }
 
 export function getStreamProviders(params) {

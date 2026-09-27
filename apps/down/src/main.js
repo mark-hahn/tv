@@ -2641,9 +2641,42 @@ async function main() {
         var s = Number.isInteger(parsed.season) ? parsed.season : 0;
         var e = Number.isInteger(parsed.episode) ? parsed.episode : 0;
         var key = `${titleKey}\u0000${String(s).padStart(4, "0")}\u0000${String(e).padStart(4, "0")}\u0000${base.toLowerCase()}`;
-        return { line, key, base };
+        var epKey =
+          !processingForced &&
+          s > 0 &&
+          e > 0 &&
+          isVideoEpisodeFile(base) &&
+          !(torFilePaths && torFilePaths.has(filePath))
+            ? `${titleKey}\u0000${s}\u0000${e}`
+            : null;
+        var bytes = parseInt(line.split("-").pop(), 10) || 0;
+        return { line, key, base, filePath, epKey, bytes };
       })
       .sort((a, b) => a.key.localeCompare(b.key));
+
+    // Same episode twice in one usb list: only the best file goes on to
+    // checkFile, the larger one when neither is better. Forced and tor files
+    // are explicit picks and are never dropped.
+    var bestByEp = {};
+    for (var bi = 0; bi < usbFiles.length; bi++) {
+      var bf = usbFiles[bi];
+      if (!bf.epKey) continue;
+      var cur = bestByEp[bf.epKey];
+      if (
+        !cur ||
+        flexFileIsBetterThanSent(bf.base, { title: cur.base }) ||
+        (!flexFileIsBetterThanSent(cur.base, { title: bf.base }) &&
+          bf.bytes > cur.bytes)
+      ) {
+        bestByEp[bf.epKey] = bf;
+      }
+    }
+    usbFiles = usbFiles.filter((x) => {
+      if (!x.epKey || bestByEp[x.epKey] === x) return true;
+      if (skipLoggedOnce(x.filePath))
+        unilog(2613, `same episode in usb list, skipping "${x.base}" for "${bestByEp[x.epKey].base}"`);
+      return false;
+    });
 
     usbFiles = usbFiles.map((x) => x.line);
     skipPaths = [];

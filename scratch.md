@@ -1,10 +1,11 @@
 
+
 - these 2 downloads are only 30 secs apart:
 `American.Hostage.S01E03.Magic.Ticket.Sweepstakes.1080p.AMZN.WEB-DL.DDP5.1.H.264-RAWR.mkv
 1/3 - 1080p  09/26.22:15:20  3.456 GB  92 Mb  100%  4:38  Finished` and
 `American Hostage S01E03 Magic Ticket Sweepstakes 2160p AMZN WEB-DL DDP5 1 H 265-RAWR.mkv
 1/3 - 2160p  09/26.22:45:22  5.792 GB  86 Mb  100%  8:10  Finished`
-  so they must have come from one list of usb files. 
+  so they must have come from the same list of usb files. 
 - on flex when 2 files of same episode appear in one list only the best is used
   - the down cycle should also only use the best of matching episodes
 
@@ -14,6 +15,8 @@ why are you scoping Actor Photos per show?
 don't browse `In Development`
 manage upcoming shows
 =================
+
+when viewing a video that was started by tvapp, and then finished playing, if the pos was less than 4 mins from end mark the show as watched
 
 # one consistent image choice logic
 for all images use these providers in order:

@@ -3223,6 +3223,7 @@ const TV_URL = "https://hahnca.com/tv";
 const SRVR_PUBLIC_URL = "https://hahnca.com/tv-srvr";
 const TVAPP_DEVICE = "tvapp";
 const EARLY_STOP_MS = 10000;
+const NEAR_END_MS = 4 * 60 * 1000;
 
 // Next-up: the first episode past season 0 with a file and not watched.
 function nextUpEpisode(ed) {
@@ -3311,7 +3312,10 @@ async function playProgress({ showName, season, episode, posMs, durMs, state }) 
   const code = fmtSeasonEpisode(season, episode);
   if (!Number.isInteger(season) || !Number.isInteger(episode) || !epd.getEp(ed, season, episode))
     throw new Error(`playProgress: no episode ${code} in ${showName}`);
-  const ended = state === "ended";
+  // Stopped in the last few minutes (the credits) counts as run to the end.
+  const ended =
+    state === "ended" ||
+    (state === "stopped" && durMs > 0 && durMs - posMs < NEAR_END_MS);
   const stopped = ended || state === "stopped";
   const started =
     !stopped &&

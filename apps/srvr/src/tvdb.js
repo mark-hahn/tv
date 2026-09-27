@@ -1597,7 +1597,7 @@ function keepTmdbCharacters(characters, existingCharacters) {
   return kept.length ? [...characters, ...kept] : characters;
 }
 
-async function getTmdbCast(remoteIds, name, ids) {
+async function getTmdbCast(remoteIds, name) {
   try {
     const cast = await getTmdbAggregateCast(remoteIds);
     const top = cast
@@ -1612,8 +1612,7 @@ async function getTmdbCast(remoteIds, name, ids) {
       top.map(async (actor, i) => ({
         character: actor.roles?.[0]?.character ?? "",
         actor: actor.name,
-        image:
-          (await personImage(ids, name, { name: actor.name, tmdbPersonId: actor.id })) || null,
+        image: (await personImage(actor.name)) || null,
         tvdbUrl: null,
         sortOrder: i,
         isFeatured: true,
@@ -1635,7 +1634,7 @@ const TVMAZE_CREW_TYPES = [
 
 // The crew list comes from TVmaze; each member's photo is chosen like any other
 // (see images.js), TVmaze's own only when the providers before it have none.
-async function getTvmazeCrew(tvdbId, showName) {
+async function getTvmazeCrew(tvdbId) {
   if (!tvdbId) return [];
   try {
     const tvmazeId = getTvmazeIdByTvdbId(tvdbId);
@@ -1644,7 +1643,6 @@ async function getTvmazeCrew(tvdbId, showName) {
     if (!res.ok) return [];
     const data = await res.json();
     if (!Array.isArray(data)) return [];
-    const ids = showIdsFor({ showName, tvdbId });
     const crew = data
       .filter((c) => TVMAZE_CREW_TYPES.includes(c.type))
       .map((c) => ({ name: c.person?.name ?? "", type: c.type }))
@@ -1652,7 +1650,7 @@ async function getTvmazeCrew(tvdbId, showName) {
     return Promise.all(
       crew.map(async (c) => ({
         ...c,
-        image: (await personImage(ids, showName, { name: c.name })) || null,
+        image: (await personImage(c.name)) || null,
       })),
     );
   } catch {
@@ -2014,7 +2012,7 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   });
   const image = await showImage("poster", ids, name);
   let characters = getTvdbCharacters(extResObj);
-  if (!characters.length) characters = await getTmdbCast(remoteIds, name, ids);
+  if (!characters.length) characters = await getTmdbCast(remoteIds, name);
   else {
     characters = await fillMissingCharacterNames(characters, remoteIds, name);
     // TVDB's own photo is already the first choice there is (see images.js);
@@ -2023,12 +2021,12 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
       characters
         .filter((char) => !char.image)
         .map(async (char) => {
-          char.image = (await personImage(ids, name, { name: char.actor })) || char.image;
+          char.image = (await personImage(char.actor)) || char.image;
         }),
     );
   }
   characters = keepTmdbCharacters(characters, allTvdb[name]?.characters);
-  const crew = await getTvmazeCrew(tvdbId, name);
+  const crew = await getTvmazeCrew(tvdbId);
   let lastAired = lastAiredIn ?? firstAired;
   lastAired = lastAired ?? "";
   let nextAired = nextAiredIn ?? "";
@@ -2753,7 +2751,7 @@ const tryLocalGetTvdb = async () => {
     const rec = allTvdb[processRecord.name];
     if (!Array.isArray(rec.crew)) {
       try {
-        const tvmazeCrew = await getTvmazeCrew(processRecord.tvdbId, processRecord.name);
+        const tvmazeCrew = await getTvmazeCrew(processRecord.tvdbId);
         rec.crew = tvmazeCrew;
         saveShow(processRecord.name, rec);
         unilog(
@@ -3254,7 +3252,7 @@ export const searchTvdbByImdbId = async (params) => {
       extData.remoteIds,
       extData.name || series.name || "",
     );
-    const crew = await getTvmazeCrew(tvdbId, extData.name || series.name || "");
+    const crew = await getTvmazeCrew(tvdbId);
     const firstAired = extData.firstAired || "";
     const lastAired = extData.lastAired || firstAired || "";
     const nextAired = extData.nextAired || "";
@@ -3486,7 +3484,7 @@ export const saveSeasonIntro = async (record, season, field, value) => {
 
 export const getTvmazeCrew_cmd = async (params) => {
   const tvdbId = params?.tvdbId;
-  return getTvmazeCrew(tvdbId, params?.showName);
+  return getTvmazeCrew(tvdbId);
 };
 
 // The poster for a show, for callers that only have a TVDB search result,

@@ -11,9 +11,11 @@ import { getToken } from "./tvdbToken.js";
  *  - providers in the order fanart.tv, TVDB, TMDB, TVmaze; the first one that
  *    has an image wins;
  *  - where a provider has a list to choose from, its own score picks;
- *  - lookups go by id -- the show's tvdb, tmdb, imdb and tvmaze ids, a person's
- *    ids, and names matched inside the lists those ids fetch -- and a search by
- *    name only runs once every id-based source has come up empty.
+ *  - a show's and an episode's lookups go by the show's tvdb, tmdb, imdb and
+ *    tvmaze ids, and a search by name only runs once every id-based source has
+ *    come up empty;
+ *  - a person goes by name alone: the same name gets the same photo whatever
+ *    show it is asked for from.
  *
  * Every answer, misses included, and the provider data behind it are kept for
  * the life of the process.
@@ -407,86 +409,6 @@ function mazeEpisodes(tvmazeId) {
   });
 }
 
-// People by normalized name -> photo url, from a list of {name, url}.
-function photoMap(people) {
-  const byName = new Map();
-  for (const p of people) {
-    const key = normName(p.name);
-    if (key && p.url && !byName.has(key)) byName.set(key, p.url);
-  }
-  return byName;
-}
-
-function tvdbPersonImage(peopleId) {
-  return remember(`tvdbPerson|${peopleId}`, async () =>
-    tvdbUrl((await tvdbGet(`/people/${peopleId}`))?.data?.image),
-  );
-}
-
-// Everyone TVDB lists for the series, cast and crew alike.
-function tvdbSeriesPeople(tvdbId) {
-  return remember(`tvdbSeriesPeople|${tvdbId}`, async () => {
-    const chars = (await tvdbGet(`/series/${tvdbId}/extended`))?.data?.characters ?? [];
-    return photoMap(chars.map((c) => ({ name: c.personName, url: tvdbUrl(c.personImgURL) })));
-  });
-}
-
-function tvdbEpisodePeople(tvdbId, season, episode) {
-  return remember(`tvdbEpPeople|${tvdbId}|${episodeKey(season, episode)}`, async () => {
-    const ep = (await tvdbEpisodes(tvdbId)).get(episodeKey(season, episode));
-    if (!ep) return new Map();
-    const chars = (await tvdbGet(`/episodes/${ep.id}/extended`))?.data?.characters ?? [];
-    return photoMap(chars.map((c) => ({ name: c.personName, url: tvdbUrl(c.personImgURL) })));
-  });
-}
-
-// Everyone TMDB credits across the series -- regulars, guests and crew -- by
-// normalized name -> {id, url}.
-function tmdbShowPeople(tmdbId) {
-  return remember(`tmdbShowPeople|${tmdbId}`, async () => {
-    const res = (await tmdbGet(`/tv/${tmdbId}/aggregate_credits`)) ?? {};
-    const byName = new Map();
-    for (const p of [...(res.cast ?? []), ...(res.crew ?? [])]) {
-      const key = normName(p.name);
-      if (!key || byName.get(key)?.url) continue;
-      byName.set(key, { id: p.id, url: p.profile_path ? TMDB_IMG + TMDB_PROFILE_SIZE + p.profile_path : "" });
-    }
-    return byName;
-  });
-}
-
-function tmdbPersonTvdbId(tmdbPersonId) {
-  return remember(`tmdbPersonExt|${tmdbPersonId}`, async () =>
-    String((await tmdbGet(`/person/${tmdbPersonId}/external_ids`))?.tvdb_id ?? ""),
-  );
-}
-
-function tmdbPersonImage(tmdbPersonId) {
-  return remember(`tmdbPerson|${tmdbPersonId}`, async () => {
-    const path = (await tmdbGet(`/person/${tmdbPersonId}`))?.profile_path;
-    return path ? TMDB_IMG + TMDB_PROFILE_SIZE + path : "";
-  });
-}
-
-function mazeShowPeople(tvmazeId) {
-  return remember(`mazeShowPeople|${tvmazeId}`, async () => {
-    const cast = (await mazeGet(`/shows/${tvmazeId}/cast`)) ?? [];
-    const crew = (await mazeGet(`/shows/${tvmazeId}/crew`)) ?? [];
-    return photoMap(
-      [...cast, ...crew].map((c) => ({ name: c.person?.name, url: c.person?.image?.medium })),
-    );
-  });
-}
-
-function mazeEpisodePeople(tvmazeId, season, episode) {
-  return remember(`mazeEpPeople|${tvmazeId}|${episodeKey(season, episode)}`, async () => {
-    const ep = (await mazeEpisodes(tvmazeId)).get(episodeKey(season, episode));
-    if (!ep) return new Map();
-    const guests = (await mazeGet(`/episodes/${ep.id}/guestcast`)) ?? [];
-    return photoMap(guests.map((g) => ({ name: g.person?.name, url: g.person?.image?.medium })));
-  });
-}
-
 ////////////////////////  show images  ////////////////////////
 
 const SHOW_SOURCES = {
@@ -578,61 +500,25 @@ export function episodeImage(ids, showName, season, episode) {
 
 ////////////////////////  people  ////////////////////////
 
-// fanart.tv has no photos of people. p is {name, key, season, episode,
-// tvdbPeopleId, tmdbPersonId}; season and episode narrow it to a guest.
-const PERSON_SOURCES = [
-  async (ids, p) => {
-    if (p.tvdbPeopleId) {
-      const url = await tvdbPersonImage(p.tvdbPeopleId);
-      if (url) return url;
-    }
-    if (ids.tvdbId && p.season != null) {
-      const url = (await tvdbEpisodePeople(ids.tvdbId, p.season, p.episode)).get(p.key);
-      if (url) return url;
-    }
-    if (ids.tvdbId) {
-      const url = (await tvdbSeriesPeople(ids.tvdbId)).get(p.key);
-      if (url) return url;
-    }
-    // TMDB knows the tvdb ids of people TVDB doesn't list under this show.
-    const tmdbPersonId =
-      p.tmdbPersonId || (ids.tmdbId ? (await tmdbShowPeople(ids.tmdbId)).get(p.key)?.id : "");
-    if (!tmdbPersonId) return "";
-    const tvdbPeopleId = await tmdbPersonTvdbId(tmdbPersonId);
-    return tvdbPeopleId ? tvdbPersonImage(tvdbPeopleId) : "";
-  },
-  async (ids, p) => {
-    if (p.tmdbPersonId) return tmdbPersonImage(p.tmdbPersonId);
-    return ids.tmdbId ? (await tmdbShowPeople(ids.tmdbId)).get(p.key)?.url || "" : "";
-  },
-  async (ids, p) => {
-    if (!ids.tvmazeId) return "";
-    if (p.season != null) {
-      const url = (await mazeEpisodePeople(ids.tvmazeId, p.season, p.episode)).get(p.key);
-      if (url) return url;
-    }
-    return (await mazeShowPeople(ids.tvmazeId)).get(p.key) || "";
-  },
-];
-
-// The searches by the person's own name, the last resort, in the same provider
-// order. An exact name match with a photo, the provider's best scored.
+// A person's name is who they are, so a photo is found by searching for it and
+// is the same for every show. fanart.tv has no photos of people; the rest in
+// provider order, an exact name match with a photo, the provider's best scored.
 const PERSON_SEARCHES = [
-  (_ids, _showName, p) =>
+  (p) =>
     remember(`tvdbSearchPerson|${p.key}`, async () => {
       // TVDB's people search carries no score; its own order stands in for one.
       const res = await tvdbGet(`/search?type=people&query=${encodeURIComponent(p.name)}`);
       const hit = (res?.data ?? []).find((d) => normName(d.name) === p.key && d.image_url);
       return tvdbUrl(hit?.image_url);
     }),
-  (_ids, _showName, p) =>
+  (p) =>
     remember(`tmdbSearchPerson|${p.key}`, async () => {
       const results = (await tmdbGet(`/search/person?query=${encodeURIComponent(p.name)}`))?.results ?? [];
       const hits = results.filter((r) => normName(r.name) === p.key && r.profile_path);
       hits.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
       return hits[0] ? TMDB_IMG + TMDB_PROFILE_SIZE + hits[0].profile_path : "";
     }),
-  (_ids, _showName, p) =>
+  (p) =>
     remember(`mazeSearchPerson|${p.key}`, async () => {
       const hits = ((await mazeGet(`/search/people?q=${encodeURIComponent(p.name)}`)) ?? []).filter(
         (h) => normName(h.person?.name) === p.key && h.person?.image?.medium,
@@ -643,17 +529,11 @@ const PERSON_SEARCHES = [
 ];
 
 /**
- * A photo of someone in a show: a cast member, a crew member, or with season
- * and episode a guest. person is {name, season?, episode?, tvdbPeopleId?,
- * tmdbPersonId?}. Empty when no provider has one. Never throws.
+ * A photo of a cast, guest or crew member, by name alone. Empty when no
+ * provider has one. Never throws.
  */
-export function personImage(ids, showName, person) {
-  const p = { ...person, key: normName(person?.name) };
+export function personImage(name) {
+  const p = { name, key: normName(name) };
   if (!p.key) return Promise.resolve("");
-  if (p.season == null || p.episode == null) p.season = p.episode = null;
-  const key =
-    `person|${ids?.tvdbId || ""}|${showName || ""}|${p.season}|${p.episode}|${p.key}|` +
-    `${p.tvdbPeopleId || ""}|${p.tmdbPersonId || ""}`;
-  const label = `${p.name} in ${showName || ids?.tvdbId}`;
-  return answer(key, label, () => firstById(PERSON_SOURCES, PERSON_SEARCHES, ids, showName, label, p));
+  return answer(`person|${p.key}`, name, () => firstOf(PERSON_SEARCHES, name, p));
 }

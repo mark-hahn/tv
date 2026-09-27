@@ -852,10 +852,7 @@ export default function App() {
         const res = await fetch(`${TV_SRVR_HTTP_URL}/api/getPersonImages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            showName: selectedShow.name,
-            people: names.map((name) => ({ name })),
-          }),
+          body: JSON.stringify({ people: names.map((name) => ({ name })) }),
         });
         const urls = await res.json();
         if (cancelled || !Array.isArray(urls)) return;

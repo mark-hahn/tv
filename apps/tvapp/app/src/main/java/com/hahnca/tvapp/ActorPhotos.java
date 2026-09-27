@@ -16,8 +16,8 @@ import org.json.JSONObject;
  * is what lets this app show the whole cast it shows -- a show like Angel has
  * fifteen in the record and only three of them carry an image.
  *
- * tv-srvr chooses it, the same way as every other image (its images.js), from
- * the person's name within their show. Remembered for the life of the app: the
+ * tv-srvr chooses it (its images.js) by the person's name alone, so it is the
+ * same whatever show they are in. Remembered for the life of the app: the
  * same cast is rebuilt every time cardMisc comes round to it. An empty answer
  * is remembered as readily as a real one, so an actor no provider has a photo
  * of is asked about once.
@@ -44,7 +44,7 @@ class ActorPhotos {
       ready.onPhoto("");
       return;
     }
-    String key = actor.showName + "\n" + actor.name;
+    String key = actor.name;
     String cached;
     synchronized (CACHE) {
       cached = CACHE.get(key);
@@ -69,11 +69,10 @@ class ActorPhotos {
       JSONObject person = new JSONObject();
       person.put("name", actor.name);
       JSONObject body = new JSONObject();
-      body.put("showName", actor.showName);
       body.put("people", new JSONArray().put(person));
       return new JSONArray(Http.postJson(PERSON_URL, body.toString())).optString(0, "");
     } catch (Exception e) {
-      Log.e(TAG, "actor photo lookup failed for " + actor.name + " in " + actor.showName + ": " + e);
+      Log.e(TAG, "actor photo lookup failed for " + actor.name + ": " + e);
       return "";
     }
   }

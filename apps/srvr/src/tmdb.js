@@ -92,12 +92,7 @@ export async function getTmdb(params) {
       Promise.all(
         guestActorList.map(async (guest) => ({
           ...guest,
-          image: await personImage(ids, showName, {
-            name: guest.name,
-            season,
-            episode,
-            tmdbPersonId: guest.id,
-          }),
+          image: await personImage(guest.name),
         })),
       ),
     ]);
@@ -143,12 +138,9 @@ export async function getBackdrop(params) {
  * people is [{name, tvdbPeopleId?, tmdbPersonId?}]; season and episode, when
  * given, make them that episode's guests. Answers "" for anyone with no photo.
  */
-export async function getPersonImages(params) {
-  const { showName, season, episode, people } = params;
-  const ids = showIdsFor(params);
-  return Promise.all(
-    (people ?? []).map((person) => personImage(ids, showName, { ...person, season, episode })),
-  );
+// By name alone (see images.js).
+export async function getPersonImages({ people }) {
+  return Promise.all((people ?? []).map((person) => personImage(person.name)));
 }
 
 export async function getStreamProviders(params) {

@@ -1271,22 +1271,15 @@ export default {
       });
     },
 
-    // Photos for the people that have none, chosen by tv-srvr the same way as
-    // every other image (images.js). season and episode make them guests.
-    async fillMissingImages(list, season, episode) {
+    // Photos for the people that have none, chosen by tv-srvr by name alone
+    // (images.js), the same whatever show they are in.
+    async fillMissingImages(list) {
       // list items may use personName/name (actors) or just name (crew)
       const missing = list.filter((item) => !item.image && !item.personImgURL);
       if (!missing.length) return;
       try {
         const urls = await srvr.getPersonImages({
-          showName: this.showName,
-          season,
-          episode,
-          people: missing.map((item) => ({
-            name: item.personName || item.name,
-            tmdbPersonId: item.tmdbPersonId,
-            tvdbPeopleId: item.tvdbPeopleId,
-          })),
+          people: missing.map((item) => ({ name: item.personName || item.name })),
         });
         missing.forEach((item, i) => {
           if (!urls?.[i]) return;
@@ -1606,7 +1599,7 @@ export default {
       const mergeResult = this.mergeTmdbTvdbActors(tmdbList, tvdbList);
       this.actors = this.dedupeByPersonName(mergeResult.output);
 
-      await this.fillMissingImages(this.actors, season, episode);
+      await this.fillMissingImages(this.actors);
 
       if (this.actors.length === 0) {
         this.errorMessage = "No guest stars found";

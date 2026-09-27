@@ -1743,7 +1743,12 @@ async function getTmdbFallback(showName, ids) {
 // PST "YYYY/MM/DD ..." string). Otherwise playing tonight's episode makes the
 // remaining ones look one day short until the day rolls over.
 // Returns "{M-DD}" or "{YY-M-DD}" when future, "" when past/today, null when no data.
-const calculateWaitStr = (episodeData, lastPlayedDate = null) => {
+// A wait over a year out also returns "" unless capAtOneYear is false.
+const calculateWaitStr = (
+  episodeData,
+  lastPlayedDate = null,
+  capAtOneYear = true,
+) => {
   try {
     if (!Array.isArray(episodeData)) return null;
 
@@ -1809,7 +1814,7 @@ const calculateWaitStr = (episodeData, lastPlayedDate = null) => {
       )
         .toISOString()
         .slice(0, 10);
-      if (minWaitDate > oneYearOut) return "";
+      if (capAtOneYear && minWaitDate > oneYearOut) return "";
       const waitMD = minWaitDate.slice(5).replace(/^0/, " ").trim();
       const todayYear = today.slice(0, 4);
       const waitYear = minWaitDate.slice(0, 4);

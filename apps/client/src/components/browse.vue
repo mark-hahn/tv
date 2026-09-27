@@ -310,6 +310,16 @@
             >
               Get
             </button>
+            <span
+              v-if="curSnoozeWaitStr"
+              :style="{
+                color: '#00f',
+                fontWeight: 'bold',
+                display: 'inline-flex',
+                alignItems: 'center',
+              }"
+              >{{ curSnoozeWaitStr }}</span
+            >
             <button
               v-if="existingShowMatch && !isLoadingNext && !suppressButtons"
               @click="handleSelectExisting(existingShowMatch.name)"
@@ -813,6 +823,18 @@ export default {
         })
         .catch(() => {});
     };
+    // tv-srvr redoes each snoozed show's waitStr at most once a day.
+    const refreshSnoozeWaitStrs = async () => {
+      try {
+        const res = await fetch(
+          `${config.tvSrvrUrl}/api/refreshSnoozeWaitStrs`,
+          { method: "POST" },
+        );
+        if (res.ok) snoozeList.value = await res.json();
+      } catch (e) {
+        logHere({ lvl: "error" }, `refreshSnoozeWaitStrs failed: ${e.message}`);
+      }
+    };
     watch(browseHasMore, (val) => {
       evtBus.emit("browseHasMoreChanged", val);
     });
@@ -821,6 +843,7 @@ export default {
       (isActive) => {
         if (isActive) {
           checkBrowseHasMore();
+          refreshSnoozeWaitStrs();
         }
       },
       { immediate: true },
@@ -1282,6 +1305,18 @@ export default {
       }
       upcomingMode.value = true;
     };
+
+    // The selected show's waitStr, while looking at the snoozed shows.
+    const curSnoozeWaitStr = computed(() => {
+      if (!unSnoozeMode.value || !curTvdb.value) return "";
+      const curId = String(
+        curTvdb.value.tvdb_id || curTvdb.value.tvdbId || curTvdb.value.id || "",
+      ).trim();
+      return (
+        snoozeList.value.find((s) => String(s.tvdbId).trim() === curId)
+          ?.waitStr || ""
+      );
+    });
 
     const isCurrentSnoozed = computed(() => {
       if (!curTvdb.value || snoozeList.value.length === 0) return false;
@@ -2164,6 +2199,7 @@ export default {
       curTvmazeMeta,
       snoozeList,
       isCurrentSnoozed,
+      curSnoozeWaitStr,
       curDisplayOverview,
       unSnoozeMode,
       upcomingMode,

@@ -1902,6 +1902,9 @@ app.post(
 
 // Snooze list
 const SNOOZE_FILE = path.join(SRVR_DATA_DIR, "snooze-list.json");
+const SNOOZE_WAITSTR_MS = 24 * 60 * 60 * 1000;
+const SNOOZE_NO_DATA_WAITSTR = "{no data}";
+const TV_API_URL = "https://hahnca.com/tv-api";
 
 function readSnoozeList() {
   if (!fs.existsSync(SNOOZE_FILE)) return [];
@@ -1939,6 +1942,87 @@ app.get(
   apiWrapper(async () => readSnoozeList()),
 );
 
+// A snoozed show's waitStr, from TVDB air dates alone (nothing is on disk or
+// watched). Too little data to tell, or a wait over a year out, counts as
+// still waiting. undefined when TVDB could not be read in full, so the old
+// value is kept.
+async function snoozeWaitStr({ tvdbId, name }) {
+  try {
+    const seriesMap = await tvdb.getSeriesMap(tvdbId);
+    if (seriesMap.partial) return undefined;
+    const ed = [];
+    for (const [s, eps] of seriesMap)
+      for (const [e, { aired }] of eps)
+        if (aired && Number.isInteger(e) && e >= 1)
+          epd.setEpisode(ed, s, e, { aired });
+    return tvdb.calculateWaitStr(ed, null, false) ?? SNOOZE_NO_DATA_WAITSTR;
+  } catch (e) {
+    unilog(2616, `snooze waitStr failed for ${name}: ${e.message}`);
+    return undefined;
+  }
+}
+
+// Gives each snoozed show missing a waitStr, or holding one over a day old, a
+// fresh one. A show whose waitStr just cleared can be binged now, so it is
+// unsnoozed and goes back in the browse rotation. One snoozed with no waitStr
+// is left for a manual unsnooze.
+async function runSnoozeRefresh() {
+  const now = Date.now();
+  const fresh = new Map();
+  for (const s of readSnoozeList()) {
+    if (now - (s.waitStrAt || 0) < SNOOZE_WAITSTR_MS) continue;
+    const waitStr = await snoozeWaitStr(s);
+    if (waitStr !== undefined) fresh.set(s.tvdbId, waitStr || null);
+  }
+  if (fresh.size === 0) return;
+  // Re-read: the list may have changed during the TVDB fetches.
+  const ready = [];
+  const next = [];
+  for (const s of readSnoozeList()) {
+    if (fresh.has(s.tvdbId)) {
+      const waitStr = fresh.get(s.tvdbId);
+      if (s.waitStr && !waitStr) {
+        ready.push(s);
+        continue;
+      }
+      s.waitStr = waitStr;
+      s.waitStrAt = now;
+    }
+    next.push(s);
+  }
+  writeSnoozeList(next);
+  notifyClients("snoozeListUpdated", next);
+  for (const { tvdbId, name } of ready) {
+    unilog(2617, `auto-unsnoozed ${name}, no longer waiting`);
+    const res = await fetch(`${TV_API_URL}/api/unackBrowsed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tvdbId }),
+    });
+    if (!res.ok)
+      unilog(2618, `unackBrowsed ${name}: HTTP ${res.status}`);
+  }
+}
+
+// Runs one after another, so a later call sees what an earlier one stamped.
+let snoozeRefreshChain = Promise.resolve();
+function refreshSnoozeWaitStrs() {
+  snoozeRefreshChain = snoozeRefreshChain
+    .then(runSnoozeRefresh)
+    .catch((e) => {
+      unilog(2619, `snooze waitStr refresh: ${e.message}`);
+    });
+  return snoozeRefreshChain;
+}
+
+app.post(
+  "/api/refreshSnoozeWaitStrs",
+  apiWrapper(async () => {
+    await refreshSnoozeWaitStrs();
+    return readSnoozeList();
+  }),
+);
+
 app.post(
   "/api/snooze",
   apiWrapper(async ({ tvdbId, name, image, year }) => {
@@ -1947,6 +2031,8 @@ app.post(
       list.push({ tvdbId, name, image, year });
       writeSnoozeList(list);
     }
+    // Not awaited: the waitStr comes in by snoozeListUpdated.
+    refreshSnoozeWaitStrs();
     return list;
   }),
 );

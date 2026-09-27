@@ -1,13 +1,23 @@
 
+no.
+- when a show is snoozed then calculate a waitstr and save it with the show. 
+- recalculate waitstr for all snoozed shows when the browse pane is opened but never more often than 24 hrs. 
+- when a snoozed show transitions from having a waitstr to not having one then automatically unsnooze it -- if it doesn't have a waitstr then don't auto-check for the transistion. i will unooze them manually.
+- when a show doesn't have enough data to calculate a waitstr then consider it to have a waitstr.
+- when looking at snoozed shows in the gallery and one is selected and it has a waitstr then show the waitstr text between the get button and where the "no more shows" message is shown
+- as a one-time operation backfill snoozed shows with waitstr.
 
 
-why are you scoping Actor Photos per show? the actor's name is authoritative and we should treat all the same no matter what show they are in or any other metadata
+i am worried about Far-off premieres being considered ready -- does that mean they will show up in the browse pane?  if so that is unacceptable and they shouldn't be considered for browsing while in that state.
+in browse pane i want to unsnooze shows automatically when they had a waitstr  datef
 
 ????????????????
-don't browse `In Development`
 manage upcoming shows
 
 =================
+
+why are you scoping Actor Photos per show? the actor's name is authoritative and we should treat all the same no matter what show they are in or any other metadata
+
 - these 2 downloads are only 30 secs apart:
 `American.Hostage.S01E03.Magic.Ticket.Sweepstakes.1080p.AMZN.WEB-DL.DDP5.1.H.264-RAWR.mkv
 1/3 - 1080p  09/26.22:15:20  3.456 GB  92 Mb  100%  4:38  Finished` and

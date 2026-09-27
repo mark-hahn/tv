@@ -1,5 +1,20 @@
 
+# torrents history feature
+- keep a history of torrents the tor pane sent to the qbt
+  - also store in that history the date/time the torrent was sent
+  - is there already a history stored for showing the clock icon in the card?
+    - if so that history could be just updated to implement this new history feature
 
+- add a `History` button the the left of the del button
+  - the button should set the tor pane into history mode and be a toggle
+  - it should filter the list of cards to show only ones sent
+  - the shown list should be sorted by date/time ascending when the torrent was sent. 
+  - when entering the history mode the pane should be scrolled to the bottom 
+  - the background of the button should be hilighted with light-red when in history mode
+
+- in all modes the cards for sent torrents should show the date/time sent with the clock icons
+
+- as a one-time operation backfill history based on logs if that is possible.
 
 ????????????????
 don't browse `In Development`

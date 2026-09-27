@@ -1446,6 +1446,9 @@ app.post("/api/local/textfile", async (req, res) => {
   }
 });
 
+// Full history of torrents the tor pane sent to qbt, oldest first:
+// [{ ts, keys, torrent }]. keys are what the client matches search cards
+// against; torrent is the whole card as it was when sent.
 const TOR_SENT_PATH = path.join(getApiMiscDir(), "tor-sent.json");
 const TOR_SENT_HISTORY_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -1459,36 +1462,16 @@ function logRecentSent(action, details = {}) {
   }
 }
 
+// Sync read-modify-write so two sends can't interleave and drop a record.
 function loadTorSent() {
-  try {
-    if (fs.existsSync(TOR_SENT_PATH)) {
-      const j = JSON.parse(fs.readFileSync(TOR_SENT_PATH, "utf8"));
-      if (j && typeof j === "object" && !Array.isArray(j)) {
-        const cutoff = Date.now() - TOR_SENT_HISTORY_WINDOW_MS;
-        const pruned = {};
-        let removed = 0;
-        for (const [k, ts] of Object.entries(j)) {
-          const t = Number(ts);
-          if (Number.isFinite(t) && t >= cutoff) pruned[k] = t;
-          else removed++;
-        }
-        if (removed > 0) {
-          fs.writeFileSync(TOR_SENT_PATH, JSON.stringify(pruned), "utf8");
-          logRecentSent("LOAD", {
-            entryCount: Object.keys(pruned).length,
-            removed,
-          });
-        } else {
-          logRecentSent("LOAD", { entryCount: Object.keys(pruned).length });
-        }
-        return pruned;
-      }
-    }
-    logRecentSent("LOAD", { entryCount: 0, note: "file not found or invalid" });
-  } catch (e) {
-    logRecentSent("LOAD_ERROR", { error: e.message });
+  const records = JSON.parse(fs.readFileSync(TOR_SENT_PATH, "utf8"));
+  const cutoff = Date.now() - TOR_SENT_HISTORY_WINDOW_MS;
+  const kept = records.filter((r) => r.ts >= cutoff);
+  if (kept.length < records.length) {
+    fs.writeFileSync(TOR_SENT_PATH, JSON.stringify(kept), "utf8");
+    logRecentSent("PRUNE", { removed: records.length - kept.length });
   }
-  return {};
+  return kept;
 }
 
 app.get("/api/tor/seedCheck", async (req, res) => {
@@ -1511,39 +1494,29 @@ app.post("/api/tor/seedDismiss", (req, res) => {
 app.get("/api/tor/sent", (req, res) => {
   const data = loadTorSent();
   logRecentSent("GET", {
-    entryCount: Object.keys(data).length,
+    entryCount: data.length,
     ip: req.ip || req.connection?.remoteAddress,
   });
   res.json(data);
 });
 
 app.post("/api/tor/sent", (req, res) => {
-  const keys = Array.isArray(req.body?.keys) ? req.body.keys : [];
-  if (keys.length === 0) {
-    logRecentSent("POST_ERROR", { error: "keys required" });
-    return res.status(400).json({ error: "keys required" });
+  const keys = Array.isArray(req.body?.keys)
+    ? req.body.keys.filter((k) => k && typeof k === "string")
+    : [];
+  const torrent = req.body?.torrent;
+  if (keys.length === 0 || !torrent || typeof torrent !== "object") {
+    logRecentSent("POST_ERROR", { error: "keys and torrent required" });
+    return res.status(400).json({ error: "keys and torrent required" });
   }
   const data = loadTorSent();
   const now = Date.now();
-  const beforeCount = Object.keys(data).length;
-  let newKeys = 0;
-  let updatedKeys = 0;
-  for (const k of keys) {
-    if (k && typeof k === "string") {
-      if (data[k]) updatedKeys++;
-      else newKeys++;
-      data[k] = now;
-    }
-  }
+  data.push({ ts: now, keys, torrent });
   try {
     fs.writeFileSync(TOR_SENT_PATH, JSON.stringify(data), "utf8");
-    const afterCount = Object.keys(data).length;
     logRecentSent("POST", {
       keysProvided: keys.length,
-      newKeys,
-      updatedKeys,
-      beforeCount,
-      afterCount,
+      afterCount: data.length,
       timestamp: now,
       ip: req.ip || req.connection?.remoteAddress,
       sampleKeys: keys.slice(0, 3),

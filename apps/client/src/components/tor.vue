@@ -374,6 +374,19 @@
             >
               Bad Grp
             </button>
+            <button
+              @click.stop="torHistoryClick"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 8px',
+                border: '1px solid #bbb',
+                '--btn-bg': historyMode ? '#fcc' : 'whitesmoke',
+              }"
+            >
+              History
+            </button>
           </div>
         </div>
         <div
@@ -426,7 +439,7 @@
       </div>
       <div
         id="unaired"
-        v-if="!showStream && unaired"
+        v-if="!showStream && !historyMode && unaired"
         style="
           text-align: center;
           color: #666;
@@ -631,7 +644,7 @@
 
       <div
         id="error"
-        v-if="!unaired &amp;&amp; error"
+        v-if="!historyMode &amp;&amp; !unaired &amp;&amp; error"
         style="
           text-align: center;
           color: #c00;
@@ -645,7 +658,7 @@
       </div>
       <div
         id="warning"
-        v-if="!unaired &amp;&amp; !error &amp;&amp; providerWarning"
+        v-if="!historyMode &amp;&amp; !unaired &amp;&amp; !error &amp;&amp; providerWarning"
         style="
           text-align: center;
           color: #b36b00;
@@ -659,7 +672,14 @@
       </div>
       <div
         id="no-torrents-needed"
-        v-if="!showStream && !unaired && noTorrentsNeeded && !loading && !error"
+        v-if="
+          !showStream &&
+          !historyMode &&
+          !unaired &&
+          noTorrentsNeeded &&
+          !loading &&
+          !error
+        "
         style="
           text-align: center;
           color: #666;
@@ -673,9 +693,10 @@
         id="torrents-list"
         v-if="
           !showStream &&
-          !unaired &&
-          (!loading || torrents.length > 0) &&
-          !noTorrentsNeeded
+          (historyMode ||
+            (!unaired &&
+              (!loading || torrents.length > 0) &&
+              !noTorrentsNeeded))
         "
         style="
           padding: 10px;
@@ -720,7 +741,7 @@
             :style="getDownloadedBeforeIconStyle(torrent)"
             title="Downloaded before"
           >
-            🕘
+            <span style="font-size: 14.4px">{{ fmtSentTs(torrent) }}</span> 🕘
           </div>
           <div
             v-if="getDownloadStatus(torrent)"
@@ -740,6 +761,7 @@
           </div>
           <div
             v-if="SHOW_TITLE &amp;&amp; torrent.raw"
+            :style="{ paddingRight: isDownloadedBefore(torrent) ? '130px' : '' }"
             style="
               font-size: 14px;
               font-weight: bold;
@@ -1421,6 +1443,8 @@ export default {
       holdFlash: false, // true = flash Hold button highlight for 500ms
 
       showFilter: null, // non-null = show name filter is active
+      historyMode: false, // true = show sentHistory instead of search results
+      sentHistory: [], // every torrent sent to qbt, oldest first, with sentTs
     };
   },
 
@@ -1517,6 +1541,8 @@ export default {
       return [...seasons, ...this.mapEpisodes];
     },
     filteredTorrents() {
+      if (this.historyMode) return this.sentHistory;
+
       // Use season filter if present
       const sVal = parseInt(this.seasonFilter, 10);
       const hasSeasonFilter =
@@ -2209,11 +2235,21 @@ export default {
       try {
         const res = await fetch(`${config.torrentsApiUrl}/api/tor/sent`);
         if (res.ok) {
-          const j = await res.json();
-          if (j && typeof j === "object" && !Array.isArray(j)) {
-            const entryCount = Object.keys(j).length;
-            unilog(1035, `loadDownloadedHistory: loaded ${entryCount} entries`);
-            this.downloadedByHash = j;
+          const records = await res.json();
+          if (Array.isArray(records)) {
+            unilog(
+              1035,
+              `loadDownloadedHistory: loaded ${records.length} entries`,
+            );
+            const map = {};
+            for (const r of records) {
+              for (const k of r.keys) if (!(map[k] >= r.ts)) map[k] = r.ts;
+            }
+            this.downloadedByHash = map;
+            this.sentHistory = records.map((r) => ({
+              ...r.torrent,
+              sentTs: r.ts,
+            }));
           }
         }
       } catch (e) {
@@ -2381,7 +2417,9 @@ export default {
     },
 
     getTorrentCardKey(torrent) {
-      return this.getTorrentIdentityKey(torrent);
+      // The same torrent can be in the history more than once.
+      const key = this.getTorrentIdentityKey(torrent);
+      return torrent.sentTs ? `${key}|${torrent.sentTs}` : key;
     },
 
     reconcileVisibleTorrents(nextTorrents) {
@@ -2465,15 +2503,24 @@ export default {
         now,
       );
 
+      const plain = JSON.parse(JSON.stringify(torrent));
+      this.sentHistory.push({ ...plain, sentTs: now });
+
       // Persist to server.
       fetch(`${config.torrentsApiUrl}/api/tor/sent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keys }),
+        body: JSON.stringify({ keys, torrent: plain }),
       }).catch(() => {});
     },
 
     isDownloadedBefore(torrent) {
+      return this.getSentTs(torrent) > 0;
+    },
+
+    // When the torrent was last sent to qbt (ms), or 0 if not within the window.
+    getSentTs(torrent) {
+      if (torrent?.sentTs) return torrent.sentTs; // history card
       // Title keys are only written for torrents with no unique key, plus
       // legacy entries from before unique keys (they age out after a year).
       const uniqueKey = this.getTorrentUniqueKey(torrent);
@@ -2481,15 +2528,25 @@ export default {
         ...(uniqueKey ? [uniqueKey] : []),
         ...this.getTorrentHistoryKeys(torrent),
       ];
-      if (!keys.length) return false;
       const cutoff = Date.now() - this.downloadHistoryWindowMs();
+      let sentTs = 0;
       for (const k of keys) {
         const ts = Number(this.downloadedByHash?.[k]);
-        if (Number.isFinite(ts) && ts >= cutoff) {
-          return true;
-        }
+        if (Number.isFinite(ts) && ts >= cutoff && ts > sentTs) sentTs = ts;
       }
-      return false;
+      return sentTs;
+    },
+
+    // Sent date/time as PST MM-DD HH:mm.
+    fmtSentTs(torrent) {
+      const ts = this.getSentTs(torrent);
+      return ts ? util.fmtLaDateTime(ts).slice(5, 16).replace("T", " ") : "";
+    },
+
+    torHistoryClick() {
+      this.showStream = false;
+      this.historyMode = !this.historyMode;
+      if (this.historyMode) this.$nextTick(() => this.scrollToBottom());
     },
 
     getDownloadedBeforeIconStyle(torrent) {
@@ -3418,6 +3475,9 @@ export default {
         }, 300);
         return;
       }
+
+      // History cards are view-only.
+      if (this.historyMode) return;
 
       const idx = this.filteredTorrents.indexOf(torrent);
 

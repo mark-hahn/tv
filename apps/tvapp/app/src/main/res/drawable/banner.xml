@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The tile the Google TV launcher shows for tvapp, and the app icon too.
      320x180 is the banner size Android TV asks for, and the viewport matches it,
-     so a 100-unit home glyph sits centered on the blue. -->
+     so the glyph sits centered on the blue. The glyph is the app icon
+     shared with the web favicon and the phone app: a TV under a house roof. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="320dp"
     android:height="180dp"
@@ -12,9 +13,28 @@
       android:fillColor="#1E3A8A"
       android:pathData="M0,0 h320 v180 h-320 z" />
 
-  <!-- The standard home outline: up one side of the door, across the walls, up
-       the right eave to the apex, then down the left eave. -->
-  <path
-      android:fillColor="#FFFFFF"
-      android:pathData="M151.67,123.33 v-25 h16.67 v25 h20.83 v-33.33 h12.5 L160,52.5 L118.33,90 h12.5 v33.33 z" />
+  <!-- Scaled up so it nearly fills the circle the launcher crops out of the
+       middle of the banner. -->
+  <group
+      android:scaleX="1.9"
+      android:scaleY="1.9"
+      android:translateX="65"
+      android:translateY="-5.5">
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M15,50 L50,20 L85,50" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:pathData="M31,45 H69 A5,5 0 0 1 74,50 V76 A5,5 0 0 1 69,81 H31 A5,5 0 0 1 26,76 V50 A5,5 0 0 1 31,45 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:strokeColor="#FBBF24"
+        android:strokeWidth="3"
+        android:strokeLineJoin="round"
+        android:pathData="M44,54 L60.2,63 L44,72 Z" />
+  </group>
 </vector>

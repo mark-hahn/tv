@@ -1,8 +1,13 @@
 
-
+tv video is darkened when time bar is showing at the button -- can you keep it full screen?
 
 =================
-you said `Far-off premieres: a wait more than a year away returns "", which is the same as "ready now"`.
+
+you said `Fthe android phone remote app has an icon with the android robot with antennas in a circle and the tv home page has an icon for tvapp that is a home in a circle.  i want a standard icon for this app to use in those places and everywhere an icon is needed. the favicon for the web app already has a tv which is ok but a bit generic.
+
+suggest icons for this app. it could be as simple as a tv but something that shows it is a app for tv shows in our home would be nice.
+
+ar-off premieres: a wait more than a year away returns "", which is the same as "ready now"`.
 i am worried about Far-off premieres being considered ready -- does that mean they will show up in the browse pane?  if so that is unacceptable and they shouldn't be considered for browsing while in that state.
 
 no.

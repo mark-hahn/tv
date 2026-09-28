@@ -1972,64 +1972,22 @@ export default {
       const oldLinks = document.querySelectorAll("link[rel*='icon']");
       oldLinks.forEach((oldLink) => oldLink.remove());
 
-      // Create canvas for favicon
-      const canvas = document.createElement("canvas");
-      canvas.width = 32;
-      canvas.height = 32;
-      const ctx = canvas.getContext("2d");
+      // The app icon: a TV under a house roof, the same as the phone app's and
+      // tvapp's. The badge is a red dot in the top-right.
+      const badge = shouldShowBadge
+        ? `<circle cx="74" cy="25" r="14" fill="#f00"/>`
+        : "";
+      const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="11 11 78 78">` +
+        `<path d="M15 50 L50 20 L85 50" fill="none" stroke="#000" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>` +
+        `<rect x="26" y="45" width="48" height="36" rx="5" fill="none" stroke="#000" stroke-width="6"/>` +
+        `<path d="M44 54 L60.2 63 L44 72 Z" fill="#000" stroke="#000" stroke-width="3" stroke-linejoin="round"/>` +
+        `${badge}</svg>`;
 
-      // Scale the drawing 20% larger about the canvas center
-      ctx.translate(16, 16);
-      ctx.scale(1.2, 1.2);
-      ctx.translate(-16, -16);
-
-      if (shouldShowBadge) {
-        // Draw background circle
-        ctx.fillStyle = "#1a73e8"; // Blue background
-        ctx.beginPath();
-        ctx.arc(16, 16, 16, 0, 2 * Math.PI);
-        ctx.fill();
-
-        // Draw red badge circle in top-right
-        ctx.fillStyle = "#f00";
-        ctx.beginPath();
-        ctx.arc(24, 8, 8, 0, 2 * Math.PI);
-        ctx.fill();
-      } else {
-        // Draw TV icon
-        // TV screen (rectangle)
-        ctx.fillStyle = "#333";
-        ctx.fillRect(6, 10, 20, 16);
-
-        // TV screen inner (lighter)
-        ctx.fillStyle = "#4a9eff";
-        ctx.fillRect(8, 12, 16, 12);
-
-        // Antenna left
-        ctx.strokeStyle = "#666";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(12, 10);
-        ctx.lineTo(8, 4);
-        ctx.stroke();
-
-        // Antenna right
-        ctx.beginPath();
-        ctx.moveTo(20, 10);
-        ctx.lineTo(24, 4);
-        ctx.stroke();
-
-        // Stand base
-        ctx.fillStyle = "#333";
-        ctx.fillRect(13, 26, 6, 2);
-        ctx.fillRect(15, 24, 2, 4);
-      }
-
-      // Create new favicon link with canvas data
       const link = document.createElement("link");
-      link.type = "image/x-icon";
+      link.type = "image/svg+xml";
       link.rel = "shortcut icon";
-      link.href = canvas.toDataURL("image/png");
+      link.href = "data:image/svg+xml," + encodeURIComponent(svg);
       document.getElementsByTagName("head")[0].appendChild(link);
     },
   },

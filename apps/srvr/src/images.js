@@ -45,6 +45,9 @@ const TMDB_REMOTE_TYPE = 12;
 // TVmaze allows 20 calls in 10 s and answers 429 past that.
 const RATE_LIMIT_RETRY_MS = 2000;
 const RATE_LIMIT_TRIES = 3;
+// How long an answer reached through an error is kept before it is dropped,
+// so the next ask for it tries the providers again.
+const ERROR_RETRY_MS = 24 * 60 * 60 * 1000;
 
 // Languages in the order wanted. Posters and card thumbs carry the show's name,
 // so English first; a plain background is best with no text at all.
@@ -70,10 +73,22 @@ function remember(key, fn) {
   return cache.get(key);
 }
 
-// An answer for a caller, "" when there is none. It is remembered only when
-// every provider asked on the way answered: one that failed -- a 502, a
-// timeout -- may have had the image, so the answer stands for this ask alone
-// and the next ask tries them all again. fn gets the trace firstOf marks.
+// The keys of answers reached through an error -- a provider failing on the
+// way, or the whole lookup. Once a day they are dropped from the cache, and
+// nothing is asked of the providers until one of them is wanted again.
+const errored = new Set();
+
+setInterval(() => {
+  if (errored.size === 0) return;
+  for (const key of errored) cache.delete(key);
+  unilog(2632, `dropped ${errored.size} image answers reached through an error`);
+  errored.clear();
+}, ERROR_RETRY_MS);
+
+// An answer for a caller, remembered for the life of the process: "" when
+// there is none, and "" too when the lookup fails -- that is logged. One
+// reached through an error is marked in errored. fn gets the trace firstOf
+// marks a failing provider on.
 function answer(key, label, fn) {
   if (!cache.has(key)) {
     const trace = { label, failed: false };
@@ -81,11 +96,11 @@ function answer(key, label, fn) {
       key,
       fn(trace).then(
         (url) => {
-          if (trace.failed) cache.delete(key);
+          if (trace.failed) errored.add(key);
           return url;
         },
         (e) => {
-          cache.delete(key);
+          errored.add(key);
           unilog(2608, `image lookup failed for ${label}: ${e.message}`);
           return "";
         },

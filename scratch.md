@@ -1,7 +1,8 @@
 
-tv video is darkened when time bar is showing at the button -- can you keep it full screen?
 
 =================
+
+tv video is darkened when time bar is showing at the button -- can you keep the full screen normal brightness?
 
 you said `Fthe android phone remote app has an icon with the android robot with antennas in a circle and the tv home page has an icon for tvapp that is a home in a circle.  i want a standard icon for this app to use in those places and everywhere an icon is needed. the favicon for the web app already has a tv which is ok but a bit generic.
 

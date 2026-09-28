@@ -128,6 +128,8 @@ class VideoPlayer extends FrameLayout {
     view.setShowFastForwardButton(false);
     view.findViewById(androidx.media3.ui.R.id.exo_play_pause).setVisibility(GONE);
     view.findViewById(androidx.media3.ui.R.id.exo_settings).setVisibility(GONE);
+    // No full-screen dimming while the time bar is up; the bar keeps its own strip.
+    view.findViewById(androidx.media3.ui.R.id.exo_controls_background).setBackgroundColor(Color.TRANSPARENT);
     TextView pos = view.findViewById(androidx.media3.ui.R.id.exo_position);
     LinearLayout time = view.findViewById(androidx.media3.ui.R.id.exo_time);
     for (int i = 0; i < time.getChildCount(); i++)

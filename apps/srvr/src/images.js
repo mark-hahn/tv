@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 import { smartTitleMatch, logHere, unilog} from "@tv/share"
 import { getTvmazeIdByTvdbId } from "../../api/src/tvmaze.js";
-import { getToken } from "./tvdbToken.js";
+import { getToken, clearToken } from "./tvdbToken.js";
 
 /*
  * Every image the apps show -- a show's poster and card image, an episode's
@@ -70,13 +70,29 @@ function remember(key, fn) {
   return cache.get(key);
 }
 
-// An answer for a caller: remembered like any other lookup, and "" when the
-// lookup fails -- that is logged, and not remembered, so the next ask retries.
+// An answer for a caller, "" when there is none. It is remembered only when
+// every provider asked on the way answered: one that failed -- a 502, a
+// timeout -- may have had the image, so the answer stands for this ask alone
+// and the next ask tries them all again. fn gets the trace firstOf marks.
 function answer(key, label, fn) {
-  return remember(key, fn).catch((e) => {
-    unilog(2608, `image lookup failed for ${label}: ${e.message}`);
-    return "";
-  });
+  if (!cache.has(key)) {
+    const trace = { label, failed: false };
+    cache.set(
+      key,
+      fn(trace).then(
+        (url) => {
+          if (trace.failed) cache.delete(key);
+          return url;
+        },
+        (e) => {
+          cache.delete(key);
+          unilog(2608, `image lookup failed for ${label}: ${e.message}`);
+          return "";
+        },
+      ),
+    );
+  }
+  return cache.get(key);
 }
 
 // null for a 404: the provider has no such thing.
@@ -90,15 +106,28 @@ async function getJson(url, init) {
       continue;
     }
     if (res.status === 404) return null;
-    // The query is left off: fanart.tv and TMDB carry their keys in it.
-    if (!res.ok) throw new Error(`${res.status} from ${url.split("?")[0]}`);
+    if (!res.ok) {
+      // The query is left off: fanart.tv and TMDB carry their keys in it.
+      const err = new Error(`${res.status} from ${url.split("?")[0]}`);
+      err.status = res.status;
+      throw err;
+    }
     return res.json();
   }
 }
 
+// A token TVDB turns down before it was due to expire is replaced, and the
+// call made again, once.
 async function tvdbGet(path) {
-  const token = await getToken();
-  return getJson(TVDB_API + path, { headers: { Authorization: "Bearer " + token } });
+  for (let tries = 1; ; tries++) {
+    const token = await getToken();
+    try {
+      return await getJson(TVDB_API + path, { headers: { Authorization: "Bearer " + token } });
+    } catch (e) {
+      if (e.status !== 401 || tries > 1) throw e;
+      clearToken();
+    }
+  }
 }
 
 function tmdbGet(path) {
@@ -156,14 +185,15 @@ export function normName(name) {
 }
 
 // The first source with an image. Each source is one provider; one that fails
-// is logged and passed over.
-async function firstOf(sources, label, ...args) {
+// is logged, marked on the trace, and passed over.
+async function firstOf(sources, trace, ...args) {
   for (const source of sources) {
     try {
       const url = await source(...args);
       if (url) return url;
     } catch (e) {
-      unilog(2609, `image provider failed for ${label}: ${e.message}`);
+      unilog(2609, `image provider failed for ${trace.label}: ${e.message}`);
+      trace.failed = true;
     }
   }
   return "";
@@ -172,13 +202,13 @@ async function firstOf(sources, label, ...args) {
 // The sources with every id the show's own ids lead to; only if none of them
 // has an image, again with the ids a search for the show's name turns up; and
 // last the searches by name.
-async function firstById(sources, searches, ids, showName, label, ...args) {
+async function firstById(sources, searches, ids, showName, trace, ...args) {
   const byId = await idsById(ids);
-  let url = await firstOf(sources, label, byId, ...args);
+  let url = await firstOf(sources, trace, byId, ...args);
   if (url) return url;
   const byName = showName ? await idsByName(byId, showName) : byId;
-  if (showName) url = await firstOf(sources, label, byName, ...args);
-  return url || firstOf(searches, label, byName, showName, ...args);
+  if (showName) url = await firstOf(sources, trace, byName, ...args);
+  return url || firstOf(searches, trace, byName, showName, ...args);
 }
 
 ////////////////////////  show ids  ////////////////////////
@@ -472,8 +502,8 @@ const SHOW_SEARCHES = {
 export function showImage(kind, ids, showName) {
   const key = `show|${kind}|${ids?.tvdbId || ""}|${ids?.tmdbId || ""}|${showName || ""}`;
   const label = showName || ids?.tvdbId;
-  return answer(key, label, () =>
-    firstById(SHOW_SOURCES[kind], SHOW_SEARCHES[kind], ids, showName, label),
+  return answer(key, label, (trace) =>
+    firstById(SHOW_SOURCES[kind], SHOW_SEARCHES[kind], ids, showName, trace),
   );
 }
 
@@ -493,8 +523,8 @@ const EPISODE_SOURCES = [
 export function episodeImage(ids, showName, season, episode) {
   const key = `episode|${ids?.tvdbId || ""}|${showName || ""}|${episodeKey(season, episode)}`;
   const label = `${showName} ${episodeKey(season, episode)}`;
-  return answer(key, label, () =>
-    firstById(EPISODE_SOURCES, [], ids, showName, label, season, episode),
+  return answer(key, label, (trace) =>
+    firstById(EPISODE_SOURCES, [], ids, showName, trace, season, episode),
   );
 }
 
@@ -535,5 +565,5 @@ const PERSON_SEARCHES = [
 export function personImage(name) {
   const p = { name, key: normName(name) };
   if (!p.key) return Promise.resolve("");
-  return answer(`person|${p.key}`, name, () => firstOf(PERSON_SEARCHES, name, p));
+  return answer(`person|${p.key}`, name, (trace) => firstOf(PERSON_SEARCHES, trace, p));
 }

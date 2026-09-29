@@ -1165,8 +1165,9 @@ export default {
         this._repeatActive = true;
         this._pendingLRKey = null;
         this._repeatKey = key;
-        // When its kh went, 0 before it has.
-        this._repeatStart = 0;
+        // When its kh went, 0 before it has. Up's key-up is what tvapp tells
+        // a tap from a hold by over a video, so up counts from its press.
+        this._repeatStart = key === "up" ? Date.now() : 0;
         const isUpDown = key === "up" || key === "down";
         (async () => {
           const r = await this.sendKeyThrough(key, null);
@@ -1295,7 +1296,7 @@ export default {
       const repeatKey = this._repeatKey;
       this._repeatKey = null;
       if (this.tvapprcMode) {
-        // Only a left/right that got as far as its kh was a hold.
+        // Only up, and a left/right that got as far as its kh, get a key-up.
         if (repeatKey && this._repeatStart)
           this.sendTvapprc(
             `${CMD_KEY_UP},${repeatKey},${Date.now() - this._repeatStart}`,

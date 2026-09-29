@@ -71,6 +71,12 @@ class VideoPlayer extends FrameLayout {
   private static final double HOLD_BACK_SPEED = 250 / 3.0;
   private static final long NO_STILLS_STEP_MS = 5000;
   private static final long SKIP_LOCKOUT_MS = 2000;
+  // An up press is a tap when its key-up comes before any repeat of it (see
+  // key and keyUp). A remote's key-up can go missing (its socket closing), so
+  // a press with neither in this long counts as a tap too. The remotes' first
+  // repeat comes 400 ms after the press plus a round trip to tv-srvr, well
+  // inside it.
+  private static final long UP_TAP_MS = 2000;
   // A seek has ended once no left/right has come for this long: how long a
   // press keeps the time bar up, and the dead-man of a hold whose key-up
   // never came (a held key repeats well inside it).
@@ -159,6 +165,17 @@ class VideoPlayer extends FrameLayout {
       };
   private final Runnable holdStep = this::stepHold;
   private final Runnable stillsDown = this::landed;
+  // An up press waiting UP_TAP_MS to learn if it is a hold (see key).
+  private boolean upPending;
+  // An up tap: the episode is done, as if it had run to the end, so tv-srvr
+  // marks it watched with its resume point back at 0.
+  private final Runnable upTap =
+      () -> {
+        upPending = false;
+        report("ended");
+        ready = false;
+        close();
+      };
   // The video's text tracks, in the order the remote's subtitle panel lists
   // them.
   private final List<Tracks.Group> textGroups = new ArrayList<>();
@@ -326,7 +343,8 @@ class VideoPlayer extends FrameLayout {
   /**
    * A remote key while the video is up -- tvapprc mode's arrows and ok, the
    * same keys that drive the list: ok pauses and resumes, left and right seek,
-   * up jumps back to the start (trimPosMs, past the intro, when there is one),
+   * a tap of up ends the episode as watched and closes the video, a held up
+   * jumps back to the start (trimPosMs, past the intro, when there is one),
    * skip (the remotes' Skip key) jumps over the intro by the show's skip
    * length, and down toggles the time bar. Down's bar stays until down again, any key but a seek, or the
    * video closing. A seek's is up only until the seek ends, and the bar is
@@ -359,7 +377,19 @@ class VideoPlayer extends FrameLayout {
       if ("ok".equals(key)) exo.setPlayWhenReady(!exo.getPlayWhenReady());
       else if ("left".equals(key)) seekBy(false, pos, -SEEK_BACK_MS);
       else if ("right".equals(key)) seekBy(false, pos, SEEK_FWD_MS);
-      else if ("up".equals(key)) exo.seekTo(playing.optLong("trimPosMs"));
+      else if ("up".equals(key)) {
+        // The press waits for a repeat to say it is a hold, or its key-up
+        // (or UP_TAP_MS) to say it is a tap. Later repeats do nothing.
+        if (!repeat) {
+          upPending = true;
+          ui.removeCallbacks(upTap);
+          ui.postDelayed(upTap, UP_TAP_MS);
+        } else if (upPending) {
+          upPending = false;
+          ui.removeCallbacks(upTap);
+          exo.seekTo(playing.optLong("trimPosMs"));
+        }
+      }
       else if ("skip".equals(key)) {
         // A held Skip repeats, and a second skip would land past the intro
         // into the show, so repeats inside the lockout are dropped.
@@ -381,6 +411,11 @@ class VideoPlayer extends FrameLayout {
    * key came up, so the hold lands on the last of those.
    */
   void keyUp(String key, long heldMs) {
+    if ("up".equals(key) && upPending) {
+      ui.removeCallbacks(upTap);
+      upTap.run();
+      return;
+    }
     if (!holding || !key.equals(holdKey)) return;
     boolean left = "left".equals(holdKey);
     int steps = (int) (1 + heldMs / holdTickMs(left));
@@ -536,6 +571,8 @@ class VideoPlayer extends FrameLayout {
     ui.removeCallbacks(seekEnd);
     ui.removeCallbacks(holdStep);
     ui.removeCallbacks(stillsDown);
+    ui.removeCallbacks(upTap);
+    upPending = false;
     seeking = false;
     holding = false;
     remoteHold = false;

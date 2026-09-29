@@ -7,12 +7,16 @@
 
 import { parentPort, workerData } from "node:worker_threads";
 import { spawn, execFile } from "node:child_process";
+import { promisify } from "node:util";
 import path from "node:path";
 import fs from "node:fs";
 import { logHere, setUnilogSink, unilog } from "@tv/share";
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
 const PARTIAL_DIR_PREFIX = ".rsync-tmp-";
+const MKV_HEAD_BYTES = 1 << 20;
+const MKV_CLUSTER_ID = Buffer.from([0x1f, 0x43, 0xb6, 0x75]);
+const MKV_CUES_ID = Buffer.from([0x1c, 0x53, 0xbb, 0x6b]);
 // The worker exits as soon as it finishes, so in-flight log POSTs have to be
 // awaited before process.exit or they never reach tv-srvr.
 const pendingLogPosts = new Set();
@@ -102,6 +106,38 @@ const summarizeStderr = (stderrText) => {
     .trim();
   if (oneLine.length <= 280) return oneLine;
   return oneLine.slice(0, 277) + "...";
+};
+
+// tvapp's player (Media3) finds an mkv's seek index (Cues) only when it, or a
+// SeekHead entry for it, comes before the first Cluster. Some releases list it
+// only in a second SeekHead at the end of the file, and tvapp can't seek those
+// at all: the start past the intro and every seek land at 0. mkvmerge rewrites
+// them with the index listed up front. A failure leaves the file as it came.
+const fixMkvSeekIndex = async (file) => {
+  if (path.extname(file).toLowerCase() !== ".mkv") return;
+  const tmp = path.join(path.dirname(file), `.${path.basename(file)}.remux`);
+  try {
+    const fh = await fs.promises.open(file, "r");
+    const { buffer, bytesRead } = await fh
+      .read(Buffer.alloc(MKV_HEAD_BYTES), 0, MKV_HEAD_BYTES, 0)
+      .finally(() => fh.close());
+    const cluster = buffer.subarray(0, bytesRead).indexOf(MKV_CLUSTER_ID);
+    const head = buffer.subarray(0, cluster < 0 ? bytesRead : cluster);
+    if (head.includes(MKV_CUES_ID)) return;
+    // mkvmerge exits 1 for warnings with the file written, 2 for errors.
+    await promisify(execFile)("mkvmerge", ["-q", "-o", tmp, file]).catch((e) => {
+      if (e.code !== 1) throw e;
+    });
+    const st = await fs.promises.stat(file);
+    await fs.promises.chown(tmp, st.uid, st.gid);
+    await fs.promises.chmod(tmp, st.mode);
+    await fs.promises.utimes(tmp, st.atime, st.mtime);
+    await fs.promises.rename(tmp, file);
+    unilog(2634, `remuxed ${path.basename(file)} so tvapp can seek it`);
+  } catch (e) {
+    await fs.promises.rm(tmp, { force: true });
+    unilog(2635, `could not remux ${path.basename(file)} for tvapp seeking: ${e.message}`);
+  }
 };
 
 const escapeForDoubleQuotes = (s) =>
@@ -375,19 +411,22 @@ const main = () => {
   };
 
   // A transfer that wrote into the partial dir still has to be moved to its
-  // real name. Returns false when the move failed and the entry has already
-  // been finished with the error.
-  const promoteFile = (fromPath) => {
+  // real name, and every landed file gets its seek index fixed for tvapp.
+  // Returns false when the move failed and the entry has already been
+  // finished with the error.
+  const promoteFile = async (fromPath) => {
     const { dst } = makeSrcDst();
-    if (fromPath === dst) return true;
-    try {
-      fs.renameSync(fromPath, dst);
-    } catch (e) {
-      unilog(2131, `could not move finished ${title} into place: ${e.message}`);
-      failFinish(`could not move finished file into place: ${e.message}`);
-      return false;
+    if (fromPath !== dst) {
+      try {
+        fs.renameSync(fromPath, dst);
+      } catch (e) {
+        unilog(2131, `could not move finished ${title} into place: ${e.message}`);
+        failFinish(`could not move finished file into place: ${e.message}`);
+        return false;
+      }
+      removePartialDir();
     }
-    removePartialDir();
+    await fixMkvSeekIndex(dst);
     return true;
   };
 
@@ -421,7 +460,7 @@ const main = () => {
       const landedBytes = await verifyLandedIntact(partialPath);
       if (landedBytes) {
         unilog(2132, `${title} was already complete in the partial dir at ${landedBytes} bytes — moved into place without re-running rsync`);
-        if (!promoteFile(partialPath)) return;
+        if (!(await promoteFile(partialPath))) return;
         entry.progress = 100;
         finish("finished");
         return;
@@ -590,7 +629,7 @@ const main = () => {
           resuming ? rsyncDst : null,
         );
         if (landedBytes) {
-          if (!promoteFile(rsyncDst)) return;
+          if (!(await promoteFile(rsyncDst))) return;
           unilog(2030, `rsync exit code ${code} for ${title}: ${stderrSummary || "no stderr"}`);
           unilog(2031, `rsync for ${title} actually succeeded: local file is complete at ${landedBytes} bytes, matching the remote`);
           entry.progress = 100;
@@ -647,7 +686,7 @@ const main = () => {
         failFinish(msg);
         return;
       }
-      if (!promoteFile(rsyncDst)) return;
+      if (!(await promoteFile(rsyncDst))) return;
       entry.progress = 100;
       finish("finished");
     });

@@ -143,7 +143,7 @@ class Images {
     }
   }
 
-  static byte[] read(String url) {
+  private static byte[] read(String url) {
     HttpURLConnection conn = null;
     try {
       conn = (HttpURLConnection) new URL(url).openConnection();

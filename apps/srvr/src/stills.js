@@ -42,12 +42,16 @@ const STILL_SPAN_SECS = 1200;
 // tvapp's scrub stills (playStills): the whole file on the same grid, in this
 // subdir of the episode's stills dir.
 const PLAY_SUBDIR = "play";
-// ffmpegs a play set runs at once. 8 made a 720p episode's 260 stills in 5.4s
-// while another read shared the disk.
-const PLAY_THREADS = 8;
-// A held right in tvapp steps along every PLAY_COARSE-th still (15s), so a
-// new set makes those first.
-const PLAY_COARSE = 3;
+// A play set's still spacing: tvapp's hold steps one still at a time, so this
+// sets how many it shows a second (50 for a held right). Keyframes are about
+// 2s apart in most files, so a finer grid would mostly repeat pictures.
+const PLAY_GAP_SECS = 2.5;
+// ffmpegs a play set runs at once. 12 made about 39 stills a second off a 1080p
+// mkv, against 28 for 8; 16 made no more.
+const PLAY_THREADS = 12;
+// A new set makes every PLAY_COARSE-th still (15s) first, so a hold on a set
+// still building has a picture every 15s before it has them all.
+const PLAY_COARSE = 6;
 // tvapp shows a still full screen, and its UI is 1920x1080 on the 4K set.
 // Smaller sources stay their own size. The keyframe's decode is what a still
 // costs, and the width hardly changes it: 0.22s for a 2160p hevc still at 400
@@ -459,27 +463,44 @@ export async function startStills(
   return job;
 }
 
-// Play sets building now, by resolved video path.
+// Play sets building now, by resolved video path: { stop, done }. Only the
+// newest play's set builds: each is up to PLAY_THREADS ffmpegs, and a set
+// left building for every episode flipped through piled them up on the disk.
+// A stopped set carries on from where it got to the next time its episode
+// plays.
 const playBuilds = new Map();
+let newestPlay = null;
 
 // tvapp's scrub stills for an episode it is about to play, which it shows
 // while left/right is held. Starts the set building unless it is already on
-// disk or on its way, and returns at once with where it is. startMs is where
-// the video starts; the stills nearest it come first.
+// disk or on its way, stopping any other set's build, and returns at once with
+// where it is. startMs is where the video starts; the stills nearest it come
+// first.
 export function playStills(videoFilePath, startMs) {
   const resolved = path.resolve(videoFilePath);
   const dir = path.join(stillsDirFor(resolved), PLAY_SUBDIR);
-  if (!playBuilds.has(resolved)) {
-    playBuilds.set(
-      resolved,
-      buildPlayStills(resolved, dir, startMs / 1000)
-        .catch((e) => {
-          unilog(2640, `play stills failed for ${path.basename(resolved)}: ${e.message}`);
-        })
-        .finally(() => playBuilds.delete(resolved)),
-    );
-  }
-  return { urlBase: stillsUrlBase(dir), gapMs: STILL_GAP_SECS * 1000 };
+  newestPlay = resolved;
+  for (const [file, build] of playBuilds) if (file !== resolved) build.stop = true;
+  const running = playBuilds.get(resolved);
+  if (!running) startPlayBuild(resolved, dir, startMs);
+  // Played again while its stop winds down: it starts over once that has,
+  // unless yet another episode has been played by then.
+  else if (running.stop)
+    running.done.then(() => {
+      if (newestPlay === resolved && !playBuilds.has(resolved))
+        startPlayBuild(resolved, dir, startMs);
+    });
+  return { urlBase: stillsUrlBase(dir), gapMs: PLAY_GAP_SECS * 1000 };
+}
+
+function startPlayBuild(file, dir, startMs) {
+  const build = { stop: false };
+  build.done = buildPlayStills(file, dir, startMs / 1000, build)
+    .catch((e) => {
+      unilog(2653, `play stills failed for ${path.basename(file)}: ${e.message}`);
+    })
+    .finally(() => playBuilds.delete(file));
+  playBuilds.set(file, build);
 }
 
 // The intro strip's one pass reads the whole file, minutes for a big one, so a
@@ -490,39 +511,52 @@ export function playStills(videoFilePath, startMs) {
 // thread hands out its first frame without waiting for more packets. Order:
 // the coarse marks from the start to the end, then from the start back to 0,
 // then the marks between them in the same order. Each still lands by rename,
-// so tvapp can use a set before it is finished.
-async function buildPlayStills(file, dir, startSec) {
+// so tvapp can use a set before it is finished. The sidecar is written
+// `partial` at the start, so a build stopped part way (build.stop) keeps its
+// stills and the next one makes only the rest.
+async function buildPlayStills(file, dir, startSec, build) {
   const srcStat = await fsp.stat(file);
   const sc = await readSidecar(dir);
-  if (
+  const sameSet =
     sc &&
     sc.mtimeMs === srcStat.mtimeMs &&
     sc.size === srcStat.size &&
-    sc.gapSecs === STILL_GAP_SECS &&
-    sc.width === PLAY_WIDTH
-  )
-    return;
+    sc.gapSecs === PLAY_GAP_SECS &&
+    sc.width === PLAY_WIDTH;
+  if (sameSet && !sc.partial) return;
   const startedAt = Date.now();
-  await clearSet(dir);
+  if (!sameSet) await clearSet(dir);
   const { durationSec, dvProfile } = await probePlay(file);
-  const count = Math.ceil(durationSec / STILL_GAP_SECS);
-  const first = Math.min(count - 1, Math.round(startSec / STILL_GAP_SECS));
+  const sidecar = {
+    src: file,
+    mtimeMs: srcStat.mtimeMs,
+    size: srcStat.size,
+    gapSecs: PLAY_GAP_SECS,
+    width: PLAY_WIDTH,
+    durationSec,
+  };
+  await fsp.writeFile(
+    path.join(dir, SIDECAR_NAME),
+    JSON.stringify({ ...sidecar, partial: true }),
+    "utf8",
+  );
+  const stillName = (n) => `${String(n + 1).padStart(5, "0")}.jpg`;
+  const have = new Set(await fsp.readdir(dir));
+  const count = Math.ceil(durationSec / PLAY_GAP_SECS);
+  const first = Math.min(count - 1, Math.round(startSec / PLAY_GAP_SECS));
   const rank = (n) =>
     (n % PLAY_COARSE ? 2 * count : 0) + (n < first ? count : 0) + Math.abs(n - first);
-  const order = [...Array(count).keys()].sort((a, b) => rank(a) - rank(b));
+  const order = [...Array(count).keys()]
+    .filter((n) => !have.has(stillName(n)))
+    .sort((a, b) => rank(a) - rank(b));
   let next = 0;
   let failed = 0;
   let lastErr = "";
   const worker = async () => {
-    while (next < order.length) {
+    while (!build.stop && next < order.length) {
       const n = order[next++];
       await runFfmpeg(
-        playStillArgs(
-          file,
-          n * STILL_GAP_SECS,
-          path.join(dir, `${String(n + 1).padStart(5, "0")}.jpg`),
-          dvProfile === 5,
-        ),
+        playStillArgs(file, n * PLAY_GAP_SECS, path.join(dir, stillName(n)), dvProfile === 5),
       ).catch((e) => {
         failed++;
         lastErr = e.message;
@@ -532,21 +566,17 @@ async function buildPlayStills(file, dir, startSec) {
   await Promise.all(Array.from({ length: PLAY_THREADS }, worker));
   const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
   if (failed > 0)
-    unilog(2641, `${failed} of ${count} play stills failed for ${path.basename(file)}: ${lastErr.slice(-200)}`);
+    unilog(2654, `${failed} of ${count} play stills failed for ${path.basename(file)}: ${lastErr.slice(-200)}`);
+  if (build.stop) {
+    unilog(2655, `play stills stopped after ${next} of ${order.length} in ${secs}s, another episode played: ${path.basename(file)}`);
+    return;
+  }
   await fsp.writeFile(
     path.join(dir, SIDECAR_NAME),
-    JSON.stringify({
-      src: file,
-      mtimeMs: srcStat.mtimeMs,
-      size: srcStat.size,
-      gapSecs: STILL_GAP_SECS,
-      width: PLAY_WIDTH,
-      total: count - failed,
-      durationSec,
-    }),
+    JSON.stringify({ ...sidecar, total: count - failed }),
     "utf8",
   );
-  unilog(2642, `${count - failed} play stills in ${secs}s: ${path.basename(file)}`);
+  unilog(2656, `${order.length - failed} play stills (${count} in the set) in ${secs}s: ${path.basename(file)}`);
 }
 
 // Dolby Vision profile 5 has no HDR10 base layer: decoded as plain video its

@@ -7,9 +7,14 @@ import android.graphics.Color;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.Log;
 import android.util.LruCache;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -28,15 +33,20 @@ import org.json.JSONObject;
  */
 class Stills extends FrameLayout {
 
-  private static final int THREADS = 3;
-  // Steps fetched ahead of the target, in the hold's direction.
-  private static final int AHEAD = 8;
-  // A 1920x1080 still is 4 MB decoded. Room for the ones fetched ahead and a
-  // few behind.
-  private static final int CACHED = 24;
+  private static final String TAG = "tvapp";
+  // A still costs about 60 ms to fetch and decode, and a held right shows 50
+  // a second: 4 threads, one a core, make about 65.
+  private static final int THREADS = 4;
+  // Steps fetched ahead of the target, in the hold's direction: half a second
+  // of a held right.
+  private static final int AHEAD = 24;
+  // A 1920x1080 still is 4 MB decoded, so 160 MB. Room for the ones fetched
+  // ahead, and some of the ones behind that a late key-up steps back to.
+  private static final int CACHED = 40;
   // A still that wasn't there is asked for again after this long: the set may
   // still be building.
   private static final long RETRY_MS = 1000;
+  private static final int TIMEOUT_MS = 5000;
   private static final ExecutorService POOL = Executors.newFixedThreadPool(THREADS);
 
   private final Handler ui = new Handler(Looper.getMainLooper());
@@ -109,6 +119,10 @@ class Stills extends FrameLayout {
     for (int i = 1; i <= AHEAD; i++) load((int) (wanted + dir * i * step));
   }
 
+  long gapMs() {
+    return gapMs;
+  }
+
   /** Where the still on screen is, -1 for none. */
   long shownMs() {
     return shown < 0 ? -1 : shown * gapMs;
@@ -129,7 +143,7 @@ class Stills extends FrameLayout {
     String url = urlBase + String.format(Locale.US, "/%05d.jpg", n + 1);
     POOL.execute(
         () -> {
-          byte[] bytes = Images.read(url);
+          byte[] bytes = read(url);
           BitmapFactory.Options opts = new BitmapFactory.Options();
           opts.inPreferredConfig = Bitmap.Config.RGB_565;
           Bitmap b = bytes == null ? null : BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
@@ -146,6 +160,34 @@ class Stills extends FrameLayout {
                 if ((shown < 0 || (n - shown) * dir > 0) && (wanted - n) * dir >= 0) draw(n, b);
               });
         });
+  }
+
+  // One still's bytes, null when it isn't there (yet). The connection goes
+  // back to the pool, the error body read out and no disconnect, so a hold's
+  // 50 fetches a second reuse a few keep-alive connections, not a handshake
+  // each.
+  private static byte[] read(String url) {
+    HttpURLConnection conn = null;
+    try {
+      conn = (HttpURLConnection) new URL(url).openConnection();
+      conn.setConnectTimeout(TIMEOUT_MS);
+      conn.setReadTimeout(TIMEOUT_MS);
+      boolean ok = conn.getResponseCode() == HttpURLConnection.HTTP_OK;
+      InputStream in = ok ? conn.getInputStream() : conn.getErrorStream();
+      if (in == null) return null;
+      try (InputStream body = in) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[16384];
+        int n;
+        while ((n = body.read(buf)) > 0) out.write(buf, 0, n);
+        return ok ? out.toByteArray() : null;
+      }
+    } catch (Exception e) {
+      Log.e(TAG, "still load failed: " + e);
+      // A connection that broke is not one to hand back to the pool.
+      if (conn != null) conn.disconnect();
+      return null;
+    }
   }
 
   private void draw(int n, Bitmap b) {

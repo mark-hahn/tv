@@ -430,9 +430,12 @@ because the TV is unreachable from any wireless host here.
 - Any other key is swallowed. Back, `r`, or tvapp going to the background
   closes the video.
 - Held keys: the remotes send the first press as `k,<key>` and each
-  auto-repeat as `kr,<key>`. The TV's own remote marks its repeats itself.
-  tvapp drops a repeat once a video has opened or closed since the press, so a
-  seek held past the end never lands on the list.
+  auto-repeat as `kr,<key>`, except left/right, which send one `kh,<key>`
+  where the repeats would start and `ku,<key>,<heldMs>` on release. tvapp
+  makes a held left/right's repeats itself away from a video. The TV's own
+  remote marks its repeats itself. tvapp drops a repeat once a video has
+  opened or closed since the press, so a seek held past the end never lands
+  on the list.
 - Subtitles: holding Vol+ on the remote in tvapprc mode opens its subtitle
   panel.
   - tvapp sends the video's text tracks as `l,<json>` on every change, and
@@ -445,22 +448,36 @@ because the TV is unreachable from any wireless host here.
 
 **Scrub stills** (`Stills` in tvapp, `playStills()` in `apps/srvr/src/stills.js`)
 - `getPlayUrl` starts the episode's set and returns `stills: {urlBase,
-  gapMs}`. A set is a jpg up to 1920 wide for every 5 s mark of the whole
+  gapMs}`. A set is a jpg up to 1920 wide for every 2.5 s mark of the whole
   file, in the episode's stills dir under `play/`, served by nginx at
   `/stills`. Sets expire 30 days after they are built (`oldFiles.js`).
 - Each still is its own ffmpeg, which seeks through the mkv's index to the
-  keyframe at or before its mark and decodes only that frame. Eight run at
+  keyframe at or before its mark and decodes only that frame. Twelve run at
   once, the 15 s marks from the start position first, and tvapp uses a set
-  while it is still building. Dolby Vision profile 5 files go through
-  libplacebo on the GPU, or their stills come out magenta.
-- A left/right within 1 s of the last one is a hold. Each repeat steps the
-  target −10 s or +15 s (right snaps to the 15 s marks) and shows its still
-  full screen, under the time bar, which shows the still's time. Playback
-  and audio are off meanwhile (Media3 scrubbing mode).
+  while it is still building. Only the newest play's set builds: playing
+  another episode stops the last one's, which carries on from where it got
+  to the next time that episode plays (its sidecar is `partial` until done).
+  Dolby Vision profile 5 files go through libplacebo on the GPU, or their
+  stills come out magenta.
+- A remote's `kh,<left|right>` starts a hold; so does the first repeat from
+  the TV's own remote. The hold steps one still at a time on tvapp's own
+  clock, as fast as its speed allows: right every 20 ms (50 stills, about 2
+  minutes of video a second) and left every 30 ms (83 s a second). It shows
+  each still full screen, under the time bar, which shows the still's time.
+  A still late for its step is skipped, never shown out of order. tvapp
+  fetches 24 ahead on 4 keep-alive connections.
+  Playback and audio are off meanwhile (Media3 scrubbing mode).
+- The remotes send nothing between `kh` and `ku`: repeats arrive bunched over
+  the LAN and held the release back behind them. `ku` ends the hold; it
+  carries how long the key was held, so a `ku` that arrives late steps the
+  hold back to where it was when the key came up. With no `ku` (its socket
+  closed), any key press ends the hold and does nothing else. The TV's own
+  remote's hold ends on its key-up, or 1 s with no repeat.
 - Stills are fetched ahead of the hold and never step against its
   direction. One not built yet is asked for again after 1 s.
-- 1 s after the last repeat the video seeks to the keyframe the still
-  shows, and the still stays up until the player is ready there.
+- When the hold ends the video seeks to the keyframe the still shows, and
+  the still stays up until 250 ms after the player is ready there: the set
+  shows a new video frame about 100 ms after the player hands it over.
 - A video with no set seeks in scrubbing mode during a hold instead.
 
 **Back ladder** — camera → video → trailer → actor overlay → focus →
@@ -472,6 +489,8 @@ actor filter → filter text → top of list. At the top Back goes to the TV's h
 | --- | --- |
 | `k,<up\|down\|left\|right\|ok\|sort\|filter\|info\|skip>` | a key press |
 | `kr,<key>` | an auto-repeat of a held key |
+| `kh,<left\|right>` | the key held; no repeats follow, only its `ku` |
+| `ku,<key>,<heldMs>` | the held key let go, after `heldMs` held |
 | `j,<up\|down>` | skip: by letter in alpha order, by page otherwise; list only |
 | `b` | back one level; the TV's home screen at the top |
 | `e` | play |

@@ -61,19 +61,30 @@ class VideoPlayer extends FrameLayout {
   private static final long REPORT_MS = 10000;
   private static final long SEEK_BACK_MS = 10000;
   private static final long SEEK_FWD_MS = 30000;
-  // A held right's step, half a press's: the remotes repeat every 120 ms, so
-  // a hold covers about two minutes of video a second. tv-srvr builds a new
-  // stills set on this grid first (stills.js's PLAY_COARSE marks).
-  private static final long HOLD_FWD_MS = 15000;
+  // A hold steps one still at a time on its own clock, as fast as its speed
+  // allows: right about two minutes of video a second, left 83 s. With the
+  // stills 2.5 s apart that is a still every 20 ms right (50 a second) and
+  // every 30 ms left. A video with no stills steps NO_STILLS_STEP_MS. The
+  // remotes' key-up ends a hold; for the tv's own remote, SEEK_END_MS with no
+  // repeat does too.
+  private static final double HOLD_FWD_SPEED = 125;
+  private static final double HOLD_BACK_SPEED = 250 / 3.0;
+  private static final long NO_STILLS_STEP_MS = 5000;
   private static final long SKIP_LOCKOUT_MS = 2000;
-  // A seek has ended once no left/right has come for this long. The remotes
-  // send no key release, and a held key repeats well inside it.
+  // A seek has ended once no left/right has come for this long: how long a
+  // press keeps the time bar up, and the dead-man of a hold whose key-up
+  // never came (a held key repeats well inside it).
   // ponytail: ignores buffering after the seek; hold the bar through
   // STATE_BUFFERING too if it goes down before the new frame shows.
   private static final long SEEK_END_MS = 1000;
   // A still left up by a landing (see landStills) comes down after this
   // even if no frame was drawn.
   private static final long LAND_MAX_MS = 3000;
+  // Ready at the landing, the player has handed its frame to the set, but the
+  // set shows it about 100 ms later (its picture processing), and a still
+  // taken down at once let the frame from before the hold flash up. It stays
+  // this long past ready.
+  private static final long LAND_LINGER_MS = 250;
   // ffmpeg's input seek aims 3/23 s early in any file with B-frames (its dts
   // heuristic), so a still is the keyframe at or before its mark less this.
   // A file without B-frames and a keyframe in the 130 ms before a mark lands
@@ -124,6 +135,17 @@ class VideoPlayer extends FrameLayout {
   // hold leaves the video where it was, and while scrubbing the player's
   // position flips between the newest target and the last one it landed on.
   private long seekTarget;
+  // A left/right is held (see key and hold), and which.
+  private boolean holding;
+  private String holdKey;
+  // The hold is a remote's kh: no repeats keep it alive, so it has no
+  // dead-man. Its key-up ends it, or any key press (the user stopping one
+  // whose key-up never came), or its socket closing.
+  private boolean remoteHold;
+  // Each step's target, for a key-up that says the hold ended some steps back.
+  private final List<Long> holdSteps = new ArrayList<>();
+  // Where a late key-up put the landing, -1 for the still on screen.
+  private long landAt = -1;
   // A hold is showing stills for seekTarget, not seeking the video.
   private boolean stillsHold;
   // A hold's landing seek is on its way (see landStills).
@@ -132,10 +154,10 @@ class VideoPlayer extends FrameLayout {
   private final Runnable seekEnd =
       () -> {
         seeking = false;
-        setScrub(false);
-        landStills();
+        endHold();
         updateBar();
       };
+  private final Runnable holdStep = this::stepHold;
   private final Runnable stillsDown = this::landed;
   // The video's text tracks, in the order the remote's subtitle panel lists
   // them.
@@ -227,7 +249,11 @@ class VideoPlayer extends FrameLayout {
               report("playing");
               ui.postDelayed(reportTick, REPORT_MS);
             }
-            if (state == Player.STATE_READY && landing) landed();
+            if (state == Player.STATE_READY && landing) {
+              landing = false;
+              ui.removeCallbacks(stillsDown);
+              ui.postDelayed(stillsDown, LAND_LINGER_MS);
+            }
             if (state == Player.STATE_ENDED) {
               report("ended");
               ready = false;
@@ -304,35 +330,126 @@ class VideoPlayer extends FrameLayout {
    * skip (the remotes' Skip key) jumps over the intro by the show's skip
    * length, and down toggles the time bar. Down's bar stays until down again, any key but a seek, or the
    * video closing. A seek's is up only until the seek ends, and the bar is
-   * always up while paused.
+   * always up while paused. repeat: an auto-repeat of a held key (the tv's
+   * own remote); a left/right's first one starts a hold. Any key during a
+   * remote's hold (see hold) only ends it.
    */
-  void key(String key) {
+  void key(String key, boolean repeat) {
     if (exo == null) return;
+    if (remoteHold) {
+      finishHold();
+      return;
+    }
     boolean seek = "left".equals(key) || "right".equals(key);
     if ("down".equals(key)) barUp = !barUp;
     else if (!seek) barUp = false;
-    boolean hold = seek && seeking;
-    setScrub(hold);
-    if (!hold) landStills();
+    boolean hold = seek && repeat;
+    if (!hold) endHold();
     seeking = seek;
     ui.removeCallbacks(seekEnd);
     if (seek) ui.postDelayed(seekEnd, SEEK_END_MS);
-    long pos = hold ? seekTarget : exo.getCurrentPosition();
-    long skipDurMs = playing.optLong("skipDurMs");
-    if ("ok".equals(key)) exo.setPlayWhenReady(!exo.getPlayWhenReady());
-    else if ("left".equals(key)) seekBy(hold, pos, -SEEK_BACK_MS);
-    else if ("right".equals(key)) seekBy(hold, pos, hold ? HOLD_FWD_MS : SEEK_FWD_MS);
-    else if ("up".equals(key)) exo.seekTo(playing.optLong("trimPosMs"));
-    else if ("skip".equals(key)) {
-      // A held Skip repeats, and a second skip would land past the intro into
-      // the show, so repeats inside the lockout are dropped.
-      long now = SystemClock.uptimeMillis();
-      if (skipDurMs > 0 && now - lastSkipAt >= SKIP_LOCKOUT_MS) {
-        lastSkipAt = now;
-        exo.seekTo(pos + skipDurMs);
+    if (hold) {
+      // A repeat of the held key (the tv's own remote) only keeps the hold
+      // alive (seekEnd above): the hold steps on its own clock. The first one
+      // starts it, and a repeat of the other key turns it round.
+      if (!holding || !key.equals(holdKey)) startHold(key);
+    } else {
+      long pos = exo.getCurrentPosition();
+      long skipDurMs = playing.optLong("skipDurMs");
+      if ("ok".equals(key)) exo.setPlayWhenReady(!exo.getPlayWhenReady());
+      else if ("left".equals(key)) seekBy(false, pos, -SEEK_BACK_MS);
+      else if ("right".equals(key)) seekBy(false, pos, SEEK_FWD_MS);
+      else if ("up".equals(key)) exo.seekTo(playing.optLong("trimPosMs"));
+      else if ("skip".equals(key)) {
+        // A held Skip repeats, and a second skip would land past the intro
+        // into the show, so repeats inside the lockout are dropped.
+        long now = SystemClock.uptimeMillis();
+        if (skipDurMs > 0 && now - lastSkipAt >= SKIP_LOCKOUT_MS) {
+          lastSkipAt = now;
+          exo.seekTo(pos + skipDurMs);
+        }
       }
     }
     updateBar();
+  }
+
+  /**
+   * The held key let go: its hold ends now. The time bar stays until seekEnd.
+   * heldMs is how long the remote had the key held, -1 for the tv's own
+   * remote. The key-up can come in late, and the hold has gone on stepping
+   * meanwhile; the steps that fit in heldMs are the ones that were up when the
+   * key came up, so the hold lands on the last of those.
+   */
+  void keyUp(String key, long heldMs) {
+    if (!holding || !key.equals(holdKey)) return;
+    boolean left = "left".equals(holdKey);
+    int steps = (int) (1 + heldMs / holdTickMs(left));
+    if (heldMs >= 0 && stillsHold && steps < holdSteps.size()) {
+      landAt = holdSteps.get(steps - 1);
+      stills.show(landAt, left ? holdStepMs() : -holdStepMs(), exo.getDuration());
+    }
+    finishHold();
+  }
+
+  /** A remote's left/right held (kh): a hold with no repeats, until its key-up. */
+  void hold(String key) {
+    if (exo == null) return;
+    barUp = false;
+    seeking = true;
+    ui.removeCallbacks(seekEnd);
+    remoteHold = true;
+    if (!holding || !key.equals(holdKey)) startHold(key);
+    updateBar();
+  }
+
+  /** A remote's socket closed: its hold gets no key-up now. */
+  void dropHold() {
+    if (remoteHold) finishHold();
+  }
+
+  // A hold ends, and the time bar stays up SEEK_END_MS more.
+  private void finishHold() {
+    endHold();
+    ui.removeCallbacks(seekEnd);
+    ui.postDelayed(seekEnd, SEEK_END_MS);
+  }
+
+  // A hold starts (a remote's kh, or the tv's own remote's first repeat) or
+  // turns round: steps now and every holdTickMs until endHold.
+  private void startHold(String key) {
+    ui.removeCallbacks(holdStep);
+    holding = true;
+    holdKey = key;
+    holdSteps.clear();
+    setScrub(true);
+    stepHold();
+  }
+
+  private void stepHold() {
+    if (!holding || exo == null) return;
+    boolean left = "left".equals(holdKey);
+    seekBy(true, seekTarget, left ? -holdStepMs() : holdStepMs());
+    holdSteps.add(seekTarget);
+    ui.postDelayed(holdStep, holdTickMs(left));
+  }
+
+  // A hold's step, one still, and how often it steps to keep its speed.
+  private long holdStepMs() {
+    return stills.has() ? stills.gapMs() : NO_STILLS_STEP_MS;
+  }
+
+  private long holdTickMs(boolean left) {
+    return Math.round(holdStepMs() / (left ? HOLD_BACK_SPEED : HOLD_FWD_SPEED));
+  }
+
+  // The key-up, a fresh key, or SEEK_END_MS with no repeat.
+  private void endHold() {
+    if (!holding) return;
+    holding = false;
+    remoteHold = false;
+    ui.removeCallbacks(holdStep);
+    setScrub(false);
+    landStills();
   }
 
   // A left/right, stepMs from pos. A hold shows the stills for its target
@@ -344,9 +461,9 @@ class VideoPlayer extends FrameLayout {
       return;
     }
     stillsHold = true;
-    // A held right lands on the HOLD_FWD_MS marks, the stills a new set has
-    // first.
-    if (stepMs > 0) seekTarget = Math.round(seekTarget / (double) HOLD_FWD_MS) * HOLD_FWD_MS;
+    // Each step lands on a still's mark.
+    long grid = Math.abs(stepMs);
+    seekTarget = Math.round(seekTarget / (double) grid) * grid;
     long dur = exo.getDuration();
     if (dur > 0) seekTarget = Math.min(seekTarget, dur);
     stills.show(seekTarget, stepMs, dur);
@@ -372,7 +489,8 @@ class VideoPlayer extends FrameLayout {
     if (!stillsHold || exo == null) return;
     stillsHold = false;
     landing = true;
-    long ms = stills.shownMs() < 0 ? seekTarget : stills.shownMs();
+    long ms = landAt >= 0 ? landAt : stills.shownMs() < 0 ? seekTarget : stills.shownMs();
+    landAt = -1;
     exo.setSeekParameters(SeekParameters.PREVIOUS_SYNC);
     exo.seekTo(Math.max(0, ms - FFMPEG_SEEK_BACK_MS));
     exo.setSeekParameters(SeekParameters.DEFAULT);
@@ -380,15 +498,15 @@ class VideoPlayer extends FrameLayout {
     ui.postDelayed(stillsDown, LAND_MAX_MS);
   }
 
-  // A landing's frame is up (or LAND_MAX_MS passed): the still comes down,
-  // unless a new hold has it up again.
+  // A landing's frame is on screen (LAND_LINGER_MS past ready, or LAND_MAX_MS
+  // passed): the still comes down, unless a new hold has it up again.
   private void landed() {
     landing = false;
     if (!stillsHold) stills.hide();
   }
 
-  // On for a hold: a left/right that comes while the last one's seekEnd is
-  // pending. Scrubbing mode keeps playback and audio off until the hold ends,
+  // On for a hold (a remote's kh, or a repeat from the tv's own remote).
+  // Scrubbing mode keeps playback and audio off until the hold ends,
   // under its stills. For a video with no stills it also holds each seek back
   // until the one before has drawn its frame; plain seeks each dropped the one
   // before them undrawn, and the picture froze through a hold.
@@ -416,8 +534,11 @@ class VideoPlayer extends FrameLayout {
     if (exo == null) return;
     ui.removeCallbacks(reportTick);
     ui.removeCallbacks(seekEnd);
+    ui.removeCallbacks(holdStep);
     ui.removeCallbacks(stillsDown);
     seeking = false;
+    holding = false;
+    remoteHold = false;
     stillsHold = false;
     landing = false;
     stills.close();

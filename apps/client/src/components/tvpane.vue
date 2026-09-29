@@ -744,6 +744,13 @@ const CMD_KEY = "k";
 // hold belongs to whatever it started on, and its repeats are dropped once
 // that is gone (a seek held past the end of a video).
 const CMD_KEY_REPEAT = "kr";
+// A held left/right, sent once where its repeats would start, and the key let
+// go. Nothing goes in between: repeats bunch up on the way to the tv and held
+// the release back behind them. tvapp makes the hold's steps itself. The
+// release carries how long the key was held, so tvapp can land where the hold
+// was when it came up even when the message arrives late.
+const CMD_KEY_HOLD = "kh";
+const CMD_KEY_UP = "ku";
 // The hide key. What it acts on -- the episode under the map's cursor, else
 // the selected show -- is tvapp's to decide, so the press is all that is sent.
 const CMD_HIDE = "h";
@@ -1157,6 +1164,9 @@ export default {
         this.flash(key);
         this._repeatActive = true;
         this._pendingLRKey = null;
+        this._repeatKey = key;
+        // When its kh went, 0 before it has.
+        this._repeatStart = 0;
         const isUpDown = key === "up" || key === "down";
         (async () => {
           const r = await this.sendKeyThrough(key, null);
@@ -1165,6 +1175,16 @@ export default {
           await new Promise((r) => {
             this._repeatTimer = setTimeout(r, SCRUB_HOLD_DELAY_MS);
           });
+          if (key === "left" || key === "right") {
+            const rr = await this.sendKeyThrough(key, null, {
+              repeating: true,
+            });
+            if (rr.blocked) return this.stopRepeat();
+            if (!this._repeatActive) return;
+            this._repeatStart = Date.now();
+            this.sendTvapprc(`${CMD_KEY_HOLD},${key}`);
+            return;
+          }
           // Fast phase, repeating every TVAPP_FAST_REPEAT_MS. Once up/down have
           // held through another SCRUB_HOLD_DELAY_MS of it -- the same delay
           // that got us here -- switch to letter-skip mode: back to the slow
@@ -1272,7 +1292,16 @@ export default {
       clearTimeout(this._repeatTimer);
       const pendingLRKey = this._pendingLRKey;
       this._pendingLRKey = null;
-      if (this.tvapprcMode) return;
+      const repeatKey = this._repeatKey;
+      this._repeatKey = null;
+      if (this.tvapprcMode) {
+        // Only a left/right that got as far as its kh was a hold.
+        if (repeatKey && this._repeatStart)
+          this.sendTvapprc(
+            `${CMD_KEY_UP},${repeatKey},${Date.now() - this._repeatStart}`,
+          );
+        return;
+      }
       // Stop server-side scrubbing. This is a gesture-end cleanup, not a
       // keypress, and must fire even when locked (else the tv keeps scrubbing),
       // so it goes direct rather than through the collision gate.

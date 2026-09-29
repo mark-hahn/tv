@@ -63,6 +63,8 @@ class CtrlServer extends WebSocketServer {
   private static final String TAG = "tvapp";
   private static final String CMD_KEY = "k";
   private static final String CMD_KEY_REPEAT = "kr";
+  private static final String CMD_KEY_HOLD = "kh";
+  private static final String CMD_KEY_UP = "ku";
   private static final String CMD_KEY_LETTER = "j";
   private static final String CMD_BACK = "b";
   private static final String CMD_PLAY = "e";
@@ -88,6 +90,18 @@ class CtrlServer extends WebSocketServer {
 
   interface Listener {
     void onRemoteKey(String key, boolean repeat);
+
+    /** A left/right held: no repeats follow it, only its key-up. */
+    void onRemoteKeyHold(String key);
+
+    /**
+     * The held key let go. heldMs is how long it was held on the remote, -1 if
+     * not sent.
+     */
+    void onRemoteKeyUp(String key, long heldMs);
+
+    /** A remote's socket closed: a hold it started gets no key-up now. */
+    void onRemoteGone();
 
     void onRemoteKeyLetter(String key);
 
@@ -173,6 +187,7 @@ class CtrlServer extends WebSocketServer {
   @Override
   public void onClose(WebSocket conn, int code, String reason, boolean remote) {
     Log.i(TAG, "tvapprc disconnected, code " + code + " " + reason);
+    listener.onRemoteGone();
   }
 
   /** To the phone. There is only ever the one connection, so broadcast is it. */
@@ -217,6 +232,21 @@ class CtrlServer extends WebSocketServer {
     }
     if (message.startsWith(CMD_KEY_LETTER + ",")) {
       listener.onRemoteKeyLetter(message.substring(CMD_KEY_LETTER.length() + 1));
+      return;
+    }
+    if (message.startsWith(CMD_KEY_HOLD + ",")) {
+      listener.onRemoteKeyHold(message.substring(CMD_KEY_HOLD.length() + 1));
+      return;
+    }
+    if (message.startsWith(CMD_KEY_UP + ",")) {
+      String[] kh = message.substring(CMD_KEY_UP.length() + 1).split(",");
+      long heldMs = -1;
+      try {
+        if (kh.length > 1) heldMs = Long.parseLong(kh[1]);
+      } catch (NumberFormatException e) {
+        Log.w(TAG, "bad key-up command: " + message);
+      }
+      listener.onRemoteKeyUp(kh[0], heldMs);
       return;
     }
     if (message.startsWith(CMD_KEY_REPEAT + ",")) {

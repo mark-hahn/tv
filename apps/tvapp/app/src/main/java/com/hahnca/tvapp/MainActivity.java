@@ -1003,7 +1003,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   private void playClick() {
     // The Play key over a video pauses and resumes it, as ok does.
     if (video.isOpen()) {
-      video.key("ok");
+      video.key("ok", false);
       return;
     }
     String trailerUrl = showList.focusedTrailerUrl();
@@ -1114,7 +1114,68 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     ui.post(
         () -> {
           bumpKeepAwake();
-          if (!strayRepeat(key, repeat)) handleRemoteKey(key);
+          // A press is the user stopping a hold whose key-up never came.
+          if (!repeat) stopHeld();
+          if (!strayRepeat(key, repeat)) handleRemoteKey(key, repeat);
+        });
+  }
+
+  // A remote's left/right held away from a video (kh): the remote sends no
+  // repeats, so they are made here, every HELD_REPEAT_MS until its key-up, a
+  // press, or its socket closing.
+  private static final long HELD_REPEAT_MS = 120;
+  private String heldKey;
+  private final Runnable heldRepeat =
+      new Runnable() {
+        @Override
+        public void run() {
+          if (heldKey == null) return;
+          if (strayRepeat(heldKey, true)) {
+            heldKey = null;
+            return;
+          }
+          handleRemoteKey(heldKey, true);
+          ui.postDelayed(this, HELD_REPEAT_MS);
+        }
+      };
+
+  private void stopHeld() {
+    heldKey = null;
+    ui.removeCallbacks(heldRepeat);
+  }
+
+  @Override
+  public void onRemoteKeyHold(String key) {
+    if (showsLoading && blockedWhileLoading(key)) return;
+    ui.post(
+        () -> {
+          bumpKeepAwake();
+          if (strayRepeat(key, true)) return;
+          if (video.isOpen()) {
+            video.hold(key);
+            return;
+          }
+          stopHeld();
+          heldKey = key;
+          heldRepeat.run();
+        });
+  }
+
+  @Override
+  public void onRemoteGone() {
+    ui.post(
+        () -> {
+          stopHeld();
+          video.dropHold();
+        });
+  }
+
+  @Override
+  public void onRemoteKeyUp(String key, long heldMs) {
+    ui.post(
+        () -> {
+          if (key.equals(heldKey)) stopHeld();
+          video.keyUp(key, heldMs);
         });
   }
 
@@ -1453,20 +1514,25 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   }
 
   private void handleRemoteKey(String key) {
+    handleRemoteKey(key, false);
+  }
+
+  // repeat: an auto-repeat of a held key, not a press. Only a video cares.
+  private void handleRemoteKey(String key, boolean repeat) {
     // A camera has nothing to steer, so every key is swallowed rather than
     // moving a list nobody can see underneath it. Back is not here: it comes
     // in on its own path, and handleBack closes the overlay.
     if (cam.isShowing()) return;
     // The remotes' Skip: the intro skip of a playing video, nothing without one.
     if ("skip".equals(key)) {
-      if (video.isOpen()) video.key("skip");
+      if (video.isOpen()) video.key("skip", false);
       return;
     }
     // While a video is up the keys are its own (see VideoPlayer.key); Back and
     // the Shows key come in on their own paths and close it. Keys it has no
     // use for are swallowed so they cannot move the hidden list underneath.
     if (video.isOpen()) {
-      video.key(key);
+      video.key(key, repeat);
       return;
     }
     if (player.isPlaying()) {
@@ -1661,8 +1727,9 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
       bumpKeepAwake();
       if ("back".equals(key)) handleBack();
       else if ((!showsLoading || !blockedWhileLoading(key))
-          && !strayRepeat(key, event.getRepeatCount() > 0)) handleRemoteKey(key);
-    }
+          && !strayRepeat(key, event.getRepeatCount() > 0))
+        handleRemoteKey(key, event.getRepeatCount() > 0);
+    } else if (event.getAction() == KeyEvent.ACTION_UP) video.keyUp(key, -1);
     return true;
   }
 

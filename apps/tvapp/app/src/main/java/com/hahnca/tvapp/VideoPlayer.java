@@ -148,8 +148,8 @@ class VideoPlayer extends FrameLayout {
   // dead-man. Its key-up ends it, or any key press (the user stopping one
   // whose key-up never came), or its socket closing.
   private boolean remoteHold;
-  // Each step's target, for a key-up that says the hold ended some steps back.
-  private final List<Long> holdSteps = new ArrayList<>();
+  // When the hold started, for placing a key-up's heldMs on tvapp's clock.
+  private long holdStartedAt;
   // Where a late key-up put the landing, -1 for the still on screen.
   private long landAt = -1;
   // A hold is showing stills for seekTarget, not seeking the video.
@@ -407,8 +407,8 @@ class VideoPlayer extends FrameLayout {
    * The held key let go: its hold ends now. The time bar stays until seekEnd.
    * heldMs is how long the remote had the key held, -1 for the tv's own
    * remote. The key-up can come in late, and the hold has gone on stepping
-   * meanwhile; the steps that fit in heldMs are the ones that were up when the
-   * key came up, so the hold lands on the last of those.
+   * meanwhile; heldMs past the hold's start is when the key came up, so the
+   * hold lands on the still that was up then.
    */
   void keyUp(String key, long heldMs) {
     if ("up".equals(key) && upPending) {
@@ -417,12 +417,7 @@ class VideoPlayer extends FrameLayout {
       return;
     }
     if (!holding || !key.equals(holdKey)) return;
-    boolean left = "left".equals(holdKey);
-    int steps = (int) (1 + heldMs / holdTickMs(left));
-    if (heldMs >= 0 && stillsHold && steps < holdSteps.size()) {
-      landAt = holdSteps.get(steps - 1);
-      stills.show(landAt, left ? holdStepMs() : -holdStepMs(), exo.getDuration());
-    }
+    if (heldMs >= 0 && stillsHold) landAt = stills.shownAt(holdStartedAt + heldMs);
     finishHold();
   }
 
@@ -455,7 +450,7 @@ class VideoPlayer extends FrameLayout {
     ui.removeCallbacks(holdStep);
     holding = true;
     holdKey = key;
-    holdSteps.clear();
+    holdStartedAt = SystemClock.uptimeMillis();
     setScrub(true);
     stepHold();
   }
@@ -464,7 +459,6 @@ class VideoPlayer extends FrameLayout {
     if (!holding || exo == null) return;
     boolean left = "left".equals(holdKey);
     seekBy(true, seekTarget, left ? -holdStepMs() : holdStepMs());
-    holdSteps.add(seekTarget);
     ui.postDelayed(holdStep, holdTickMs(left));
   }
 
@@ -526,6 +520,7 @@ class VideoPlayer extends FrameLayout {
     landing = true;
     long ms = landAt >= 0 ? landAt : stills.shownMs() < 0 ? seekTarget : stills.shownMs();
     landAt = -1;
+    stills.settle(ms);
     exo.setSeekParameters(SeekParameters.PREVIOUS_SYNC);
     exo.seekTo(Math.max(0, ms - FFMPEG_SEEK_BACK_MS));
     exo.setSeekParameters(SeekParameters.DEFAULT);

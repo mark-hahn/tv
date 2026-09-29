@@ -469,8 +469,10 @@ because the TV is unreachable from any wireless host here.
   Playback and audio are off meanwhile (Media3 scrubbing mode).
 - The remotes send nothing between `kh` and `ku`: repeats arrive bunched over
   the LAN and held the release back behind them. `ku` ends the hold; it
-  carries how long the key was held, so a `ku` that arrives late steps the
-  hold back to where it was when the key came up. With no `ku` (its socket
+  carries how long the key was held, so a `ku` that arrives late still lands
+  on the still that was on screen when the key came up. The stills freeze on
+  the landing still at once: a held right runs a few behind its target, and
+  the fetches still on their way would otherwise go on drawing past it. With no `ku` (its socket
   closed), any key press ends the hold and does nothing else. The TV's own
   remote's hold ends on its key-up, or 1 s with no repeat.
 - Stills are fetched ahead of the hold and never step against its

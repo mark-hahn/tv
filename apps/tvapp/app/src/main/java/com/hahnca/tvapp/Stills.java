@@ -15,8 +15,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -47,6 +50,8 @@ class Stills extends FrameLayout {
   // still be building.
   private static final long RETRY_MS = 1000;
   private static final int TIMEOUT_MS = 5000;
+  // Draws remembered for shownAt: 5 s of a held right.
+  private static final int HISTORY = 256;
   private static final ExecutorService POOL = Executors.newFixedThreadPool(THREADS);
 
   private final Handler ui = new Handler(Looper.getMainLooper());
@@ -66,6 +71,10 @@ class Stills extends FrameLayout {
   private int shown = -1;
   private int dir;
   private long durMs;
+  // The hold is over (settle): only the landing's still may go up now.
+  private boolean settled;
+  // Recent draws, newest last: {uptime, still index}.
+  private final Deque<long[]> drawn = new ArrayDeque<>();
 
   Stills(Context context, Runnable onShown) {
     super(context);
@@ -109,6 +118,7 @@ class Stills extends FrameLayout {
    * is the hold's signed step.
    */
   void show(long ms, long stepMs, long durMs) {
+    settled = false;
     this.durMs = durMs;
     dir = stepMs < 0 ? -1 : 1;
     wanted = (int) Math.round(ms / (double) gapMs);
@@ -128,10 +138,34 @@ class Stills extends FrameLayout {
     return shown < 0 ? -1 : shown * gapMs;
   }
 
+  /**
+   * The hold is over and lands at ms: that still stays up, and the fetches
+   * still on their way can no longer draw past it. A held right runs a few
+   * stills behind its target, and those went on going up after the release.
+   */
+  void settle(long ms) {
+    settled = true;
+    wanted = (int) Math.round(ms / (double) gapMs);
+    Bitmap b = cache.get(wanted);
+    if (b != null) draw(wanted, b);
+    else load(wanted);
+  }
+
+  /** Where the still that was up at uptime is, -1 for none. */
+  long shownAt(long uptime) {
+    for (Iterator<long[]> it = drawn.descendingIterator(); it.hasNext(); ) {
+      long[] d = it.next();
+      if (d[0] <= uptime) return d[1] * gapMs;
+    }
+    return -1;
+  }
+
   void hide() {
     setVisibility(GONE);
     image.setImageDrawable(null);
     shown = -1;
+    settled = false;
+    drawn.clear();
   }
 
   private void load(int n) {
@@ -157,7 +191,8 @@ class Stills extends FrameLayout {
                 }
                 missing.remove(n);
                 cache.put(n, b);
-                if ((shown < 0 || (n - shown) * dir > 0) && (wanted - n) * dir >= 0) draw(n, b);
+                if (settled ? n == wanted : (shown < 0 || (n - shown) * dir > 0) && (wanted - n) * dir >= 0)
+                  draw(n, b);
               });
         });
   }
@@ -192,6 +227,8 @@ class Stills extends FrameLayout {
 
   private void draw(int n, Bitmap b) {
     shown = n;
+    drawn.addLast(new long[] {SystemClock.uptimeMillis(), n});
+    if (drawn.size() > HISTORY) drawn.removeFirst();
     image.setImageBitmap(b);
     setVisibility(VISIBLE);
     onShown.run();

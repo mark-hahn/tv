@@ -1,10 +1,10 @@
 
-pressing up-arrow during playback should quit playing and then mark the episode watched and then set stored pos to 0 for the next episode to use. long-press up arrow during playback should jump back to beginning or trim pos
 
 clnup info in tvapp
 
 =================
-not going out
+
+pressing up-arrow during playback should quit playing and then mark the episode watched and then set stored pos to 0 for the next episode to use. long-press up arrow during playback should jump back to beginning or trim pos
 
 tv video is darkened when time bar is showing at the button -- can you keep the full screen normal brightness?
 

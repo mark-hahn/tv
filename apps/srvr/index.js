@@ -3373,17 +3373,20 @@ async function getPlayUrl({ showName, season: s, episode: e }) {
   if (!file) return { url: null };
   const rel = file.slice(tvDir.length + 1);
   const intro = tvdb.getSeasonIntro(rec, season);
+  const posMs = epd.getPos(ed, season, episode);
+  const trimPosMs = Math.max(0, Math.round(intro.trimPos || 0));
   return {
     url: `${TV_URL}/${rel.split("/").map(encodeURIComponent).join("/")}`,
     showName,
     season,
     episode,
-    posMs: epd.getPos(ed, season, episode),
+    posMs,
     res: epd.getRes(ed, season, episode),
     seasonEps: ed[season]?.length ?? 0,
-    trimPosMs: Math.max(0, Math.round(intro.trimPos || 0)),
+    trimPosMs,
     skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),
     ...subsForFile(file, season, episode),
+    stills: stills.playStills(file, posMs > 0 ? posMs : trimPosMs),
   };
 }
 

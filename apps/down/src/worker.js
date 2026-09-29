@@ -17,6 +17,7 @@ const PARTIAL_DIR_PREFIX = ".rsync-tmp-";
 const MKV_HEAD_BYTES = 1 << 20;
 const MKV_CLUSTER_ID = Buffer.from([0x1f, 0x43, 0xb6, 0x75]);
 const MKV_CUES_ID = Buffer.from([0x1c, 0x53, 0xbb, 0x6b]);
+const MKV_REMUX_MIN_RATIO = 0.99;
 // The worker exits as soon as it finishes, so in-flight log POSTs have to be
 // awaited before process.exit or they never reach tv-srvr.
 const pendingLogPosts = new Set();
@@ -129,6 +130,11 @@ const fixMkvSeekIndex = async (file) => {
       if (e.code !== 1) throw e;
     });
     const st = await fs.promises.stat(file);
+    // A remux only drops padding. On a truncated file mkvmerge exited 0
+    // having written 4 KB, so a much smaller result is data lost.
+    const { size } = await fs.promises.stat(tmp);
+    if (size < st.size * MKV_REMUX_MIN_RATIO)
+      throw new Error(`remux came out ${size} bytes from ${st.size}`);
     await fs.promises.chown(tmp, st.uid, st.gid);
     await fs.promises.chmod(tmp, st.mode);
     await fs.promises.utimes(tmp, st.atime, st.mtime);

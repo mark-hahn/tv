@@ -39,6 +39,20 @@ const NGINX_ORIGIN = "https://hahnca.com";
 const VAAPI_DEVICE = "/dev/dri/renderD128";
 const STILL_GAP_SECS = 5;
 const STILL_SPAN_SECS = 1200;
+// tvapp's scrub stills (playStills): the whole file on the same grid, in this
+// subdir of the episode's stills dir.
+const PLAY_SUBDIR = "play";
+// ffmpegs a play set runs at once. 8 made a 720p episode's 260 stills in 5.4s
+// while another read shared the disk.
+const PLAY_THREADS = 8;
+// A held right in tvapp steps along every PLAY_COARSE-th still (15s), so a
+// new set makes those first.
+const PLAY_COARSE = 3;
+// tvapp shows a still full screen, and its UI is 1920x1080 on the 4K set.
+// Smaller sources stay their own size. The keyframe's decode is what a still
+// costs, and the width hardly changes it: 0.22s for a 2160p hevc still at 400
+// wide, 0.24s at 1920.
+const PLAY_WIDTH = 1920;
 // Twice the 200px the strip renders them at, for hidpi.
 const STILL_WIDTH = 400;
 const STILL_QUALITY = 4;
@@ -443,6 +457,168 @@ export async function startStills(
   }
   pump();
   return job;
+}
+
+// Play sets building now, by resolved video path.
+const playBuilds = new Map();
+
+// tvapp's scrub stills for an episode it is about to play, which it shows
+// while left/right is held. Starts the set building unless it is already on
+// disk or on its way, and returns at once with where it is. startMs is where
+// the video starts; the stills nearest it come first.
+export function playStills(videoFilePath, startMs) {
+  const resolved = path.resolve(videoFilePath);
+  const dir = path.join(stillsDirFor(resolved), PLAY_SUBDIR);
+  if (!playBuilds.has(resolved)) {
+    playBuilds.set(
+      resolved,
+      buildPlayStills(resolved, dir, startMs / 1000)
+        .catch((e) => {
+          unilog(2640, `play stills failed for ${path.basename(resolved)}: ${e.message}`);
+        })
+        .finally(() => playBuilds.delete(resolved)),
+    );
+  }
+  return { urlBase: stillsUrlBase(dir), gapMs: STILL_GAP_SECS * 1000 };
+}
+
+// The intro strip's one pass reads the whole file, minutes for a big one, so a
+// play set is one short ffmpeg per grid mark instead: the input seek goes
+// through the mkv's index to the keyframe at or before the mark, and that one
+// frame is decoded, a few MB read per still. Software decode, one thread each:
+// no GPU needed, so these stay out of the intro builds' slot, and one decoder
+// thread hands out its first frame without waiting for more packets. Order:
+// the coarse marks from the start to the end, then from the start back to 0,
+// then the marks between them in the same order. Each still lands by rename,
+// so tvapp can use a set before it is finished.
+async function buildPlayStills(file, dir, startSec) {
+  const srcStat = await fsp.stat(file);
+  const sc = await readSidecar(dir);
+  if (
+    sc &&
+    sc.mtimeMs === srcStat.mtimeMs &&
+    sc.size === srcStat.size &&
+    sc.gapSecs === STILL_GAP_SECS &&
+    sc.width === PLAY_WIDTH
+  )
+    return;
+  const startedAt = Date.now();
+  await clearSet(dir);
+  const { durationSec, dvProfile } = await probePlay(file);
+  const count = Math.ceil(durationSec / STILL_GAP_SECS);
+  const first = Math.min(count - 1, Math.round(startSec / STILL_GAP_SECS));
+  const rank = (n) =>
+    (n % PLAY_COARSE ? 2 * count : 0) + (n < first ? count : 0) + Math.abs(n - first);
+  const order = [...Array(count).keys()].sort((a, b) => rank(a) - rank(b));
+  let next = 0;
+  let failed = 0;
+  let lastErr = "";
+  const worker = async () => {
+    while (next < order.length) {
+      const n = order[next++];
+      await runFfmpeg(
+        playStillArgs(
+          file,
+          n * STILL_GAP_SECS,
+          path.join(dir, `${String(n + 1).padStart(5, "0")}.jpg`),
+          dvProfile === 5,
+        ),
+      ).catch((e) => {
+        failed++;
+        lastErr = e.message;
+      });
+    }
+  };
+  await Promise.all(Array.from({ length: PLAY_THREADS }, worker));
+  const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
+  if (failed > 0)
+    unilog(2641, `${failed} of ${count} play stills failed for ${path.basename(file)}: ${lastErr.slice(-200)}`);
+  await fsp.writeFile(
+    path.join(dir, SIDECAR_NAME),
+    JSON.stringify({
+      src: file,
+      mtimeMs: srcStat.mtimeMs,
+      size: srcStat.size,
+      gapSecs: STILL_GAP_SECS,
+      width: PLAY_WIDTH,
+      total: count - failed,
+      durationSec,
+    }),
+    "utf8",
+  );
+  unilog(2642, `${count - failed} play stills in ${secs}s: ${path.basename(file)}`);
+}
+
+// Dolby Vision profile 5 has no HDR10 base layer: decoded as plain video its
+// frames come out tinted magenta, so libplacebo applies the DV metadata on the
+// GPU (Vulkan) and maps it to SDR. Twice the time of a plain still.
+const DV5_FILTER =
+  `libplacebo=w=min(${PLAY_WIDTH}\\,iw):h=-2:apply_dolbyvision=1:colorspace=bt709:` +
+  "color_primaries=bt709:color_trc=bt709:range=tv:format=yuv420p";
+
+function playStillArgs(videoFilePath, sec, out, dv5) {
+  return [
+    ...(dv5 ? ["-init_hw_device", "vulkan"] : []),
+    "-threads",
+    "1",
+    "-noaccurate_seek",
+    "-ss",
+    String(sec),
+    "-i",
+    videoFilePath,
+    "-an",
+    "-sn",
+    "-frames:v",
+    "1",
+    // The keyframe is stamped before the mark, and the image muxer's default
+    // constant rate drops every frame until the mark: 150 decoded and 1.5MB
+    // read for a still, not 1 and 200KB.
+    "-fps_mode",
+    "passthrough",
+    "-vf",
+    dv5 ? DV5_FILTER : `scale=min(${PLAY_WIDTH}\\,iw):-2`,
+    "-q:v",
+    String(STILL_QUALITY),
+    "-update",
+    "1",
+    "-atomic_writing",
+    "1",
+    out,
+  ];
+}
+
+// Duration, and the Dolby Vision profile (null for none).
+function probePlay(videoFilePath) {
+  return new Promise((resolve, reject) => {
+    cp.execFile(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "format=duration:stream_side_data=dv_profile",
+        "-of",
+        "json",
+        videoFilePath,
+      ],
+      (err, stdout) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        const out = JSON.parse(stdout);
+        const durationSec = parseFloat(out.format?.duration);
+        if (!(durationSec > 0)) {
+          reject(new Error(`no duration: ${stdout.trim()}`));
+          return;
+        }
+        const dv = (out.streams?.[0]?.side_data_list || []).find((d) => d.dv_profile != null);
+        resolve({ durationSec, dvProfile: dv?.dv_profile ?? null });
+      },
+    );
+  });
 }
 
 // Progress for the client: how many stills exist right now, whether the build

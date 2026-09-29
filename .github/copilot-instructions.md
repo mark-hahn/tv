@@ -352,7 +352,7 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-09-25**. tvapp (`apps/tvapp`, native Java, package
+Current as of **2026-09-29**. tvapp (`apps/tvapp`, native Java, package
 `com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
 (`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
@@ -424,6 +424,7 @@ because the TV is unreachable from any wireless host here.
 
 **Video keys** — while a video is up, the tvapprc arrows and OK drive it:
 - OK pauses/resumes, left −10 s, right +30 s, down shows the time bar.
+  Holding left or right scrubs through stills (below).
 - Up skips the intro by `skipDurMs`; repeats within 2 s are ignored. The
   remotes' Skip key (`k,skip`) does the same, and nothing with no video up.
 - Any other key is swallowed. Back, `r`, or tvapp going to the background
@@ -441,6 +442,26 @@ because the TV is unreachable from any wireless host here.
 - The camera overlay pauses a playing video. The video resumes when the
   camera comes off, unless the Shows key took it off, since that closes the
   video too.
+
+**Scrub stills** (`Stills` in tvapp, `playStills()` in `apps/srvr/src/stills.js`)
+- `getPlayUrl` starts the episode's set and returns `stills: {urlBase,
+  gapMs}`. A set is a jpg up to 1920 wide for every 5 s mark of the whole
+  file, in the episode's stills dir under `play/`, served by nginx at
+  `/stills`. Sets expire 30 days after they are built (`oldFiles.js`).
+- Each still is its own ffmpeg, which seeks through the mkv's index to the
+  keyframe at or before its mark and decodes only that frame. Eight run at
+  once, the 15 s marks from the start position first, and tvapp uses a set
+  while it is still building. Dolby Vision profile 5 files go through
+  libplacebo on the GPU, or their stills come out magenta.
+- A left/right within 1 s of the last one is a hold. Each repeat steps the
+  target −10 s or +15 s (right snaps to the 15 s marks) and shows its still
+  full screen, under the time bar, which shows the still's time. Playback
+  and audio are off meanwhile (Media3 scrubbing mode).
+- Stills are fetched ahead of the hold and never step against its
+  direction. One not built yet is asked for again after 1 s.
+- 1 s after the last repeat the video seeks to the keyframe the still
+  shows, and the still stays up until the player is ready there.
+- A video with no set seeks in scrubbing mode during a hold instead.
 
 **Back ladder** — camera → video → trailer → actor overlay → focus →
 actor filter → filter text → top of list. At the top Back goes to the TV's home screen.
@@ -505,4 +526,5 @@ TMDB aggregate credits for shows TVDB has none for (anthologies). It keeps only
 actors with photos, sorted by episode count and capped at `TMDB_CAST_MAX`.
 
 Build/install with `cd apps/tvapp && ./build-apk`; gradle and adb run on
-hahnca.com, and there is no hot reload.
+hahnca.com, and there is no hot reload. A failed build stops the script before
+it installs anything.

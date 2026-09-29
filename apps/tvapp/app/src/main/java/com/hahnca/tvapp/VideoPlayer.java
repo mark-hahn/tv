@@ -12,6 +12,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.media3.common.C;
+import androidx.media3.common.ForwardingPlayer;
 import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
@@ -20,9 +21,13 @@ import androidx.media3.common.Player;
 import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.TrackSelectionParameters;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.util.Util;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.SeekParameters;
 import androidx.media3.ui.PlayerView;
+import androidx.media3.ui.TimeBar;
 import java.util.ArrayList;
+import java.util.Formatter;
 import java.util.List;
 import java.util.Locale;
 import org.json.JSONArray;
@@ -56,12 +61,24 @@ class VideoPlayer extends FrameLayout {
   private static final long REPORT_MS = 10000;
   private static final long SEEK_BACK_MS = 10000;
   private static final long SEEK_FWD_MS = 30000;
+  // A held right's step, half a press's: the remotes repeat every 120 ms, so
+  // a hold covers about two minutes of video a second. tv-srvr builds a new
+  // stills set on this grid first (stills.js's PLAY_COARSE marks).
+  private static final long HOLD_FWD_MS = 15000;
   private static final long SKIP_LOCKOUT_MS = 2000;
   // A seek has ended once no left/right has come for this long. The remotes
   // send no key release, and a held key repeats well inside it.
   // ponytail: ignores buffering after the seek; hold the bar through
   // STATE_BUFFERING too if it goes down before the new frame shows.
   private static final long SEEK_END_MS = 1000;
+  // A still left up by a landing (see landStills) comes down after this
+  // even if no frame was drawn.
+  private static final long LAND_MAX_MS = 3000;
+  // ffmpeg's input seek aims 3/23 s early in any file with B-frames (its dts
+  // heuristic), so a still is the keyframe at or before its mark less this.
+  // A file without B-frames and a keyframe in the 130 ms before a mark lands
+  // one keyframe past its still, which only carries the hold a bit further.
+  private static final long FFMPEG_SEEK_BACK_MS = 130;
   // Each sideloaded .srt's track id is this plus its index in getPlayUrl's subs.
   private static final String SUBS_ID = "tvapp-subs";
   private static final String PLAY_FAILED_TOAST = "Video failed.";
@@ -75,6 +92,12 @@ class VideoPlayer extends FrameLayout {
   private final PlayerView view;
   // The show and episode, right of the time display in the time bar.
   private final TitleRow title;
+  // The time bar's position text and bar, set straight off when a still goes
+  // up (see showStillTime).
+  private final TextView posView;
+  private final TimeBar timeBar;
+  private final StringBuilder timeText = new StringBuilder();
+  private final Formatter timeFormat = new Formatter(timeText, Locale.getDefault());
   private final Events events;
   private final Handler ui = new Handler(Looper.getMainLooper());
   private final Runnable reportTick =
@@ -97,11 +120,23 @@ class VideoPlayer extends FrameLayout {
   private boolean barUp;
   // A left/right seek has the time bar up until it ends.
   private boolean seeking;
+  // Where the last left/right aimed. A held key steps on from it: a stills
+  // hold leaves the video where it was, and while scrubbing the player's
+  // position flips between the newest target and the last one it landed on.
+  private long seekTarget;
+  // A hold is showing stills for seekTarget, not seeking the video.
+  private boolean stillsHold;
+  // A hold's landing seek is on its way (see landStills).
+  private boolean landing;
+  private final Stills stills;
   private final Runnable seekEnd =
       () -> {
         seeking = false;
+        setScrub(false);
+        landStills();
         updateBar();
       };
+  private final Runnable stillsDown = this::landed;
   // The video's text tracks, in the order the remote's subtitle panel lists
   // them.
   private final List<Tracks.Group> textGroups = new ArrayList<>();
@@ -130,15 +165,20 @@ class VideoPlayer extends FrameLayout {
     view.findViewById(androidx.media3.ui.R.id.exo_settings).setVisibility(GONE);
     // No full-screen dimming while the time bar is up; the bar keeps its own strip.
     view.findViewById(androidx.media3.ui.R.id.exo_controls_background).setBackgroundColor(Color.TRANSPARENT);
-    TextView pos = view.findViewById(androidx.media3.ui.R.id.exo_position);
+    posView = view.findViewById(androidx.media3.ui.R.id.exo_position);
+    timeBar = view.findViewById(androidx.media3.ui.R.id.exo_progress);
     LinearLayout time = view.findViewById(androidx.media3.ui.R.id.exo_time);
     for (int i = 0; i < time.getChildCount(); i++)
       ((TextView) time.getChildAt(i)).setTextColor(BAR_TEXT_COLOR);
     float density = getResources().getDisplayMetrics().density;
-    title = new TitleRow(context, pos, (int) (PART_GAP_DP * density));
+    title = new TitleRow(context, posView, (int) (PART_GAP_DP * density));
     title.setPadding((int) (TITLE_GAP_DP * density), 0, 0, 0);
     time.addView(title);
     addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+    // Over the video and its subtitles, under the time bar.
+    stills = new Stills(context, this::showStillTime);
+    view.getOverlayFrameLayout()
+        .addView(stills, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
   }
 
   boolean isOpen() {
@@ -151,7 +191,8 @@ class VideoPlayer extends FrameLayout {
    * (the episode count of its season), trimPosMs (where the show starts past its intro), skipDurMs
    * (the Skip key's jump), subs (the episode's .srt files as vtt, [{url,
    * label}]), subIndex (the embedded subtitle stream chksrt chose) and subPick
-   * (the index in subs to start on otherwise, -1 for none). show is the
+   * (the index in subs to start on otherwise, -1 for none) and stills (the
+   * scrub stills, {urlBase, gapMs}, see Stills). show is the
    * list's record of the show, for the time bar's show-wide parts.
    */
   void play(JSONObject p, Shows.Show show) {
@@ -174,6 +215,7 @@ class VideoPlayer extends FrameLayout {
         show.status,
         res > 0 ? String.valueOf(res) : "");
     subsPicked = false;
+    stills.open(p.optJSONObject("stills"));
     String url = p.optString("url");
     exo = new ExoPlayer.Builder(getContext()).build();
     exo.addListener(
@@ -184,7 +226,9 @@ class VideoPlayer extends FrameLayout {
               ready = true;
               report("playing");
               ui.postDelayed(reportTick, REPORT_MS);
-            } else if (state == Player.STATE_ENDED) {
+            }
+            if (state == Player.STATE_READY && landing) landed();
+            if (state == Player.STATE_ENDED) {
               report("ended");
               ready = false;
               close();
@@ -219,7 +263,20 @@ class VideoPlayer extends FrameLayout {
             events.onVideoError(PLAY_FAILED_TOAST);
           }
         });
-    view.setPlayer(exo);
+    // The time bar reads the position from the player it is given, about once
+    // a second. During a stills hold that is the still's, not the paused video's.
+    view.setPlayer(
+        new ForwardingPlayer(exo) {
+          @Override
+          public long getCurrentPosition() {
+            return stillsHold && stills.shownMs() >= 0 ? stills.shownMs() : super.getCurrentPosition();
+          }
+
+          @Override
+          public long getContentPosition() {
+            return stillsHold && stills.shownMs() >= 0 ? stills.shownMs() : super.getContentPosition();
+          }
+        });
     MediaItem.Builder item = new MediaItem.Builder().setUri(url);
     JSONArray subs = p.optJSONArray("subs");
     List<MediaItem.SubtitleConfiguration> subConfigs = new ArrayList<>();
@@ -254,14 +311,17 @@ class VideoPlayer extends FrameLayout {
     boolean seek = "left".equals(key) || "right".equals(key);
     if ("down".equals(key)) barUp = !barUp;
     else if (!seek) barUp = false;
+    boolean hold = seek && seeking;
+    setScrub(hold);
+    if (!hold) landStills();
     seeking = seek;
     ui.removeCallbacks(seekEnd);
     if (seek) ui.postDelayed(seekEnd, SEEK_END_MS);
-    long pos = exo.getCurrentPosition();
+    long pos = hold ? seekTarget : exo.getCurrentPosition();
     long skipDurMs = playing.optLong("skipDurMs");
     if ("ok".equals(key)) exo.setPlayWhenReady(!exo.getPlayWhenReady());
-    else if ("left".equals(key)) exo.seekTo(Math.max(0, pos - SEEK_BACK_MS));
-    else if ("right".equals(key)) exo.seekTo(pos + SEEK_FWD_MS);
+    else if ("left".equals(key)) seekBy(hold, pos, -SEEK_BACK_MS);
+    else if ("right".equals(key)) seekBy(hold, pos, hold ? HOLD_FWD_MS : SEEK_FWD_MS);
     else if ("up".equals(key)) exo.seekTo(playing.optLong("trimPosMs"));
     else if ("skip".equals(key)) {
       // A held Skip repeats, and a second skip would land past the intro into
@@ -273,6 +333,67 @@ class VideoPlayer extends FrameLayout {
       }
     }
     updateBar();
+  }
+
+  // A left/right, stepMs from pos. A hold shows the stills for its target
+  // when the video has a set, and seeks the video when it has none.
+  private void seekBy(boolean hold, long pos, long stepMs) {
+    seekTarget = Math.max(0, pos + stepMs);
+    if (!hold || !stills.has()) {
+      exo.seekTo(seekTarget);
+      return;
+    }
+    stillsHold = true;
+    // A held right lands on the HOLD_FWD_MS marks, the stills a new set has
+    // first.
+    if (stepMs > 0) seekTarget = Math.round(seekTarget / (double) HOLD_FWD_MS) * HOLD_FWD_MS;
+    long dur = exo.getDuration();
+    if (dur > 0) seekTarget = Math.min(seekTarget, dur);
+    stills.show(seekTarget, stepMs, dur);
+  }
+
+  // A still went up: the time bar says where it is now, not at its next
+  // refresh, which reads the same off the player play() gave it.
+  private void showStillTime() {
+    long ms = stills.shownMs();
+    posView.setText(Util.getStringForTime(timeText, timeFormat, ms));
+    timeBar.setPosition(ms);
+  }
+
+  // A stills hold ends: the video seeks to the still on screen (the target if
+  // none got there), and the still stays up until the player is ready there,
+  // its frame drawn. Not at the first frame drawn: turning scrubbing off (the
+  // caller does it first) brings the audio back, and that track change redraws
+  // the paused video where the hold started. A still is the keyframe at or
+  // before its mark (stills.js, see FFMPEG_SEEK_BACK_MS), so the seek goes to
+  // that keyframe through the file's index too: an exact seek to the mark
+  // started the video up to a few seconds past the still's picture.
+  private void landStills() {
+    if (!stillsHold || exo == null) return;
+    stillsHold = false;
+    landing = true;
+    long ms = stills.shownMs() < 0 ? seekTarget : stills.shownMs();
+    exo.setSeekParameters(SeekParameters.PREVIOUS_SYNC);
+    exo.seekTo(Math.max(0, ms - FFMPEG_SEEK_BACK_MS));
+    exo.setSeekParameters(SeekParameters.DEFAULT);
+    ui.removeCallbacks(stillsDown);
+    ui.postDelayed(stillsDown, LAND_MAX_MS);
+  }
+
+  // A landing's frame is up (or LAND_MAX_MS passed): the still comes down,
+  // unless a new hold has it up again.
+  private void landed() {
+    landing = false;
+    if (!stillsHold) stills.hide();
+  }
+
+  // On for a hold: a left/right that comes while the last one's seekEnd is
+  // pending. Scrubbing mode keeps playback and audio off until the hold ends,
+  // under its stills. For a video with no stills it also holds each seek back
+  // until the one before has drawn its frame; plain seeks each dropped the one
+  // before them undrawn, and the picture froze through a hold.
+  private void setScrub(boolean on) {
+    if (exo != null) exo.setScrubbingModeEnabled(on);
   }
 
   private void updateBar() {
@@ -295,7 +416,11 @@ class VideoPlayer extends FrameLayout {
     if (exo == null) return;
     ui.removeCallbacks(reportTick);
     ui.removeCallbacks(seekEnd);
+    ui.removeCallbacks(stillsDown);
     seeking = false;
+    stillsHold = false;
+    landing = false;
+    stills.close();
     if (ready) report("stopped");
     ready = false;
     barUp = false;

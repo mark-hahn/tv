@@ -23,7 +23,10 @@ rsync -a --delete \
   "$SCRIPT_DIR/" $REMOTE:$BUILD_DIR/
 
 echo "==> Building APK..."
+# pipefail: gradle's exit status, not grep's, so a failed build stops here
+# instead of installing the last good APK.
 ssh $REMOTE "
+  set -o pipefail
   export ANDROID_HOME=/opt/android-sdk
   export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
   cd $BUILD_DIR

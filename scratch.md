@@ -1,4 +1,12 @@
 
+- when seeking while paused the last still is shown briefly and then a wrong frame is shown and then quickly the video ends up paused on the same frame as the last still
+- when seeking while playing the last still is shown briefly and then a wrong frame is shown and then quickly the video ends up paused on the same frame as the last still
+
+when hold is released the last still is visible for ~300ms and then 2 more frames are shown and i think they are from video, not stills, since they are after the delay. The final frame is sometimes the correct one and sometimes not.
+
+pressing up-arrow during playback should quit playing and then mark the episode watched and then set stored pos to 0 for the next episode to use. long-press up arrow during playback should jump back to beginning
+
+clnup info in tvapp
 
 =================
 not going out

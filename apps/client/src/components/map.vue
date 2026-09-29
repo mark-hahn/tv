@@ -1627,9 +1627,13 @@ export default {
       }, 8000);
     },
 
-    onPruneClick() {
-      if (!window.confirm(`Delete watched files for ${this.mapShow?.name}?`))
-        return;
+    onPruneClick(e) {
+      unilog(2658, `Prune clicked for ${this.mapShow?.name}: isTrusted=${e?.isTrusted} detail=${e?.detail} pointerType=${e?.pointerType}`);
+      const confirmed = window.confirm(
+        `Delete watched files for ${this.mapShow?.name}?`,
+      );
+      unilog(2659, `Prune confirm for ${this.mapShow?.name}: ${confirmed ? "OK" : "Cancel"}`);
+      if (!confirmed) return;
       this.pruneFlash = true;
       this.$emit("prune", this.mapShow);
       setTimeout(() => {

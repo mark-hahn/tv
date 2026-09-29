@@ -1,5 +1,7 @@
 
 
+several shows including `The New Adventures of Old Christine` and `The Knights of Prosperity`have files deleted and i don't remember deleting them
+
 clnup info in tvapp
 
 =================

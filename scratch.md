@@ -1,6 +1,7 @@
 
 
 =================
+not going out
 
 tv video is darkened when time bar is showing at the button -- can you keep the full screen normal brightness?
 

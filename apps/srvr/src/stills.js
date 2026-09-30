@@ -618,7 +618,7 @@ function playStillArgs(videoFilePath, sec, out, dv5) {
 }
 
 // Duration, and the Dolby Vision profile (null for none).
-function probePlay(videoFilePath) {
+export function probePlay(videoFilePath) {
   return new Promise((resolve, reject) => {
     cp.execFile(
       "ffprobe",

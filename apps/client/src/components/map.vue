@@ -2436,9 +2436,9 @@ export default {
     },
     // Plays the selected episode in the browser.
     handleSelectedPlay() {
-      const path = this.selectedPlayPath;
-      if (!path) return;
-      srvr.playInTab(this.mapShow, path, this.firstSelectedEpisode.season);
+      const sel = this.firstSelectedEpisode;
+      if (!this.selectedPlayPath) return;
+      srvr.playInTab(this.mapShow, sel.season, sel.episode);
     },
     // Same as the info pane's TV button -- the tvapprc remote's Shows button
     // and a click on this show over there -- but naming the map's selected

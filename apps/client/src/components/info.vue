@@ -929,7 +929,7 @@ export default {
     playClick() {
       const res = epd.selectIntroFile(this.show);
       if (res.error) return;
-      srvr.playInTab(this.show, res.path, res.season);
+      srvr.playInTab(this.show, res.season, res.episode);
     },
 
     // Same as the tvapprc remote's Shows button and then a click on this show

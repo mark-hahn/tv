@@ -1216,6 +1216,10 @@ app.get(
 app.get("/api/getShowsFromDisk", apiWrapper(getShowsFromDisk));
 app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getPlayUrl", apiWrapper(getPlayUrl));
+// The browser's player for the info and map panes' Play button.
+app.get("/api/play", (req, res) =>
+  res.sendFile(path.join(import.meta.dirname, "src/play.html")),
+);
 app.post("/api/playProgress", apiWrapper(playProgress));
 app.get("/api/getLastViewed", apiWrapper(view.getLastViewed));
 app.get("/api/getSharedFilters", apiWrapper(getSharedFilters));
@@ -3210,8 +3214,8 @@ let lastNowPlayingList = [];
 let lastPlayingKeys = new Set(); // "showName|season|episode" of all currently-playing items
 let lastMissingEpWarning = null;
 
-// What tvapp's player is playing, from its playProgress reports. It is the
-// only player, so it is the whole now-playing list.
+// What tvapp's player (or the browser's) is playing, from its playProgress
+// reports. It is the whole now-playing list: the last one to report wins.
 let tvappNowPlaying = null;
 recode.setPlayingPathGetter(() => {
   if (!tvappNowPlaying) return null;
@@ -3357,8 +3361,10 @@ function subsForFile(file, season, episode) {
   };
 }
 
-// The named episode (season and episode both given), else next-up.
-async function getPlayUrl({ showName, season: s, episode: e }) {
+// The named episode (season and episode both given), else next-up. web is the
+// browser's player (/api/play): it has no scrub stills, and its stream through
+// /api/stream needs the file's path and doesn't know how long the file is.
+async function getPlayUrl({ showName, season: s, episode: e, web }) {
   const rec = tvdb.getAllTvdbSync()?.[showName];
   if (!rec) throw new Error(`getPlayUrl: no show ${showName}`);
   const ed = rec.episodeData;
@@ -3386,14 +3392,20 @@ async function getPlayUrl({ showName, season: s, episode: e }) {
     trimPosMs,
     skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),
     ...subsForFile(file, season, episode),
-    stills: stills.playStills(file, posMs > 0 ? posMs : trimPosMs),
+    ...(web
+      ? {
+          path: file,
+          durMs: Math.round((await stills.probePlay(file)).durationSec * 1000),
+        }
+      : { stills: stills.playStills(file, posMs > 0 ? posMs : trimPosMs) }),
   };
 }
 
 // tvapp's player reports when it starts, every few seconds while it is up, on
 // pause, and when it stops or runs to the end. The record keeps the resume
-// position and, at the end, the watched mark.
-async function playProgress({ showName, season, episode, posMs, durMs, state }) {
+// position and, at the end, the watched mark. The browser's player
+// (/api/play) reports the same way, as device "browser".
+async function playProgress({ showName, season, episode, posMs, durMs, state, device = TVAPP_DEVICE }) {
   const rec = tvdb.getAllTvdbSync()?.[showName];
   if (!rec) throw new Error(`playProgress: no show ${showName}`);
   const ed = rec.episodeData;
@@ -3441,7 +3453,7 @@ async function playProgress({ showName, season, episode, posMs, durMs, state }) 
     ? null
     : {
         showName,
-        device: TVAPP_DEVICE,
+        device,
         season,
         episode,
         positionMs: pos,

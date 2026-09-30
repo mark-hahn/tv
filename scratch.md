@@ -1,9 +1,16 @@
 
 
-
 clnup info in tvapp
 
 =================
+
+# play in web browser parity with tvapp
+- i want the full features of tvapp when playing in web browser with play button
+  - intro trim and skip 
+    - tampermonkey?
+  - persist play position for episodes
+  - subtitles with live selection
+  - mark partial and watched
 
 several shows including `The New Adventures of Old Christine` and `The Knights of Prosperity`have files deleted and i don't remember deleting them
 

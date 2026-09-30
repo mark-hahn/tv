@@ -305,10 +305,17 @@ export function registerMediaRoutes(app) {
       const usePgsSub =
         subIdx !== null && !isNaN(subIdx) && subIdx >= 0 && subIdx <= 50;
 
-      const ffmpegArgs =
-        startSec > 0
-          ? ["-ss", String(startSec), "-i", resolved]
-          : ["-i", resolved];
+      // copyts: the stream keeps the file's own timestamps, for the browser
+      // player's MediaSource (srvr/src/play.html), which puts each stream it
+      // opens at its place in the whole episode. The mp4 muxer otherwise
+      // starts every stream at 0; frag_discont and avoid_negative_ts stop it.
+      const copyts = !!req.query.copyts;
+      const ffmpegArgs = [
+        ...(copyts ? ["-copyts"] : []),
+        ...(startSec > 0 ? ["-ss", String(startSec)] : []),
+        "-i",
+        resolved,
+      ];
 
       if (usePgsSub) {
         // Burn PGS bitmap subtitle into video stream via filter_complex overlay
@@ -383,7 +390,8 @@ export function registerMediaRoutes(app) {
         "-f",
         "mp4",
         "-movflags",
-        "frag_keyframe+empty_moov+default_base_moof",
+        `frag_keyframe+empty_moov+default_base_moof${copyts ? "+frag_discont" : ""}`,
+        ...(copyts ? ["-avoid_negative_ts", "disabled"] : []),
         "pipe:1",
       );
 

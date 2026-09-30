@@ -1,0 +1,278 @@
+<!doctype html>
+<!--
+  The browser's player for the info and map panes' Play button (client srvr.js
+  playInTab), served by tv-srvr at /api/play?showName&season&episode. Like
+  tvapp's VideoPlayer it plays getPlayUrl's answer: it starts at the resume
+  point, else past the intro, has Skip for the intro and the episode's
+  subtitles in the browser's own subtitle menu, and reports to playProgress,
+  which keeps the resume point (partial) and the watched mark.
+
+  The video comes through /api/stream, a live remux/transcode that starts at
+  its start param and can't seek, fed into a MediaSource (see load()).
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Play</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: black;
+        color: white;
+        font: 16px sans-serif;
+      }
+      video {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <video controls></video>
+    <script type="module">
+      const MIME = 'video/mp4; codecs="avc1.640028,mp4a.40.2"';
+      const SKIP_REPEAT_MS = 2000;
+      const REPORT_MS = 10000;
+      // A seek up to this far past what the stream has delivered waits for it
+      // rather than reopening the stream there.
+      const SEEK_WAIT_SECS = 10;
+
+      const vid = document.querySelector("video");
+      const once = (el, type) =>
+        new Promise((ok) => el.addEventListener(type, ok, { once: true }));
+      const p = await (
+        await fetch(`getPlayUrl?${new URLSearchParams(location.search)}&web=1`)
+      ).json();
+      if (p.url) play(p);
+      else document.body.textContent = p.error || "No episode to play";
+
+      function play(p) {
+        const code =
+          `S${String(p.season).padStart(2, "0")}` +
+          `E${String(p.episode).padStart(2, "0")}`;
+        document.title = `${p.showName} ${code}`;
+        vid.volume = 0.1;
+        const startSec = (p.posMs > 0 ? p.posMs : p.trimPosMs) / 1000;
+        // Subtitles, in the player's subtitle menu: chksrt's embedded pick,
+        // then every .srt of the episode. Each loads when first turned on.
+        const subs = p.subs.map((s, i) => ({ ...s, on: i === p.subPick }));
+        if (p.subIndex != null)
+          subs.unshift({
+            label: "embedded",
+            url: `subtitle?path=${encodeURIComponent(p.path)}&index=${p.subIndex}`,
+            on: true,
+          });
+        for (const s of subs) {
+          const el = document.createElement("track");
+          Object.assign(el, {
+            kind: "subtitles",
+            label: s.label,
+            srclang: "en",
+            src: s.url,
+          });
+          vid.append(el);
+          el.track.mode = s.on ? "showing" : "disabled";
+        }
+
+        // The video is /api/stream from a point in the file, keeping the
+        // file's timestamps (copyts), fed into a MediaSource with the whole
+        // episode's length, so the player's bar spans the episode. A seek
+        // outside what the stream has delivered reopens it there. The stream
+        // is read only as fast as the buffer takes it.
+        const ms = new MediaSource();
+        let sb = null;
+        let loader = null;
+        let direct = false;
+        vid.src = URL.createObjectURL(ms);
+        ms.addEventListener(
+          "sourceopen",
+          () => {
+            URL.revokeObjectURL(vid.src);
+            ms.duration = p.durMs / 1000;
+            sb = ms.addSourceBuffer(MIME);
+            load(startSec, true);
+          },
+          { once: true },
+        );
+        // The buffered range holding t, or starting within 1 s after it: a
+        // transcoded stream's first frame lands a little past its start.
+        const rangeAt = (t) => {
+          const b = sb.buffered;
+          for (let i = 0; i < b.length; i++)
+            if (b.start(i) <= t + 1 && t <= b.end(i)) return [b.start(i), b.end(i)];
+          return null;
+        };
+        vid.addEventListener("seeking", () => {
+          if (direct || !loader) return;
+          const t = vid.currentTime;
+          if (t >= loader.lo && t <= loader.edge + SEEK_WAIT_SECS) return;
+          load(t, false);
+        });
+
+        async function load(sec, first) {
+          loader?.abort.abort();
+          const from = Math.floor(sec);
+          // lo to edge: what this stream has delivered and still buffered.
+          const me = { lo: from, edge: from, abort: new AbortController() };
+          loader = me;
+          const gone = () => loader !== me;
+          try {
+            const res = await fetch(
+              `stream?path=${encodeURIComponent(p.path)}&start=${from}&copyts=1`,
+              { signal: me.abort.signal },
+            );
+            if (res.redirected) {
+              // An h264/aac mp4 goes to the plain file on nginx, which the
+              // player seeks in by itself.
+              me.abort.abort();
+              direct = true;
+              vid.src = res.url;
+              await once(vid, "loadedmetadata");
+              vid.currentTime = sec;
+              return;
+            }
+            if (sb.updating) await once(sb, "updateend");
+            if (gone()) return;
+            // The last stream may have been cut off inside a fragment.
+            if (ms.readyState === "open") sb.abort();
+            const reader = res.body.getReader();
+            let cued = false;
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (gone()) return;
+              if (done) break;
+              if (!(await append(value, gone))) return;
+              const r = rangeAt(me.edge);
+              if (!r) continue;
+              [me.lo, me.edge] = r;
+              if (cued) continue;
+              cued = true;
+              // Never cue before the first frame, or the video waits there
+              // for data that never comes.
+              if (first) vid.currentTime = Math.max(sec, r[0] + 0.01);
+              else if (vid.currentTime < r[0] && vid.currentTime > r[0] - 1)
+                vid.currentTime = r[0] + 0.01;
+            }
+            if (ms.readyState === "open") ms.endOfStream();
+          } catch (e) {
+            if (!gone()) throw e;
+          }
+        }
+
+        // Appends a chunk of the stream; false once the stream is dropped. A
+        // full buffer first drops what is well behind the playhead, else waits
+        // for the playhead to move on.
+        async function append(chunk, gone) {
+          for (;;) {
+            try {
+              sb.appendBuffer(chunk);
+              await once(sb, "updateend");
+              return !gone();
+            } catch (e) {
+              if (e.name !== "QuotaExceededError") throw e;
+            }
+            const behind = vid.currentTime - 10;
+            if (sb.buffered.length && sb.buffered.start(0) < behind) {
+              sb.remove(0, behind);
+              await once(sb, "updateend");
+            } else await once(vid, "timeupdate");
+            if (gone()) return false;
+          }
+        }
+
+        const report = (state) =>
+          navigator.sendBeacon(
+            "playProgress",
+            new Blob(
+              [
+                JSON.stringify({
+                  showName: p.showName,
+                  season: p.season,
+                  episode: p.episode,
+                  posMs: Math.round(vid.currentTime * 1000),
+                  durMs: p.durMs,
+                  state,
+                  device: "browser",
+                }),
+              ],
+              { type: "application/json" },
+            ),
+          );
+        let played = false;
+        vid.addEventListener("playing", () => {
+          played = true;
+          report("playing");
+        });
+        vid.addEventListener("pause", () => vid.ended || report("playing"));
+        setInterval(() => vid.paused || report("playing"), REPORT_MS);
+        // Stopped, not ended: a stream cut short ends too, and a stop counts
+        // as the end only in the last few minutes.
+        vid.addEventListener("ended", () => report("stopped"));
+        addEventListener("pagehide", () => {
+          if (played && !vid.ended) report("stopped");
+        });
+
+        if (!(p.skipDurMs > 0)) return;
+        let lastSkip = 0;
+        const skip = () => {
+          if (Date.now() - lastSkip < SKIP_REPEAT_MS) return;
+          lastSkip = Date.now();
+          vid.currentTime += p.skipDurMs / 1000;
+        };
+        // Skip is a popover so it can be put above a fullscreen video in the
+        // top layer.
+        const btn = document.createElement("div");
+        btn.popover = "manual";
+        btn.textContent = "Skip";
+        btn.style.cssText =
+          "position: fixed; inset: 10px 14px auto auto; margin: 0; z-index: 2147483647;" +
+          "color: white; font: 13px sans-serif; padding: 2px 8px;" +
+          "border-radius: 4px; border: 1px solid #666; cursor: pointer;" +
+          "user-select: none; background: rgba(0, 0, 0, 0.5);";
+        // Clicks are taken by where they land, not off the button: a
+        // fullscreen video makes the rest of the page inert (Firefox), so a
+        // click on Skip goes to the video. Firefox's video controls swallow
+        // the downs, ups and clicks on the video, only moves get through, so
+        // in fullscreen the controls are off while the pointer is over Skip;
+        // the click then reaches the page and doesn't pause the video.
+        const onBtn = (e) => {
+          const r = btn.getBoundingClientRect();
+          return (
+            e.clientX >= r.left &&
+            e.clientX <= r.right &&
+            e.clientY >= r.top &&
+            e.clientY <= r.bottom
+          );
+        };
+        addEventListener(
+          "pointermove",
+          (e) => {
+            const over = document.fullscreenElement === vid && onBtn(e);
+            if (vid.controls === over) vid.controls = !over;
+          },
+          true,
+        );
+        addEventListener(
+          "click",
+          (e) => {
+            if (!onBtn(e)) return;
+            e.stopPropagation();
+            e.preventDefault();
+            skip();
+          },
+          true,
+        );
+        document.body.appendChild(btn);
+        btn.showPopover();
+        // A video going fullscreen lands on top of the top layer, over Skip.
+        document.addEventListener("fullscreenchange", () => {
+          btn.hidePopover();
+          btn.showPopover();
+        });
+      }
+    </script>
+  </body>
+</html>

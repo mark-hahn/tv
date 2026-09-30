@@ -80,7 +80,7 @@
         // The video is /api/stream from a point in the file, keeping the
         // file's timestamps (copyts), fed into a MediaSource with the whole
         // episode's length, so the player's bar spans the episode. A seek
-        // outside what the stream has delivered reopens it there. The stream
+        // outside what is buffered or about to be reopens it there. The stream
         // is read only as fast as the buffer takes it.
         const ms = new MediaSource();
         let sb = null;
@@ -108,15 +108,18 @@
         vid.addEventListener("seeking", () => {
           if (direct || !loader) return;
           const t = vid.currentTime;
-          if (t >= loader.lo && t <= loader.edge + SEEK_WAIT_SECS) return;
+          // Buffered, not just delivered once: the browser drops played data
+          // on its own, and a seek back into it waited forever.
+          if (rangeAt(t)?.[0] <= t) return;
+          if (t >= loader.edge && t <= loader.edge + SEEK_WAIT_SECS) return;
           load(t, false);
         });
 
         async function load(sec, first) {
           loader?.abort.abort();
           const from = Math.floor(sec);
-          // lo to edge: what this stream has delivered and still buffered.
-          const me = { lo: from, edge: from, abort: new AbortController() };
+          // edge: how far this stream has delivered.
+          const me = { edge: from, abort: new AbortController() };
           loader = me;
           const gone = () => loader !== me;
           try {
@@ -138,6 +141,14 @@
             if (gone()) return;
             // The last stream may have been cut off inside a fragment.
             if (ms.readyState === "open") sb.abort();
+            // Its data goes too: a range left behind counts against the
+            // browser's buffer limit (150 MiB in Firefox), and the video froze
+            // for good when the new stream ran into one.
+            if (sb.buffered.length) {
+              sb.remove(0, Infinity);
+              await once(sb, "updateend");
+              if (gone()) return;
+            }
             const reader = res.body.getReader();
             let cued = false;
             for (;;) {
@@ -147,7 +158,7 @@
               if (!(await append(value, gone))) return;
               const r = rangeAt(me.edge);
               if (!r) continue;
-              [me.lo, me.edge] = r;
+              me.edge = r[1];
               if (cued) continue;
               cued = true;
               // Never cue before the first frame, or the video waits there

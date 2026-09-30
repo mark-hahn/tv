@@ -39,6 +39,10 @@
       // A seek up to this far past what the stream has delivered waits for it
       // rather than reopening the stream there.
       const SEEK_WAIT_SECS = 10;
+      // The most appended at once. A read hands over all the stream that came
+      // in since the last one, soon more than Firefox's whole buffer (150 MiB),
+      // which it never takes, and the video froze when the buffer ran out.
+      const APPEND_BYTES = 1 << 20;
 
       const vid = document.querySelector("video");
       const once = (el, type) =>
@@ -155,7 +159,9 @@
               const { done, value } = await reader.read();
               if (gone()) return;
               if (done) break;
-              if (!(await append(value, gone))) return;
+              for (let i = 0; i < value.length; i += APPEND_BYTES)
+                if (!(await append(value.subarray(i, i + APPEND_BYTES), gone)))
+                  return;
               const r = rangeAt(me.edge);
               if (!r) continue;
               me.edge = r[1];

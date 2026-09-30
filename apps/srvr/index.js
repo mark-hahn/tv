@@ -1947,18 +1947,30 @@ app.get(
 );
 
 // A snoozed show's waitStr, from TVDB air dates alone (nothing is on disk or
-// watched). Too little data to tell counts as still waiting. undefined when
-// TVDB could not be read in full, so the old value is kept.
+// watched). Too little data to tell counts as still waiting. Its premiere is
+// the first air date of the latest season holding one, null when none.
+// undefined when TVDB could not be read in full, so the old values are kept.
 async function snoozeWaitStr({ tvdbId, name }) {
   try {
     const seriesMap = await tvdb.getSeriesMap(tvdbId);
     if (seriesMap.partial) return undefined;
     const ed = [];
+    let premiere = null;
+    let premiereSeason = 0;
     for (const [s, eps] of seriesMap)
-      for (const [e, { aired }] of eps)
-        if (aired && Number.isInteger(e) && e >= 1)
-          epd.setEpisode(ed, s, e, { aired });
-    return tvdb.calculateWaitStr(ed) ?? SNOOZE_NO_DATA_WAITSTR;
+      for (const [e, { aired }] of eps) {
+        if (!aired || !Number.isInteger(e) || e < 1) continue;
+        epd.setEpisode(ed, s, e, { aired });
+        if (s < 1 || s < premiereSeason) continue;
+        if (s > premiereSeason || aired < premiere) {
+          premiereSeason = s;
+          premiere = aired;
+        }
+      }
+    return {
+      waitStr: tvdb.calculateWaitStr(ed) ?? SNOOZE_NO_DATA_WAITSTR,
+      premiere,
+    };
   } catch (e) {
     unilog(2616, `snooze waitStr failed for ${name}: ${e.message}`);
     return undefined;
@@ -1973,9 +1985,14 @@ async function runSnoozeRefresh() {
   const now = Date.now();
   const fresh = new Map();
   for (const s of readSnoozeList()) {
-    if (now - (s.waitStrAt || 0) < SNOOZE_WAITSTR_MS) continue;
-    const waitStr = await snoozeWaitStr(s);
-    if (waitStr !== undefined) fresh.set(s.tvdbId, waitStr || null);
+    if (
+      now - (s.waitStrAt || 0) < SNOOZE_WAITSTR_MS &&
+      s.premiere !== undefined
+    )
+      continue;
+    const info = await snoozeWaitStr(s);
+    if (info !== undefined)
+      fresh.set(s.tvdbId, { ...info, waitStr: info.waitStr || null });
   }
   if (fresh.size === 0) return;
   // Re-read: the list may have changed during the TVDB fetches.
@@ -1983,12 +2000,13 @@ async function runSnoozeRefresh() {
   const next = [];
   for (const s of readSnoozeList()) {
     if (fresh.has(s.tvdbId)) {
-      const waitStr = fresh.get(s.tvdbId);
+      const { waitStr, premiere } = fresh.get(s.tvdbId);
       if (s.waitStr && !waitStr) {
         ready.push(s);
         continue;
       }
       s.waitStr = waitStr;
+      s.premiere = premiere;
       s.waitStrAt = now;
     }
     next.push(s);

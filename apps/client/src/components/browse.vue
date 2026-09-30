@@ -34,7 +34,7 @@
           creditShowList !== null
             ? creditShowList
             : unSnoozeMode
-              ? snoozeList
+              ? snoozeGalleryList
               : upcomingMode
                 ? upcomingList
                 : null
@@ -1306,6 +1306,13 @@ export default {
       upcomingMode.value = true;
     };
 
+    // Snoozed shows in the gallery: soonest premiere first, no date last.
+    const snoozeGalleryList = computed(() =>
+      [...snoozeList.value].sort((a, b) =>
+        (a.premiere || "9999").localeCompare(b.premiere || "9999"),
+      ),
+    );
+
     // The selected show's waitStr, while looking at the snoozed shows.
     const curSnoozeWaitStr = computed(() => {
       if (!unSnoozeMode.value || !curTvdb.value) return "";
@@ -1764,12 +1771,18 @@ export default {
       }
 
       // Try multiple possible property names for premiere date
+      // TVDB often has no date yet for an unaired show; then use the browse
+      // item's TVMaze premiere when it is the same show.
+      const browseTvdbId = String(browseItem?.data?.externals?.thetvdb || "");
       const dateStr =
         t.first_aired ||
         t.firstAired ||
         t.premiered ||
         t.released ||
         t.first_air_time ||
+        (browseTvdbId &&
+          browseTvdbId === String(t.tvdb_id || t.tvdbId || "") &&
+          browseItem.data.premiered) ||
         "";
 
       // console.log("browse infoLine debug:", {
@@ -1957,8 +1970,13 @@ export default {
               : null;
             // Without the id, fall back on a year-aware pick rather than
             // results[0] — TVDB puts the oldest series of a reused name first.
-            curTvdb.value =
-              match || pickTvdbSeries(results, tvdb.name, tvdb.year) || tvdb;
+            const picked =
+              match || pickTvdbSeries(results, tvdb.name, tvdb.year);
+            // TVDB often has no date yet for an unaired show; keep the
+            // upcoming list's TVMaze premiere.
+            curTvdb.value = picked
+              ? { premiered: tvdb.premiered, ...picked }
+              : tvdb;
           } else {
             curTvdb.value = tvdb;
           }
@@ -2198,6 +2216,7 @@ export default {
       existingShowMatch,
       curTvmazeMeta,
       snoozeList,
+      snoozeGalleryList,
       isCurrentSnoozed,
       curSnoozeWaitStr,
       curDisplayOverview,

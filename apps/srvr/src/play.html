@@ -58,7 +58,6 @@
           `S${String(p.season).padStart(2, "0")}` +
           `E${String(p.episode).padStart(2, "0")}`;
         document.title = `${p.showName} ${code}`;
-        vid.volume = 0.1;
         const startSec = (p.posMs > 0 ? p.posMs : p.trimPosMs) / 1000;
         // Subtitles, in the player's subtitle menu: chksrt's embedded pick,
         // then every .srt of the episode. Each loads when first turned on.

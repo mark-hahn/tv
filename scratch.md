@@ -1,10 +1,11 @@
 
 
-several shows including `The New Adventures of Old Christine` and `The Knights of Prosperity`have files deleted and i don't remember deleting them
 
 clnup info in tvapp
 
 =================
+
+several shows including `The New Adventures of Old Christine` and `The Knights of Prosperity`have files deleted and i don't remember deleting them
 
 pressing up-arrow during playback should quit playing and then mark the episode watched and then set stored pos to 0 for the next episode to use. long-press up arrow during playback should jump back to beginning or trim pos
 

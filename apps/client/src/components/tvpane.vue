@@ -616,8 +616,11 @@
       <div
         v-if="tvapprcMode"
         :style="cellStyle('white', 'skip')"
-        @mousedown="tvKey('skip')"
-        @touchstart.prevent="tvKey('skip')"
+        @mousedown="startSkipHold"
+        @mouseup="stopSkipHold"
+        @mouseleave="stopSkipHold"
+        @touchstart.prevent="startSkipHold"
+        @touchend="stopSkipHold"
       >
         Skip
       </div>
@@ -1399,6 +1402,13 @@ export default {
       });
     },
     stopBackHold() {
+      this._dbStop();
+    },
+
+    startSkipHold() {
+      this._dbStart(() => this.tvKey("skip"));
+    },
+    stopSkipHold() {
       this._dbStop();
     },
 

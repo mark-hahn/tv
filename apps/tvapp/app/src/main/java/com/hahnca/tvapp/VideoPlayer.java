@@ -70,7 +70,6 @@ class VideoPlayer extends FrameLayout {
   private static final double HOLD_FWD_SPEED = 125;
   private static final double HOLD_BACK_SPEED = 250 / 3.0;
   private static final long NO_STILLS_STEP_MS = 5000;
-  private static final long SKIP_LOCKOUT_MS = 2000;
   // An up press is a tap when its key-up comes before any repeat of it (see
   // key and keyUp). A remote's key-up can go missing (its socket closing), so
   // a press with neither in this long counts as a tap too. The remotes' first
@@ -132,7 +131,6 @@ class VideoPlayer extends FrameLayout {
   // Past its first STATE_READY: the position is real and worth reporting.
   private boolean ready;
   private boolean subsPicked;
-  private long lastSkipAt;
   // Down put the time bar up (see key).
   private boolean barUp;
   // A left/right seek has the time bar up until it ends.
@@ -391,13 +389,7 @@ class VideoPlayer extends FrameLayout {
         }
       }
       else if ("skip".equals(key)) {
-        // A held Skip repeats, and a second skip would land past the intro
-        // into the show, so repeats inside the lockout are dropped.
-        long now = SystemClock.uptimeMillis();
-        if (skipDurMs > 0 && now - lastSkipAt >= SKIP_LOCKOUT_MS) {
-          lastSkipAt = now;
-          exo.seekTo(pos + skipDurMs);
-        }
+        if (skipDurMs > 0) exo.seekTo(pos + skipDurMs);
       }
     }
     updateBar();

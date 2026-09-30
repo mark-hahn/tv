@@ -57,6 +57,9 @@ const TVAPPRC_CONNECT_TIMEOUT_MS = 5000;
 // shorter, so every cell moves. A press this soon after the switch was aimed at
 // the old layout: it is dropped and the cell flashes DENIED_BG instead.
 const MODE_SWITCH_LOCKOUT_MS = 800;
+// A key with no hold acts on its press; any key pressed this soon after the
+// last one is dropped.
+const KEY_DEBOUNCE_MS = 100;
 const DENIED_BG = "lightcoral";
 const MSG_TVAPP_UP = "u";
 const MSG_TVAPP_DOWN = "d";
@@ -343,9 +346,9 @@ export default function App() {
   // A show name the shows pane selects as soon as its list is loaded.
   const pendingShowSelectRef = useRef(null);
 
-  const debounce = () => {
+  const debounce = (ms = 250) => {
     const now = Date.now();
-    const ok = now - lastCmdRef.current >= 250;
+    const ok = now - lastCmdRef.current >= ms;
     lastCmdRef.current = now;
     return ok;
   };
@@ -747,8 +750,6 @@ export default function App() {
       clearTimeout(lpRef.current?.debounceTimer ?? lpRef.current?.timer);
       clearTimeout(lpRef.current?.longTimer);
       lpRef.current = null;
-      clearTimeout(dbRef.current?.timer);
-      dbRef.current = null;
       closeChannel("tvPicture");
       clearTimeout(unlockHoldTimerRef.current);
     };
@@ -1081,7 +1082,6 @@ export default function App() {
       return;
     }
     if (isOff || isOther) return;
-    if (!debounce()) return;
     flash(key);
     await sendKeyThrough(key, `/tv/key/${key}`);
   };
@@ -1090,7 +1090,6 @@ export default function App() {
   // other keys it only needs the set on.
   const inputKey = async () => {
     if (isOff) return;
-    if (!debounce()) return;
     flash("input");
     await sendKeyThrough("input", "/tv/key/input");
   };
@@ -1195,23 +1194,9 @@ export default function App() {
     });
   };
 
-  // Shared simple debounce: debounce → action, no long-press
-  const dbRef = useRef(null);
+  // Shared simple debounce: the action runs on the press, no long-press
   const dbStart = (action) => {
-    clearTimeout(dbRef.current?.timer);
-    const db = { action };
-    dbRef.current = db;
-    db.timer = setTimeout(() => {
-      if (dbRef.current !== db) return;
-      dbRef.current = null;
-      action?.();
-    }, 10);
-  };
-
-  const dbStop = () => {
-    if (!dbRef.current) return;
-    clearTimeout(dbRef.current.timer);
-    dbRef.current = null;
+    if (debounce(KEY_DEBOUNCE_MS)) action();
   };
 
   // Checks the TV's actual current input (mediaTitle) rather than the
@@ -1233,8 +1218,6 @@ export default function App() {
       setShowStreamers(true);
     });
   };
-
-  const stopAppsHold = () => dbStop();
 
   const startVolDownHold = () => {
     armHold("vold", () =>
@@ -1453,8 +1436,6 @@ export default function App() {
       else tvKey("back");
     });
 
-  const stopBackPress = () => dbStop();
-
   const showsHoldRef = useRef(null);
   const showsHoldFiredRef = useRef(false);
 
@@ -1537,7 +1518,6 @@ export default function App() {
   };
 
   const stopShowsHold = () => {
-    dbStop();
     lpStop();
   };
 
@@ -1558,10 +1538,6 @@ export default function App() {
       const r = await sendKeyThrough(key, null);
       if (!r.blocked) sendTvapprc(`${CMD_KEY},${key}`);
     });
-  };
-
-  const stopTvapprcFocusHold = () => {
-    dbStop();
   };
 
   // The hide key, which tvapp reads as either of two things: the watched mark
@@ -1588,12 +1564,11 @@ export default function App() {
 
   const startHomeHold = () => {
     armHold("home", () =>
-      lpStart(() => tvKey("home"), toggleLayoutOption, 2000),
+      lpStart(() => debounce() && tvKey("home"), toggleLayoutOption, 2000),
     );
   };
 
   const stopHomeHold = () => {
-    dbStop();
     lpStop();
   };
 
@@ -1602,7 +1577,6 @@ export default function App() {
     dbStart(() => tvKey("ok"));
   };
   const stopOkHold = () => {
-    dbStop();
     lpStop();
   };
 
@@ -1616,8 +1590,6 @@ export default function App() {
       flash("text");
       setShowTvapprcInput(true);
     });
-
-  const stopSearchHold = () => dbStop();
 
   const kybdSendText = async () => {};
   const kybdSendKeyevent = async (code) => {};
@@ -1684,7 +1656,6 @@ export default function App() {
     bg: () => cellBg("white", key),
     onPress: () => {},
     onPressIn: () => startTvapprcFocusHold(key),
-    onPressOut: () => stopTvapprcFocusHold(),
   }));
 
   // Button definitions — matches tvpane.vue grid order (row-major, 3 cols x 5 rows)
@@ -1698,7 +1669,6 @@ export default function App() {
       bg: () => cellBg("white", "back"),
       onPress: () => {},
       onPressIn: () => startBackPress(),
-      onPressOut: () => stopBackPress(),
     },
     {
       key: "up",
@@ -1763,7 +1733,6 @@ export default function App() {
           bg: () => cellBg("white", "text"),
           onPress: () => {},
           onPressIn: () => startSearchHold(),
-          onPressOut: () => stopSearchHold(),
         }
       : {
           key: "emby",
@@ -1771,10 +1740,11 @@ export default function App() {
           smallText: true,
           bg: () => cellBg("white", "emby"),
           onPress: () => {},
-          onPressIn: () => {
-            flash("emby");
-            openApp(EMBY_SERVICE);
-          },
+          onPressIn: () =>
+            dbStart(() => {
+              flash("emby");
+              openApp(EMBY_SERVICE);
+            }),
         },
     {
       key: "down",
@@ -1793,7 +1763,7 @@ export default function App() {
           smallText: true,
           bg: () => cellBg("white", "skip"),
           onPress: () => {},
-          onPressIn: () => tvKey("skip"),
+          onPressIn: () => dbStart(() => tvKey("skip")),
         }
       : {
           key: "input",
@@ -1801,7 +1771,7 @@ export default function App() {
           smallText: true,
           bg: () => cellBg("white", "input"),
           onPress: () => {},
-          onPressIn: () => inputKey(),
+          onPressIn: () => dbStart(inputKey),
         },
     // Row 4: vol-, vol+, mute
     {
@@ -1849,7 +1819,6 @@ export default function App() {
       bg: () => cellBg("white", "stream"),
       onPress: () => {},
       onPressIn: () => startAppsHold(),
-      onPressOut: () => stopAppsHold(),
     },
     {
       key: "google",

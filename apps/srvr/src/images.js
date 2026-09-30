@@ -113,7 +113,15 @@ function answer(key, label, fn) {
 // null for a 404: the provider has no such thing.
 async function getJson(url, init) {
   for (let tries = 1; ; tries++) {
-    const res = await fetch(url, init);
+    let res;
+    try {
+      res = await fetch(url, init);
+    } catch (e) {
+      // Node's own text is only "fetch failed"; the reason is in its cause.
+      // The query is left off: fanart.tv and TMDB carry their keys in it.
+      const cause = e.cause?.code || e.cause?.message || "no cause";
+      throw new Error(`${e.message} (${cause}) from ${url.split("?")[0]}`);
+    }
     if (res.status === 429 && tries < RATE_LIMIT_TRIES) {
       await new Promise((resolve) => {
         setTimeout(resolve, RATE_LIMIT_RETRY_MS);

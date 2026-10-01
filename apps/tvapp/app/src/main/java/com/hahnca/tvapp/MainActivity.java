@@ -860,6 +860,16 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     ui.post(() -> video.selectSubtitle(index));
   }
 
+  @Override
+  public void onSubOffset(double sec) {
+    ui.post(() -> video.subOffset(sec));
+  }
+
+  @Override
+  public void onApplySubOffset() {
+    ui.post(video::applySubOfs);
+  }
+
   /**
    * The phone's Shows button, held, opens its own show pane on whatever show is
    * active here, so the phone is told the name on every change and again as
@@ -1526,6 +1536,11 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     // The remotes' Skip: the intro skip of a playing video, nothing without one.
     if ("skip".equals(key)) {
       if (video.isOpen()) video.key("skip", false);
+      return;
+    }
+    // The remotes' held Apps: the video reopens where it is, edited subtitles and all.
+    if ("reload".equals(key)) {
+      if (video.isOpen()) video.reload();
       return;
     }
     // While a video is up the keys are its own (see VideoPlayer.key); Back and

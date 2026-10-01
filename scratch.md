@@ -1,8 +1,46 @@
 
 
-clnup info in tvapp
 
+# new subtitles processing
+
+.mb2.srt
+remove the `aired within the last year` gate.  
+change the `downloads at most one missing .opn srt for the show` rule to `download all missing .opn srt for the show`
+aired date within the last year
+
+????????????????????????
+clnup info in tvapp
+back up pause based on pause length
 =================
+
+# live subtitle timing adjustment
+- keep a var subOfs:
+  - it is the timing offset of the currently playing subtitle in seconds
+  - it is reset to 0 when a video starts playing or a subtitle selection changes
+  - it can only be changed by +/- buttons (see below)
+- a var oldSubOfs keeps the last value of subOfs before any change
+  - it is also reset to 0 when a video starts playing or a subtitle selection changes
+- add these three rows above the close button in the subtitle screen in tvapprc:
+  - a row with subOfs display and an `Apply` button
+    - the subOfs display shows seconds as toFixed(1)
+    - the apply button adjusts timing in the currently showing subtitle file
+      - if the current subtitles are embedded then the apply button is disabled
+      - if subOfs == oldSubOfs then the apply button is disabled
+      - when pressed the playing subtitle file has all timings adjusted and rewritten in-place
+        - first the file timing is adjusted by (subOfs - oldSubOfs)
+          - this keeps subOfs matching the total amount the file timing has changed since reset
+      - then oldSubOfs is set to subOfs
+      - then the video is reloaded to use new timing
+  - a row with 2 buttons, both labelled `+`
+    - the left button increments subOfs by 1 sec
+    - the right button increments subOfs by 0.5 sec
+  - a row with 2 buttons, both labelled `-`
+    - the left button decrements subOfs by 1 sec
+    - the right button decrements subOfs by 0.5 sec
+- if these instructions are ambiguous, incomplete, contradictory, or you think there is a better way to do this then:
+  - write the problems to claude2-subofs-problems.md and stop
+  - make no changes other than writing to claude2-subofs-problems.md
+- otherwise implement these instructions immediately
 
 # play in web browser parity with tvapp
 - i want the full features of tvapp when playing in web browser with play button

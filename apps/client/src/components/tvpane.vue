@@ -248,15 +248,18 @@
         <div v-if="!subList" style="padding: 16px; color: #666">
           No video playing
         </div>
-        <template v-else>
+        <div v-else style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)">
           <div
             v-for="sub in subRows"
             :key="sub.index"
             @mousedown.prevent="subSelectTrack(sub.index)"
             @touchstart.prevent="subSelectTrack(sub.index)"
             :style="{
-              padding: '10px 14px',
+              padding: '7.5px 14px',
               borderBottom: '1px solid #eee',
+              borderRight: '1px solid #eee',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
               cursor: 'pointer',
               fontSize: '17px',
               fontWeight: subList.selected === sub.index ? 'bold' : 'normal',
@@ -266,7 +269,38 @@
           >
             {{ sub.label }}
           </div>
-        </template>
+        </div>
+      </div>
+      <!-- Timing rows: the offset and Apply, then + and - -->
+      <div style="display: flex; height: 10%; flex-shrink: 0">
+        <div :style="{ ...subOfsBtn, cursor: 'default' }">
+          {{ (subList?.subOfs ?? 0).toFixed(1) }}
+        </div>
+        <div
+          @mousedown.prevent="subApply"
+          @touchstart.prevent="subApply"
+          :style="{ ...subOfsBtn, color: subApplyOk ? '#000' : '#bbb' }"
+        >
+          Apply
+        </div>
+      </div>
+      <div
+        v-for="row in [
+          ['+', 1, 0.5],
+          ['-', -1, -0.5],
+        ]"
+        :key="row[0]"
+        style="display: flex; height: 10%; flex-shrink: 0"
+      >
+        <div
+          v-for="sec in row.slice(1)"
+          :key="sec"
+          @mousedown.prevent="subOffset(sec)"
+          @touchstart.prevent="subOffset(sec)"
+          :style="subOfsBtn"
+        >
+          {{ row[0] }}
+        </div>
       </div>
       <div
         @mousedown.prevent="showSubCtrl = false"
@@ -737,6 +771,10 @@ const MSG_ACTIVE_HIDDEN = "i";
 const MSG_SUBTITLES = "l";
 const CMD_SUBTITLES = "l";
 const CMD_SUBTITLE = "t";
+// The subtitle panel's timing offset: CMD_SUB_OFFSET,<sec> moves it (the
+// list's subOfs), CMD_SUB_APPLY shifts the playing .srt by it and reloads.
+const CMD_SUB_OFFSET = "so";
+const CMD_SUB_APPLY = "sa";
 const CMD_OPEN_TVAPP = "o";
 const CMD_BACK = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -884,6 +922,29 @@ export default {
     },
     powerBarStyle() {
       return POWER_BAR;
+    },
+    // Apply shifts a .srt file, so not an embedded track or none, and only
+    // when the offset has moved since the last one.
+    subApplyOk() {
+      const l = this.subList;
+      return l?.tracks[l.selected]?.type === "srt" && l.subOfs !== l.oldSubOfs;
+    },
+    // The timing rows' buttons.
+    subOfsBtn() {
+      return {
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        margin: "4px",
+        border: "2px solid #000",
+        borderRadius: "8px",
+        background: "#fff",
+        fontSize: "26px",
+        fontWeight: "bold",
+        cursor: "pointer",
+        userSelect: "none",
+      };
     },
     subRows() {
       const typeChar = { pgs: "*", sdh: "H", embedded: "T", forced: "F" };
@@ -1584,6 +1645,14 @@ export default {
       this.sendTvapprc(CMD_SUBTITLES);
     },
 
+    subOffset(sec) {
+      this.sendTvapprc(`${CMD_SUB_OFFSET},${sec}`);
+    },
+
+    subApply() {
+      if (this.subApplyOk) this.sendTvapprc(CMD_SUB_APPLY);
+    },
+
     subSelectTrack(index) {
       if (this.subList) this.subList = { ...this.subList, selected: index };
       this.sendTvapprc(`${CMD_SUBTITLE},${index}`);
@@ -1787,15 +1856,24 @@ export default {
       }
     },
 
+    // Held in tvapprc mode, Apps reloads the video tvapp is playing, which
+    // picks up its edited subtitles; otherwise it opens the streaming list on
+    // the press.
     startAppsHold() {
-      this._dbStart(() => {
+      const apps = () => {
         this.flash("stream");
         this.showStreamers = true;
+      };
+      if (!this.tvapprcMode) return this._dbStart(apps);
+      this._lpStart(apps, () => {
+        this.flash("stream");
+        this.sendTvapprc(`${CMD_KEY},reload`);
       });
     },
 
     stopAppsHold() {
       this._dbStop();
+      this._lpStop();
     },
 
     // Only the power key is painted this way now. Blue whenever the set is on --

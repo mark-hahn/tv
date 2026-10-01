@@ -74,6 +74,10 @@ const MSG_ACTIVE_HIDDEN = "i";
 const MSG_SUBTITLES = "l";
 const CMD_SUBTITLES = "l";
 const CMD_SUBTITLE = "t";
+// The subtitle panel's timing offset: CMD_SUB_OFFSET,<sec> moves it (the
+// list's subOfs), CMD_SUB_APPLY shifts the playing .srt by it and reloads.
+const CMD_SUB_OFFSET = "so";
+const CMD_SUB_APPLY = "sa";
 const CMD_OPEN_TVAPP = "o";
 const CMD_BACK = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -1212,10 +1216,20 @@ export default function App() {
     }
   };
 
+  // Held in tvapprc mode, Apps reloads the video tvapp is playing, which picks
+  // up its edited subtitles; otherwise it opens the streaming list on the press.
   const startAppsHold = () => {
-    dbStart(() => {
+    const apps = () => {
       flash("stream");
       setShowStreamers(true);
+    };
+    if (!tvapprcMode) {
+      dbStart(apps);
+      return;
+    }
+    lpStart(apps, () => {
+      flash("stream");
+      sendTvapprc(`${CMD_KEY},reload`);
     });
   };
 
@@ -1819,6 +1833,7 @@ export default function App() {
       bg: () => cellBg("white", "stream"),
       onPress: () => {},
       onPressIn: () => startAppsHold(),
+      onPressOut: () => lpStop(),
     },
     {
       key: "google",
@@ -1845,6 +1860,11 @@ export default function App() {
   ];
 
   if (showSubCtrl) {
+    // Apply shifts a .srt file, so not an embedded track or none, and only
+    // when the offset has moved since the last one.
+    const subApplyOk =
+      subList?.tracks[subList.selected]?.type === "srt" &&
+      subList.subOfs !== subList.oldSubOfs;
     return (
       <View style={styles.container}>
         <StatusBar hidden />
@@ -1853,7 +1873,10 @@ export default function App() {
             {subList?.title ?? "No video playing"}
           </Text>
         </View>
-        <ScrollView style={subCtrlStyles.list}>
+        <ScrollView
+          style={subCtrlStyles.list}
+          contentContainerStyle={subCtrlStyles.grid}
+        >
           {!subList ? (
             <Text style={subCtrlStyles.noVideo}>No video playing</Text>
           ) : (
@@ -1877,6 +1900,8 @@ export default function App() {
                   ]}
                 >
                   <Text
+                    numberOfLines={1}
+                    ellipsizeMode="clip"
                     style={[
                       subCtrlStyles.cardText,
                       subList.selected === index &&
@@ -1889,6 +1914,43 @@ export default function App() {
               ))
           )}
         </ScrollView>
+        <View style={subCtrlStyles.ofsRow}>
+          <View style={subCtrlStyles.ofsBtn}>
+            <Text style={subCtrlStyles.ofsBtnText}>
+              {(subList?.subOfs ?? 0).toFixed(1)}
+            </Text>
+          </View>
+          <TouchableOpacity
+            disabled={!subApplyOk}
+            onPress={() => sendTvapprc(CMD_SUB_APPLY)}
+            style={subCtrlStyles.ofsBtn}
+          >
+            <Text
+              style={[
+                subCtrlStyles.ofsBtnText,
+                !subApplyOk && subCtrlStyles.ofsBtnTextOff,
+              ]}
+            >
+              Apply
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {[
+          ["+", 1, 0.5],
+          ["-", -1, -0.5],
+        ].map(([label, ...steps]) => (
+          <View key={label} style={subCtrlStyles.ofsRow}>
+            {steps.map((sec) => (
+              <TouchableOpacity
+                key={sec}
+                onPress={() => sendTvapprc(`${CMD_SUB_OFFSET},${sec}`)}
+                style={subCtrlStyles.ofsBtn}
+              >
+                <Text style={subCtrlStyles.ofsBtnText}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ))}
         <TouchableOpacity
           onPress={() => setShowSubCtrl(false)}
           style={subCtrlStyles.closeBtn}
@@ -3529,19 +3591,55 @@ const subCtrlStyles = StyleSheet.create({
     fontWeight: "bold",
     color: "#000",
   },
+  // The timing rows above Close: the offset and Apply, then + and -.
+  ofsRow: {
+    flexDirection: "row",
+    height: 64,
+    flexShrink: 0,
+  },
+  ofsBtn: {
+    flex: 1,
+    backgroundColor: "white",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#000",
+    borderRadius: 8,
+    margin: 4,
+  },
+  ofsBtnText: {
+    fontSize: fs(31),
+    fontWeight: "bold",
+    color: "#000",
+  },
+  ofsBtnTextOff: {
+    color: "#bbb",
+  },
   noVideo: {
     padding: 20,
     textAlign: "center",
     color: "#999",
     fontSize: fs(16),
   },
-  card: {
-    padding: 28,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-    backgroundColor: "#fff",
+  // Two cards across.
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
+  card: {
+    width: "50%",
+    paddingVertical: 21,
+    paddingHorizontal: 28,
+    borderBottomWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "#ddd",
+    backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  // Wider than any card, so the label never wraps at a word and the card
+  // clips it at its edge, mid-word.
   cardText: {
+    width: 1000,
     fontSize: fs(27),
     color: "#000",
   },

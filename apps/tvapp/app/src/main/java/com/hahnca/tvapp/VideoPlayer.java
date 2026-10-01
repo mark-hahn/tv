@@ -56,6 +56,8 @@ class VideoPlayer extends FrameLayout {
 
   private static final String TAG = "tvapp";
   private static final String PROGRESS_URL = "https://hahnca.com/tv-srvr/api/playProgress";
+  // The chksrt pane's .srt timing shift, which the subtitle panel's Apply uses too.
+  private static final String SHIFT_SUBS_URL = "https://hahnca.com/tv-srvr/api/applySubOffset";
   // How often a playing video tells tv-srvr where it is: the resume point if
   // the tv goes off mid-play, and the phone's progress bar.
   private static final long REPORT_MS = 10000;
@@ -177,6 +179,17 @@ class VideoPlayer extends FrameLayout {
   // The video's text tracks, in the order the remote's subtitle panel lists
   // them.
   private final List<Tracks.Group> textGroups = new ArrayList<>();
+  // The text track that was on when reload reopened the video, turned back on
+  // once the reopened video has its tracks.
+  private String reloadSubId;
+  // The remote subtitle panel's timing offset in seconds (subOfs), and what of
+  // it the playing .srt has been shifted by already (oldSubOfs). Both go back
+  // to 0 on a new video or subtitle pick, so subOfs is how far the file has
+  // moved since then.
+  private double subOfs;
+  private double oldSubOfs;
+  // An Apply's shift is on its way to tv-srvr.
+  private boolean shifting;
 
   VideoPlayer(Context context, Events events) {
     super(context);
@@ -252,6 +265,8 @@ class VideoPlayer extends FrameLayout {
         show.status,
         res > 0 ? String.valueOf(res) : "");
     subsPicked = false;
+    subOfs = 0;
+    oldSubOfs = 0;
     stills.open(p.optJSONObject("stills"));
     String url = p.optString("url");
     exo = new ExoPlayer.Builder(getContext()).build();
@@ -285,6 +300,16 @@ class VideoPlayer extends FrameLayout {
           @Override
           public void onTracksChanged(Tracks tracks) {
             if (!subsPicked) pickSubs(tracks);
+            if (reloadSubId != null && !tracks.isEmpty()) {
+              for (Tracks.Group g : tracks.getGroups())
+                if (reloadSubId.equals(g.getTrackFormat(0).id))
+                  exo.setTrackSelectionParameters(
+                      exo.getTrackSelectionParameters()
+                          .buildUpon()
+                          .setOverrideForType(new TrackSelectionOverride(g.getMediaTrackGroup(), 0))
+                          .build());
+              reloadSubId = null;
+            }
             textGroups.clear();
             for (Tracks.Group g : tracks.getGroups()) {
               if (g.getType() != C.TRACK_TYPE_TEXT) continue;
@@ -292,6 +317,11 @@ class VideoPlayer extends FrameLayout {
               if (isSideloaded(f) || isEnglish(f)) textGroups.add(g);
             }
             events.onSubtitles(subtitleList());
+          }
+
+          @Override
+          public void onRenderedFirstFrame() {
+            view.setKeepContentOnPlayerReset(false);
           }
 
           @Override
@@ -552,6 +582,20 @@ class VideoPlayer extends FrameLayout {
     if (exo != null) exo.setPlayWhenReady(true);
   }
 
+  /**
+   * The video opens again where it is, so its .srt files are fetched again and
+   * an edit to one shows, on the subtitle track that was on. The frame on
+   * screen stays up until the reopened video draws its first one, at the same
+   * spot; the sound drops out meanwhile.
+   */
+  void reload() {
+    if (exo == null) return;
+    reloadSubId = null;
+    for (Tracks.Group g : textGroups) if (g.isSelected()) reloadSubId = g.getTrackFormat(0).id;
+    view.setKeepContentOnPlayerReset(true);
+    exo.setMediaItem(exo.getCurrentMediaItem(), exo.getCurrentPosition());
+  }
+
   void close() {
     if (exo == null) return;
     ui.removeCallbacks(reportTick);
@@ -570,6 +614,8 @@ class VideoPlayer extends FrameLayout {
     ready = false;
     barUp = false;
     view.hideController();
+    view.setKeepContentOnPlayerReset(false);
+    reloadSubId = null;
     view.setPlayer(null);
     exo.release();
     exo = null;
@@ -605,6 +651,8 @@ class VideoPlayer extends FrameLayout {
               playing.optString("showName"), playing.optInt("season"), playing.optInt("episode")));
       out.put("tracks", tracks);
       out.put("selected", selected);
+      out.put("subOfs", subOfs);
+      out.put("oldSubOfs", oldSubOfs);
     } catch (JSONException e) {
       Log.e(TAG, "subtitle list failed: " + e);
       return null;
@@ -615,6 +663,10 @@ class VideoPlayer extends FrameLayout {
   /** The remote's pick from subtitleList's tracks; -1 turns subtitles off. */
   void selectSubtitle(int index) {
     if (exo == null) return;
+    if (index != selectedSub()) {
+      subOfs = 0;
+      oldSubOfs = 0;
+    }
     TrackSelectionParameters.Builder b = exo.getTrackSelectionParameters().buildUpon();
     if (index < 0 || index >= textGroups.size()) {
       b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true);
@@ -624,6 +676,65 @@ class VideoPlayer extends FrameLayout {
               new TrackSelectionOverride(textGroups.get(index).getMediaTrackGroup(), 0));
     }
     exo.setTrackSelectionParameters(b.build());
+  }
+
+  // The index in textGroups of the track that is on, -1 for none.
+  private int selectedSub() {
+    for (int i = 0; i < textGroups.size(); i++) if (textGroups.get(i).isSelected()) return i;
+    return -1;
+  }
+
+  /** The panel's + and -: subOfs moves by sec; nothing is shifted until Apply. */
+  void subOffset(double sec) {
+    if (exo == null) return;
+    subOfs += sec;
+    events.onSubtitles(subtitleList());
+  }
+
+  /**
+   * The panel's Apply: tv-srvr shifts the playing .srt on disk by what subOfs
+   * has moved since the last Apply, oldSubOfs catches up, and the video
+   * reloads to show it. An embedded track, or none, has no file to shift.
+   */
+  void applySubOfs() {
+    int sel = selectedSub();
+    if (exo == null || shifting || sel < 0 || subOfs == oldSubOfs) return;
+    Format f = textGroups.get(sel).getTrackFormat(0);
+    if (!isSideloaded(f)) return;
+    int i = Integer.parseInt(f.id.substring(f.id.indexOf(SUBS_ID) + SUBS_ID.length()));
+    Uri sub = Uri.parse(playing.optJSONArray("subs").optJSONObject(i).optString("url"));
+    double target = subOfs;
+    JSONObject body = new JSONObject();
+    try {
+      body.put("videoPath", sub.getQueryParameter("path"));
+      body.put("srtFile", sub.getQueryParameter("file"));
+      body.put("offsetMs", Math.round((target - oldSubOfs) * 1000));
+    } catch (JSONException e) {
+      Log.e(TAG, "subtitle shift body failed: " + e);
+      return;
+    }
+    shifting = true;
+    JSONObject was = playing;
+    new Thread(
+            () -> {
+              boolean ok = false;
+              try {
+                Http.postJson(SHIFT_SUBS_URL, body.toString());
+                ok = true;
+              } catch (Exception e) {
+                Log.e(TAG, "subtitle shift failed: " + e);
+              }
+              boolean shifted = ok;
+              ui.post(
+                  () -> {
+                    shifting = false;
+                    if (!shifted || playing != was) return;
+                    oldSubOfs = target;
+                    reload();
+                  });
+            },
+            "sub-shift")
+        .start();
   }
 
   // The kinds the remote's panel marks each track with.

@@ -227,9 +227,14 @@ export const TONEMAP =
   "zscale=t=linear:npl=100,tonemap=hable:desat=0," +
   "zscale=p=bt709:t=bt709:m=bt709:r=tv,format=yuv420p";
 
+// Idle I/O class: the media disk takes one request at a time, and a set's
+// ffmpegs seeking all over it starved nginx's reads of the playing video.
+// The class only counts with the disk's nr_requests raised from its default 2
+// (hahnca.com:/etc/udev/rules.d/99-media-queue.rules).
+// ionice execs ffmpeg, so the child's pid is ffmpeg's.
 function runFfmpeg(args, onSpawn) {
   return new Promise((resolve, reject) => {
-    const child = cp.spawn("ffmpeg", ["-y", "-v", "error", ...args]);
+    const child = cp.spawn("ionice", ["-c3", "ffmpeg", "-y", "-v", "error", ...args]);
     onSpawn?.(child);
     let lastErr = "";
     child.stderr.on("data", (d) => {

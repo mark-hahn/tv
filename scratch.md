@@ -1,13 +1,13 @@
 
-OpenSubtitles limit
+don't trust db for downloaded files
+'A Woman of Substance (2026)/Season 1/bravery-a.woman.of.substance.2026.s01e01.1080p.bluray.h264.mkv'
+can't get subs
 
-subtitles with hearing_impaired set should not be skipped in nextCandidate()
-
-.opnXXXXX naming
+OpenSubtitles rate limit
 
 remove '' from all alt-copies
 
-status pill in footer should show light-green background when 
+status pill in footer should show light-green background when lower-case w is showing
 
 the subtitle error check when starting playing should include having no subtitles as an error and show pop-up
 
@@ -22,9 +22,12 @@ change the `downloads at most one missing .opn srt for the show` rule to `downlo
 aired date within the last year
 
 ????????????????????????
+.opnXXXXX naming
 clnup info in tvapp
 back up pause based on pause length
 =================
+
+subtitles with hearing_impaired set should not be skipped in nextCandidate()
 
 # new subtitle logic
 - the current subtitle processing is too complicated

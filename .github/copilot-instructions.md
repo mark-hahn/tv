@@ -42,6 +42,20 @@
   never unmount `/mnt/bkupall-bkup`, and restore to a scratch path — don't overwrite
   live files without asking.
 
+## Media disk (hahnca.com)
+
+- `/mnt/media` is a USB hard drive that serves one request at a time. Videos,
+  stills and the restic repo all live on it.
+- `/etc/udev/rules.d/99-media-queue.rules` sets its `queue/nr_requests` to 64.
+  The kernel's default for it is 2, and with 2 every reader waits in line for
+  a slot, so I/O priorities do nothing: a scrub-stills build then starves
+  nginx's reads of the playing video and tvapp freezes.
+- With 64, idle-class jobs (`ionice -c3`: the stills ffmpegs, `BATCH_SCHED`)
+  wait whenever a normal-priority reader such as nginx wants the disk.
+- If playback freezes, check `cat /sys/block/sda/queue/nr_requests` first.
+  Leave `read_ahead_kb` at its default 128: larger values slow stills builds
+  and do not help playback.
+
 ## Nginx
 
 - Nginx config location is `hahnca.com:/etc/nginx/conf.d/server.conf`
@@ -404,7 +418,7 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-10-01**. tvapp (`apps/tvapp`, native Java, package
+Current as of **2026-10-02**. tvapp (`apps/tvapp`, native Java, package
 `com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
 (`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
@@ -512,6 +526,9 @@ because the TV is unreachable from any wireless host here.
   to the next time that episode plays (its sidecar is `partial` until done).
   Dolby Vision profile 5 files go through libplacebo on the GPU, or their
   stills come out magenta.
+- The stills ffmpegs run in the idle I/O class, so a build gives way to
+  nginx's reads of the playing video (see Media disk). A build shares the
+  disk with the subtitle and ASR jobs, which are idle class too.
 - A remote's `kh,<left|right>` starts a hold; so does the first repeat from
   the TV's own remote. The hold steps one still at a time on tvapp's own
   clock, as fast as its speed allows: right every 20 ms (50 stills, about 2

@@ -1320,13 +1320,13 @@ export default {
       const isCtrlClick = Boolean(event?.ctrlKey || event?.metaKey);
       const isShiftClick = Boolean(event?.shiftKey);
 
-      // Alt-click: copy destination file path to clipboard (relative to /mnt/media/tv, bash-quoted if needed)
+      // Alt-click: copy destination file path to clipboard (relative to /mnt/media/tv)
       if (isAltClick) {
         const localPath = String(it?.localPath || "").replace(/\/?$/, "/");
         const fileName = String(it?.destTitle || it?.title || "");
         const fullPath = localPath + fileName;
         const relPath = fullPath.replace(/^\/mnt\/media\/[^/]+\//, "");
-        navigator.clipboard.writeText(util.shellQuote(relPath)).catch(() => {});
+        navigator.clipboard.writeText(relPath).catch(() => {});
         this.flashingItem = it;
         setTimeout(() => {
           this.flashingItem = null;

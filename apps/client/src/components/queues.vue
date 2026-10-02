@@ -263,7 +263,7 @@ export default {
     lineClick(event, e) {
       if (event?.altKey) {
         navigator.clipboard
-          .writeText(util.shellQuote(e.path))
+          .writeText(e.path)
           .catch((err) => unilog(2176, `copy failed: ${err}`));
         this.copyFlashPath = e.path;
         setTimeout(() => {

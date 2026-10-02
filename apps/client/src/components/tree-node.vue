@@ -139,7 +139,7 @@ export default {
       if (event.altKey) {
         const text = this.copyPath ? this.fullPath : this.node.name;
         navigator.clipboard
-          .writeText(util.shellQuote(text))
+          .writeText(text)
           .catch((err) => unilog(1044, "Copy failed", err));
         this.highlighted = true;
         setTimeout(() => {

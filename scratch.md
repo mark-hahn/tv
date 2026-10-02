@@ -1,14 +1,15 @@
 
 
-remove '' from all alt-copies
-
-describe the `aired within the last year` gate.  i don't know what/where it is
 
 ????????????????????????
 .opnXXXXX naming
 clnup info in tvapp
 back up pause based on pause length
 =================
+
+describe the `aired within the last year` gate.  i don't know what/where it is
+
+remove '' from all alt-copies
 
 Loose ends found while writing this
 

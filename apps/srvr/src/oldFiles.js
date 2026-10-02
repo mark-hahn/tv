@@ -37,7 +37,7 @@ const RECODE_SIDECAR_SUFFIX = ".recode.json";
 const DELETE_LOG_PATH = path.join(SRVR_DATA_DIR, "auto-deleted-files.log");
 const CLEANUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 // How long a mirror or a moved-aside original is kept. Long enough that a show
-// watched today can still be re-checked in chksrt or rolled back to its original
+// watched today can still be rolled back to its original
 // file weeks later, short enough that neither tree grows without bound.
 const PURGE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 

@@ -1,6 +1,6 @@
 // stills — film-strip stills straight from the original video, and a short
 // 480p window transcoded the moment one is clicked. This replaced the mp4
-// mirror (mpfour): intro marking and chksrt review used to wait 50–130s for a
+// mirror (mpfour): intro marking used to wait 50–130s for a
 // mirror encode before anything could be seen; now the strip is up in 1–20s
 // and the video in under a second.
 //

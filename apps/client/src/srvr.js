@@ -711,54 +711,6 @@ export function getLocalHistory(params) {
   return httpCall("/api/local/history", params, "POST", 60000);
 }
 
-// OpenSubtitles (server-side search)
-// tv-srvr should implement this endpoint.
-// params: { imdb_id?: string, q?: string, page?: number }
-export function subsSearch(params) {
-  return httpCall("/api/subsSearch", params, "POST");
-}
-
-// Search OpenSubtitles for each video path.
-// videoPaths: string[]
-// Returns: { results: [{ videoPath, items: [...], error? }] }
-export function searchOpn(videoPaths) {
-  return httpCall("/api/opn/search", { videoPaths }, "POST", 60000);
-}
-
-// Apply subtitle files to media files on the server.
-// fileIdObjs: [{ file_id:number, showName:string, season:number, episode:number }, ...]
-// Returns: "ok" or { error: string }
-export function applySubFiles(fileIdObjs) {
-  return httpCall("/api/applySubFiles", fileIdObjs, "POST", 120000);
-}
-
-// Delete previously applied subtitle files on the server.
-// fileIdObjs: [{ file_id:number, showName:string, season:number, episode:number }, ...]
-// Returns: "ok" or { error: string }
-export function deleteSubFiles(fileIdObjs) {
-  return httpCall("/api/deleteSubFiles", fileIdObjs, "POST");
-}
-
-// Offset (trim) existing subtitle files on the server.
-// fileIdObjs: [{ file_id:number, showName:string, season:number, episode:number, offset:number }, ...]
-// Returns: "ok" or { error: string } or { ok:true, failures:[...], applied:[...] }
-export function offsetSubFiles(fileIdObjs) {
-  return httpCall("/api/offsetSubFiles", fileIdObjs, "POST");
-}
-
-// Apply the slider offset to an SRT file in-place.
-// { videoPath:string, srtFile:string, offsetMs:number }
-export function applySubOffset(params) {
-  return httpCall("/api/applySubOffset", params, "POST");
-}
-
-// Scan the show folder for existing subtitle files and return their file-id base32 strings.
-// showName: string
-// Returns: string[] (e.g. ["ASD2H", "IF8JH"])
-export function getSubFileIds(showName) {
-  return httpCall("/api/getSubFileIds", { showName }, "POST");
-}
-
 export function tvRemoteKey(params) {
   return httpCall("/api/tvRemoteKey", params, "POST");
 }
@@ -868,16 +820,8 @@ export function handleFix(params) {
   return fCall("handleFix", params);
 }
 
-export function getChksrtList() {
-  return httpCall("/api/asr/chksrt/list");
-}
-
 export function getQueues() {
   return httpCall("/api/queues");
-}
-
-export function enqueueChksrt(videoPaths) {
-  return httpCall("/api/asr/chksrt/enqueue", { videoPaths }, "POST");
 }
 
 // Play button of the info and map panes: the episode in a tab of its own, in
@@ -886,46 +830,6 @@ export function enqueueChksrt(videoPaths) {
 export function playInTab(show, season, episode) {
   const q = new URLSearchParams({ showName: show.name, season, episode });
   window.open(`${HTTP_URL}/api/play?${q}`, "_blank");
-}
-
-export function chksrtOk(videoPath) {
-  return httpCall("/api/asr/chksrt/ok", { videoPath }, "POST");
-}
-
-export function chksrtOkShow(showName) {
-  return httpCall("/api/asr/chksrt/ok-show", { showName }, "POST");
-}
-
-export function chksrtGenSrt(videoPath) {
-  return httpCall("/api/asr/chksrt/gensrt", { videoPath }, "POST");
-}
-
-export function chksrtUnsnooze(videoPath) {
-  return httpCall("/api/asr/chksrt/unsnooze", { videoPath }, "POST");
-}
-
-export function chksrtSnooze(videoPath) {
-  return httpCall("/api/asr/chksrt/snooze", { videoPath }, "POST");
-}
-
-export function chksrtSelect(videoPath, selectedSrtPath) {
-  return httpCall(
-    "/api/asr/chksrt/select",
-    { videoPath, selectedSrtPath },
-    "POST",
-  );
-}
-
-export function chksrtSelectShow(showName) {
-  return httpCall("/api/asr/chksrt/select-show", { showName }, "POST");
-}
-
-export function getChksrtHistory() {
-  return httpCall("/api/asr/chksrt/history");
-}
-
-export function addChksrtHistory(entry) {
-  return httpCall("/api/asr/chksrt/history/add", entry, "POST");
 }
 
 export function getAsrLog() {

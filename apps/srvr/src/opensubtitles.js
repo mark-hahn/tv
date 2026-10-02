@@ -1,14 +1,13 @@
 // OpenSubtitles REST client: owns the JWT token cache (persisted to
 // secrets/subs-token.txt), login/refresh, and the subtitles search + download
-// endpoints, plus the higher-level subsSearch / subsCountEpisodes helpers.
+// endpoints, plus the higher-level subsSearch helper.
 
 import fs from "fs";
 import * as path from "node:path";
 import fetch from "node-fetch";
-import { logHere, unilog, smartTitleMatch } from "@tv/share";
+import { unilog } from "@tv/share";
 import { SRVR_SECRETS_DIR } from "./srvrPaths.js";
 import * as util from "./util.js";
-import * as tvdb from "./tvdb.js";
 
 const SECRETS_DIR = SRVR_SECRETS_DIR;
 const subsLoginPath = path.join(SECRETS_DIR, "subs-login.txt");
@@ -323,100 +322,6 @@ export const subsSearch = async (params) => {
     if (e instanceof Error && e.message.startsWith("subsSearch:")) throw e;
     throw new Error(`subsSearch: ${e.message}`);
   }
-};
-
-export const subsCountEpisodes = async (params) => {
-  const requests = Array.isArray(params?.requests) ? params.requests : null;
-  if (!requests || requests.length === 0) {
-    throw new Error("subsCountEpisodes: requests required");
-  }
-
-  const normalizeReleaseKey = (item) => {
-    const release =
-      String(item?.attributes?.release || "").trim() ||
-      String(item?.attributes?.files?.[0]?.file_name || "").trim();
-    return release
-      .toLowerCase()
-      .replace(/\.(hi|sdh)\b/g, "")
-      .replace(/\b(hi|sdh|hearing[ ._-]?impaired)\b/g, "")
-      .replace(/[^a-z0-9]+/g, ".")
-      .replace(/^\.+|\.+$/g, "");
-  };
-
-  const isHearingImpaired = (item) => {
-    if (item?.attributes?.hearing_impaired === true) return true;
-    const release = String(item?.attributes?.release || "").toLowerCase();
-    const fileName = String(
-      item?.attributes?.files?.[0]?.file_name || "",
-    ).toLowerCase();
-    return /\bhi\b|\.hi\b|\bsdh\b|hearing[ ._-]?impaired/.test(
-      `${release} ${fileName}`,
-    );
-  };
-
-  const processRequest = async (request) => {
-    const key = String(request?.key || "");
-    try {
-      const query = String(request?.query || "").trim();
-      let resolvedImdbId = normalizeImdbId(request?.imdb_id);
-      if (!resolvedImdbId && query) {
-        const tvdbAll = tvdb.getAllTvdbSync?.() || {};
-        let tvdbRec =
-          tvdbAll?.[query] ||
-          Object.values(tvdbAll).find(
-            (rec) =>
-              String(rec?.name || "").toLowerCase() === query.toLowerCase(),
-          );
-        if (!tvdbRec?.imdbId) {
-          const matched = smartTitleMatch(
-            query,
-            Object.values(tvdbAll),
-            null,
-            false,
-          );
-          if (matched?.imdbId) tvdbRec = matched;
-        }
-        resolvedImdbId = normalizeImdbId(tvdbRec?.imdbId);
-      }
-
-      const searchParams = { ...request };
-      if (resolvedImdbId) {
-        searchParams.imdb_id = resolvedImdbId;
-        delete searchParams.query;
-      }
-
-      const data = await subsSearch(searchParams);
-      const items = Array.isArray(data?.data) ? data.data : [];
-
-      const dedupedMap = new Map();
-      for (const item of items) {
-        const dedupeKey = normalizeReleaseKey(item);
-        if (!dedupeKey) continue;
-        const existing = dedupedMap.get(dedupeKey);
-        if (!existing) {
-          dedupedMap.set(dedupeKey, item);
-          continue;
-        }
-        if (isHearingImpaired(existing) && !isHearingImpaired(item)) {
-          dedupedMap.set(dedupeKey, item);
-        }
-      }
-      const countedItems = [...dedupedMap.values()];
-
-      return { key, count: countedItems.length, error: null };
-    } catch (e) {
-      return { key, count: 0, error: e?.message || String(e) };
-    }
-  };
-
-  const OPN_CONCURRENCY = 3;
-  const results = [];
-  for (let i = 0; i < requests.length; i += OPN_CONCURRENCY) {
-    const batch = requests.slice(i, i + OPN_CONCURRENCY);
-    results.push(...(await Promise.all(batch.map(processRequest))));
-  }
-
-  return { results };
 };
 
 // Proactively refresh token on startup if missing or expired

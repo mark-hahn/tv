@@ -1,187 +1,22 @@
 // Media serving routes: /api/stream (ffmpeg remux/transcode to fragmented MP4,
 // with nginx redirect fast-path for already-compatible mp4s), audio/subtitle
-// track listing, per-episode subtitle discovery, episode ffprobe stats, and
-// subtitle serving (embedded stream → WebVTT, or sidecar .srt → VTT).
+// track listing, episode ffprobe stats, and subtitle serving (sidecar .srt →
+// VTT; embedded subtitle tracks are never served).
 
 import fs from "fs";
-import * as crypto from "node:crypto";
 import * as cp from "child_process";
 import * as path from "node:path";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { unilog, logHere } from "@tv/share";
-import { resStripAlt } from "../videoFiles.js";
-import { SRVR_DATA_DIR, ensureDir } from "../srvrPaths.js";
+import { listSidecars } from "../subs.js";
 import { HDR_TRANSFERS, TONEMAP } from "../stills.js";
 
 const tvDir = "/mnt/media/tv";
-
-// Extracting an embedded subtitle stream demuxes the whole video file — ten
-// minutes for a 2160p mkv — and the result never changes for a given file, so
-// each (file, stream) is extracted once and replayed from here after that. Kept
-// out of the media tree so nothing in the disk scan or Emby sees it.
-const VTT_CACHE_DIR = path.join(SRVR_DATA_DIR, "vtt-cache");
-
-// Window the first-cue probe covers. Reading the first cue out of an extracted
-// vtt would pay that same whole-file demux (50s on a 2160p mkv), so the packet
-// timestamps are probed directly instead, bounded to the ten minutes the chksrt
-// mpfour mirror holds — a subtitle that has not started by then is past what
-// the reviewer can see anyway.
-const FIRST_CUE_PROBE_SECS = 600;
-// Only reached by a stream that has no cue at all in that window, which means
-// reading the whole ten minutes before giving up.
-const FIRST_CUE_PROBE_TIMEOUT_MS = 30_000;
-// Probing costs real disk reads, and chksrt lists the same episode every time
-// it is opened, so the answer is kept for the life of the process. Keyed on
-// file identity, so a replaced file is probed again.
-const firstCueCache = new Map();
 
 function runFfprobe(args, maxBuffer = 2 * 1024 * 1024) {
   return cp.execFileSync("ffprobe", args, {
     maxBuffer,
     encoding: "utf8",
-  });
-}
-
-// Start time of the first cue of an embedded subtitle stream, in seconds, or
-// null when the stream has no cue inside the probe window.
-//
-// ffprobe prints the first subtitle packet the moment it demuxes it, so it is
-// killed right there rather than reading the whole window — on a 2160p file
-// that is the difference between twenty seconds of video and ten minutes of
-// it. It is also spawned async: tv-srvr serves /api/stream on this same event
-// loop, and a sync probe stalls the video the reviewer is waiting for.
-function firstCueSecEmbedded(resolved, idx) {
-  const st = fs.statSync(resolved);
-  const cacheKey = `${resolved}|${st.size}|${st.mtimeMs}|${idx}`;
-  if (firstCueCache.has(cacheKey))
-    return Promise.resolve(firstCueCache.get(cacheKey));
-  return new Promise((resolve) => {
-    const ff = cp.spawn("ffprobe", [
-      "-v",
-      "error",
-      "-select_streams",
-      String(idx),
-      "-read_intervals",
-      `%+${FIRST_CUE_PROBE_SECS}`,
-      "-show_entries",
-      "packet=pts_time",
-      "-of",
-      "csv=p=0",
-      resolved,
-    ]);
-    let done = false;
-    let buf = "";
-    const finish = (sec) => {
-      if (done) return;
-      done = true;
-      clearTimeout(timer);
-      if (!ff.killed) ff.kill("SIGKILL");
-      firstCueCache.set(cacheKey, sec);
-      resolve(sec);
-    };
-    const timer = setTimeout(() => finish(null), FIRST_CUE_PROBE_TIMEOUT_MS);
-    ff.stdout.on("data", (chunk) => {
-      buf += chunk;
-      // Only whole lines: a chunk can split "24.232" into "24.2" + "32".
-      const lines = buf.split("\n");
-      buf = lines.pop();
-      for (const line of lines) {
-        const sec = parseFloat(line);
-        if (Number.isFinite(sec)) {
-          finish(sec);
-          return;
-        }
-      }
-    });
-    ff.stderr.on("data", () => {});
-    ff.on("error", () => finish(null));
-    ff.on("exit", () => finish(null));
-  });
-}
-
-// Same for a sidecar .srt, whose first timestamp is right at the top of it.
-function firstCueSecSrt(srtPath) {
-  const m = fs
-    .readFileSync(srtPath, "utf8")
-    .match(/(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->/);
-  if (!m) return null;
-  return (
-    Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(m[4]) / 1000
-  );
-}
-
-// Cache key covers file identity (path + size + mtime), so a replaced or
-// re-encoded file can never serve a stale vtt.
-function vttCachePath(resolved, idx) {
-  const st = fs.statSync(resolved);
-  const key = `${resolved}|${idx}|${st.size}|${st.mtimeMs}`;
-  const hash = crypto.createHash("sha1").update(key).digest("hex");
-  return path.join(VTT_CACHE_DIR, `${hash}.vtt`);
-}
-
-// Serve one embedded subtitle stream as WebVTT. Owns the ffmpeg lifetime and
-// the cache write for both /api/subtitle paths that need it.
-function serveEmbeddedVtt(req, res, resolved, idx) {
-  res.setHeader("Content-Type", "text/vtt");
-  res.setHeader("Cache-Control", "no-cache");
-
-  const cachePath = vttCachePath(resolved, idx);
-  if (fs.existsSync(cachePath)) {
-    res.send(fs.readFileSync(cachePath, "utf8"));
-    return;
-  }
-
-  // Cache miss: the response lasts as long as ffmpeg takes to demux the whole
-  // file, which is minutes for a big mkv. The browser consumes cues as they
-  // arrive, so nothing is actually waiting — exempt it from the slow-request
-  // warning in index.js.
-  res.locals.slowExempt = true;
-
-  ensureDir(VTT_CACHE_DIR);
-  const tmpPath = `${cachePath}.${crypto.randomBytes(4).toString("hex")}.tmp`;
-  const cacheOut = fs.createWriteStream(tmpPath);
-
-  const ff = cp.spawn("ffmpeg", [
-    "-i",
-    resolved,
-    "-map",
-    `0:${idx}`,
-    "-f",
-    "webvtt",
-    "pipe:1",
-  ]);
-  ff.stdout.pipe(res);
-  ff.stdout.pipe(cacheOut);
-  ff.stderr.on("data", () => {});
-
-  const killFf = () => {
-    if (!ff.killed) ff.kill("SIGKILL");
-  };
-  // Every way the client can go away. req close alone is not enough: when the
-  // response is proxy-buffered nobody closes the request, and a dead output
-  // pipe only surfaces as a stdout error — either way the extraction would
-  // keep demuxing a multi-GB file for nobody.
-  req.on("close", killFf);
-  res.on("close", killFf);
-  ff.stdout.on("error", (e) => {
-    unilog(2004, `subtitle stdout error: ${e.message}`);
-    killFf();
-  });
-  ff.on("error", (e) => {
-    unilog(2005, `subtitle ffmpeg spawn failed: ${e.message}`);
-  });
-  ff.on("exit", (code) => {
-    // Only a clean full extraction is worth keeping — a killed or failed run
-    // leaves a truncated vtt that would then be served forever.
-    cacheOut.end(() => {
-      try {
-        if (code === 0) fs.renameSync(tmpPath, cachePath);
-        else fs.unlinkSync(tmpPath);
-      } catch (e) {
-        unilog(2006, `vtt cache write failed: ${e.message}`);
-      }
-    });
-    if (!res.writableEnded) res.end();
   });
 }
 
@@ -481,6 +316,8 @@ export function registerMediaRoutes(app) {
     }
   });
 
+  // The video's subtitles: its sidecar .srt files. Embedded tracks are never
+  // listed; the sub queue copies the text ones out to sidecars.
   app.get("/api/subtitle-list", async (req, res) => {
     const filePath = req.query.path;
     if (!filePath) {
@@ -502,203 +339,14 @@ export function registerMediaRoutes(app) {
       res.status(404).json({ error: "file not found" });
       return;
     }
-    const dir = path.dirname(resolved);
-    const stem = resStripAlt(path.basename(resolved)).replace(/\.[^.]+$/, "");
-    const tracks = [];
-    try {
-      const probeOut = runFfprobe([
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_streams",
-        resolved,
-      ]);
-      const streams = JSON.parse(probeOut).streams || [];
-      for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
-        const lang = (s.tags?.language || "").toLowerCase();
-        if (lang && lang !== "eng" && lang !== "en") continue;
-        const label = s.tags?.title || s.tags?.language || "eng";
-        const isPgs =
-          s.codec_name === "hdmv_pgs_subtitle" ||
-          s.codec_name === "dvb_subtitle";
-        if (isPgs && s.disposition?.forced === 1) continue;
-        const isForced = !isPgs && s.disposition?.forced === 1;
-        const isSdh =
-          !isPgs &&
-          !isForced &&
-          (s.disposition?.hearing_impaired === 1 ||
-            /\bsdh\b/i.test(s.tags?.title || ""));
-        tracks.push({
-          id: `emb-${s.index}`,
-          label,
-          type: isPgs
-            ? "pgs"
-            : isForced
-              ? "forced"
-              : isSdh
-                ? "sdh"
-                : "embedded",
-          index: s.index,
-        });
-      }
-      await Promise.all(
-        tracks.map(async (t) => {
-          t.firstCue = await firstCueSecEmbedded(resolved, t.index);
-        }),
-      );
-    } catch (e) {
-      unilog(592, "probe error:", e.message);
-    }
-    try {
-      for (const f of fs.readdirSync(dir)) {
-        if (!f.endsWith(".srt") || !f.startsWith(stem)) continue;
-        const suffix = f
-          .slice(stem.length)
-          .replace(/\.srt$/, "")
-          .replace(/^\./, "");
-        tracks.push({
-          id: `srt-${f}`,
-          label: suffix || f,
-          type: "srt",
-          file: f,
-          firstCue: firstCueSecSrt(path.join(dir, f)),
-        });
-      }
-    } catch (e) {
-      // ignore readdir errors
-    }
-    // TEMP: log button details for chksrt debugging
-    try {
-      const charFor = (t) => {
-        if (t.type === "pgs") return "*";
-        if (t.type === "sdh") return "H";
-        if (t.type === "embedded") return "T";
-        if (t.type === "forced") return "F";
-        if (/\.asr\.srt$/.test(t.file || "")) return "+";
-        if (/\.mb\d+\.srt$/.test(t.file || "")) return ">";
-        if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) return "V";
-        return "S";
-      };
-      const lines = [`## ${path.basename(resolved)}\n`];
-      tracks.forEach((t, i) => {
-        const newLabel = `${charFor(t)} ${i + 1}`;
-        const filePart = t.file
-          ? t.file.slice(stem.length + 1)
-          : `(embedded index ${t.index})`;
-        lines.push(
-          `- old: \`${t.label}\`  new: \`${newLabel}\`  file: \`${filePart}\``,
-        );
-        if (/\.opn[A-Z2-7]{5}\.srt$/i.test(t.file || "")) {
-          lines.push(`  head "${path.join(dir, t.file)}"`);
-          const opnTag = (t.file.match(/\.opn([A-Z2-7]{5})\.srt$/i) || [])[1];
-          if (opnTag) {
-            // TEMP: decode base32 tag to decimal file_id
-            const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-            let fid = 0;
-            for (const ch of opnTag.toUpperCase())
-              fid = fid * 32 + alpha.indexOf(ch);
-            lines.push(
-              `  id: ${fid}  https://www.opensubtitles.com/en/subtitles/${fid}`,
-            );
-          }
-        }
-      });
-      fs.appendFileSync("/root/dev/apps/tv/temp.md", lines.join("\n") + "\n\n");
-    } catch (_) {}
-    res.json(tracks);
-  });
-
-  app.get("/api/episodeSubs", async (req, res) => {
-    const showName = (req.query.show || "").trim();
-    const season = parseInt(req.query.s, 10);
-    const episode = parseInt(req.query.e, 10);
-    if (!showName || isNaN(season) || isNaN(episode)) {
-      res.status(400).json({ error: "show, s, e required" });
-      return;
-    }
-    if (showName.includes("/") || showName.includes("\\")) {
-      res.status(400).json({ error: "invalid show name" });
-      return;
-    }
-    const seasonDir = path.join(tvDir, showName, `Season ${season}`);
-    let entries;
-    try {
-      entries = fs.readdirSync(seasonDir);
-    } catch {
-      res.json([]);
-      return;
-    }
-    const seKey = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
-    const videoExt = /\.(mkv|mp4|avi|m4v|ts)$/i;
-    const videoFile = entries.find(
-      (f) => videoExt.test(f) && f.toUpperCase().includes(seKey),
+    res.json(
+      listSidecars(resolved).map((s) => ({
+        id: `srt-${s.file}`,
+        label: s.label,
+        type: "srt",
+        file: s.file,
+      })),
     );
-    if (!videoFile) {
-      res.json([]);
-      return;
-    }
-    const resolved = path.join(seasonDir, videoFile);
-    const stem = videoFile.replace(/\.[^.]+$/, "");
-    const tracks = [];
-    try {
-      const probeOut = runFfprobe([
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_streams",
-        resolved,
-      ]);
-      const streams = JSON.parse(probeOut).streams || [];
-      for (const s of streams.filter((s) => s.codec_type === "subtitle")) {
-        const lang = (s.tags?.language || "").toLowerCase();
-        if (lang && lang !== "eng" && lang !== "en") continue;
-        const label = s.tags?.title || s.tags?.language || "eng";
-        const isPgs =
-          s.codec_name === "hdmv_pgs_subtitle" ||
-          s.codec_name === "dvb_subtitle";
-        if (isPgs && s.disposition?.forced === 1) continue;
-        const isForced = !isPgs && s.disposition?.forced === 1;
-        const isSdh =
-          !isPgs &&
-          !isForced &&
-          (s.disposition?.hearing_impaired === 1 ||
-            /\bsdh\b/i.test(s.tags?.title || ""));
-        tracks.push({
-          id: `emb-${s.index}`,
-          label,
-          type: isPgs
-            ? "pgs"
-            : isForced
-              ? "forced"
-              : isSdh
-                ? "sdh"
-                : "embedded",
-          index: s.index,
-        });
-      }
-    } catch (e) {
-      unilog(593, "probe error:", e.message);
-    }
-    try {
-      for (const f of entries) {
-        if (!f.endsWith(".srt") || !f.startsWith(stem)) continue;
-        const suffix = f
-          .slice(stem.length)
-          .replace(/\.srt$/, "")
-          .replace(/^\./, "");
-        tracks.push({
-          id: `srt-${f}`,
-          label: suffix || f,
-          type: "srt",
-          file: f,
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
-    res.json(tracks);
   });
 
   app.get("/api/episodeStats", async (req, res) => {
@@ -835,89 +483,33 @@ export function registerMediaRoutes(app) {
       return;
     }
     const dir = path.dirname(resolved);
-    const stem = resStripAlt(path.basename(resolved)).replace(/\.[^.]+$/, "");
 
-    // Explicit embedded stream by index
-    if (req.query.index !== undefined) {
-      const idx = parseInt(req.query.index, 10);
-      serveEmbeddedVtt(req, res, resolved, idx);
-      return;
-    }
-
-    // Explicit sidecar .srt by filename
-    if (req.query.file) {
-      const srtFile = path.basename(req.query.file);
-      if (!srtFile.endsWith(".srt")) {
-        res.status(400).json({ error: "invalid file" });
-        return;
-      }
-      try {
-        const offsetSec = parseFloat(req.query.offset || "0");
-        const clampedOffset = isNaN(offsetSec)
-          ? 0
-          : Math.max(-10, Math.min(10, offsetSec));
-        const srt = fs.readFileSync(path.join(dir, srtFile), "utf8");
-        let vtt =
-          "WEBVTT\n\n" + srt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
-        if (clampedOffset !== 0) {
-          vtt = vtt.replace(
-            /(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})/g,
-            (_, t1, t2) =>
-              `${shiftVttTimestamp(t1, clampedOffset)} --> ${shiftVttTimestamp(t2, clampedOffset)}`,
-          );
-        }
-        res.setHeader("Content-Type", "text/vtt");
-        res.setHeader("Cache-Control", "no-cache");
-        res.send(vtt);
-      } catch (e) {
-        unilog(595, "sidecar error:", e.message);
-        if (!res.headersSent) res.status(500).json({ error: e.message });
-      }
-      return;
-    }
-
-    // 1. Try embedded subtitle stream first (e.g. subrip inside MKV)
-    try {
-      const probeOut = runFfprobe([
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_streams",
-        resolved,
-      ]);
-      const streams = JSON.parse(probeOut).streams || [];
-      const subStream = streams.find((s) => s.codec_type === "subtitle");
-      if (subStream) {
-        serveEmbeddedVtt(req, res, resolved, subStream.index);
-        return;
-      }
-    } catch (e) {
-      unilog(596, "embedded probe error:", e.message);
-    }
-
-    // 2. Fall back to sidecar .srt matching stem (xxx.mkv matches xxx.yyy.srt)
-    let srtPath = null;
-    try {
-      const files = fs.readdirSync(dir);
-      const match = files.find((f) => f.endsWith(".srt") && f.startsWith(stem));
-      if (match) srtPath = path.join(dir, match);
-    } catch (e) {
-      // ignore readdir errors
-    }
-    if (!srtPath) {
-      res.status(404).json({ error: "no subtitle found" });
+    // A sidecar .srt by filename
+    const srtFile = path.basename(req.query.file || "");
+    if (!srtFile.endsWith(".srt")) {
+      res.status(400).json({ error: "invalid file" });
       return;
     }
     try {
-      const srt = fs.readFileSync(srtPath, "utf8");
-      const vtt =
+      const offsetSec = parseFloat(req.query.offset || "0");
+      const clampedOffset = isNaN(offsetSec)
+        ? 0
+        : Math.max(-10, Math.min(10, offsetSec));
+      const srt = fs.readFileSync(path.join(dir, srtFile), "utf8");
+      let vtt =
         "WEBVTT\n\n" + srt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
+      if (clampedOffset !== 0) {
+        vtt = vtt.replace(
+          /(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})/g,
+          (_, t1, t2) =>
+            `${shiftVttTimestamp(t1, clampedOffset)} --> ${shiftVttTimestamp(t2, clampedOffset)}`,
+        );
+      }
       res.setHeader("Content-Type", "text/vtt");
       res.setHeader("Cache-Control", "no-cache");
       res.send(vtt);
     } catch (e) {
-      unilog(597, "sidecar error:", e.message);
+      unilog(595, "sidecar error:", e.message);
       if (!res.headersSent) res.status(500).json({ error: e.message });
     }
   });

@@ -11,7 +11,7 @@ import {
   parseTitleFromFilename,
   smartTitleMatch,
 } from "@tv/share";
-import { SRVR_DATA_DIR, SRVR_ROOT_DIR } from "./srvrPaths.js";
+import { SRVR_ROOT_DIR } from "./srvrPaths.js";
 import * as flexget from "./flexget.js";
 import * as tvdb from "./tvdb.js";
 import { showFolderFor, showNameForFolder } from "./showPaths.js";
@@ -24,14 +24,7 @@ const APPS_DIR = path.dirname(SRVR_ROOT_DIR);
 const DOWN_DB_PATH = path.join(APPS_DIR, "down", "data", "tv.sqlite");
 const API_DATA_DIR = path.join(APPS_DIR, "api", "data");
 const ASR_DATA_DIR = path.join(APPS_DIR, "asr", "data");
-const CHKSRT_HISTORY_PATH = path.join(SRVR_DATA_DIR, "chksrt-history.json");
-const CHKSRT_SNOOZED_PATH = path.join(SRVR_DATA_DIR, "chksrt-snoozed.json");
-const OPN_CHECK_HISTORY_PATH = path.join(
-  SRVR_DATA_DIR,
-  "opn-check-history.json",
-);
 const SUB_QUEUE_PATH = path.join(ASR_DATA_DIR, "subQueue.json");
-const SUB_QUEUE_CHKSRT_PATH = path.join(ASR_DATA_DIR, "subQueueChkSrt.json");
 const ASR_QUEUE_PATH = path.join(ASR_DATA_DIR, "asrQueue.json");
 const BROWSE_CARDS_PATH = path.join(API_DATA_DIR, "browse-cards.json");
 const VIDEO_RE = /\.(mkv|mp4|avi|m4v|mov|wmv|mpg|mpeg|ts|m2ts|webm)$/i;
@@ -465,65 +458,6 @@ function addJsonQueueEvents(add, ctx) {
     if (entry?.videoFilePath === full)
       add(entry.addedAt, "subs", `subtitle extraction queued: ${ctx.fileName}`);
   }
-  for (const entry of readJson(SUB_QUEUE_CHKSRT_PATH, [])) {
-    if (entry?.videoFilePath === full)
-      add(entry.addedAt, "chksrt", `ChkSrt queued: ${ctx.fileName}`);
-  }
-
-  const snoozed = readJson(CHKSRT_SNOOZED_PATH, {});
-  const showEntries = Array.isArray(snoozed?.[ctx.showName])
-    ? snoozed[ctx.showName]
-    : [];
-  for (const entry of showEntries) {
-    if (entry?.videoFilePath === full)
-      add(entry.snoozedAt, "chksrt", `ChkSrt snoozed: ${ctx.fileName}`);
-  }
-}
-
-function addChksrtHistoryEvents(add, ctx) {
-  const hist = readJson(CHKSRT_HISTORY_PATH, []);
-  const fileNorm = normalizeTitle(ctx.fileName);
-  for (const entry of Array.isArray(hist) ? hist : []) {
-    if (
-      ctx.showName &&
-      normalizeTitle(entry?.showName) !== normalizeTitle(ctx.showName)
-    )
-      continue;
-    if (
-      entry?.videoFilename &&
-      normalizeTitle(entry.videoFilename) !== fileNorm
-    )
-      continue;
-    const choice = entry.choice ? ` (${entry.choice})` : "";
-    add(
-      entry.ts || entry.timestamp || entry.date || entry.addedAt,
-      "chksrt",
-      `ChkSrt finished${choice}: ${entry.videoFilename || ctx.fileName}`,
-    );
-  }
-}
-
-function addOpnCheckEvents(add, ctx) {
-  const hist = readJson(OPN_CHECK_HISTORY_PATH, {});
-  const entries = [];
-  if (hist?.[ctx.fullPath]) entries.push(hist[ctx.fullPath]);
-  if (ctx.showName && hist?.[ctx.showName]) entries.push(hist[ctx.showName]);
-  for (const entry of entries) {
-    if (Array.isArray(entry)) {
-      for (const item of entry)
-        add(
-          item?.ts || item?.at || item?.checkedAt,
-          "opensubs",
-          `OpenSubtitles checked: ${ctx.fileName}`,
-        );
-    } else if (entry && typeof entry === "object") {
-      add(
-        entry.ts || entry.at || entry.checkedAt || entry.lastChecked,
-        "opensubs",
-        `OpenSubtitles checked: ${ctx.fileName}`,
-      );
-    }
-  }
 }
 
 function addBrowseEvents(add, ctx) {
@@ -652,7 +586,6 @@ function addUnilogEvents(add, ctx) {
         lower.includes("down") ||
         lower.includes("opensubs") ||
         lower.includes("asr") ||
-        lower.includes("chksrt") ||
         lower.includes("mp4") ||
         lower.includes("intro") ||
         lower.includes("created tvdb") ||
@@ -684,8 +617,6 @@ export function getLocalHistory(params = {}) {
   addFlexgetEvents(add, ctx);
   addDownEvents(add, ctx);
   addJsonQueueEvents(add, ctx);
-  addChksrtHistoryEvents(add, ctx);
-  addOpnCheckEvents(add, ctx);
   addBrowseEvents(add, ctx);
   addSidecarEvents(add, ctx);
   addUnilogEvents(add, ctx);

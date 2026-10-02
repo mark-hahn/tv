@@ -1,5 +1,30 @@
 
+OpenSubtitles limit
+
+subtitles with hearing_impaired set should not be skipped in nextCandidate()
+
+.opnXXXXX naming
+
+remove '' from all alt-copies
+
+status pill in footer should show light-green background when 
+
+the subtitle error check when starting playing should include having no subtitles as an error and show pop-up
+
 there are too many tv-watchdog and tv app errors and warnings since noon today
+
+
+
+
+.mb2.srt
+remove the `aired within the last year` gate.  
+change the `downloads at most one missing .opn srt for the show` rule to `download all missing .opn srt for the show`
+aired date within the last year
+
+????????????????????????
+clnup info in tvapp
+back up pause based on pause length
+=================
 
 # new subtitle logic
 - the current subtitle processing is too complicated
@@ -91,18 +116,6 @@ there are too many tv-watchdog and tv app errors and warnings since noon today
   - write the problems to claude2-sublogic.md and stop
   - make no changes other than writing to claude2-sublogic.md
 - otherwise implement these instructions immediately
-
-
-
-.mb2.srt
-remove the `aired within the last year` gate.  
-change the `downloads at most one missing .opn srt for the show` rule to `download all missing .opn srt for the show`
-aired date within the last year
-
-????????????????????????
-clnup info in tvapp
-back up pause based on pause length
-=================
 
 # live subtitle timing adjustment
 - keep a var subOfs:

@@ -18,8 +18,6 @@ import { handleFix, readFixState, tailFixLog } from "./src/fix.js";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import {
   parseFileSeasonEpisode,
-  smartTitleMatch,
-  parseTitleFromFilename,
   normalizeVideoHeightToQuality,
   getResolution,
   STANDARD_RESOLUTIONS,
@@ -39,7 +37,7 @@ import {
 } from "./src/srvrPaths.js";
 import * as groupCounts from "./src/groupCounts.js";
 import * as unilogDb from "./src/unilogDb.js";
-import { srtTimeToMs, msToSrtTime } from "./src/srt.js";
+import { srtTimeToMs, msToSrtTime, cleanSrt } from "@tv/share";
 import {
   CONFIG_DIR,
   ensureDir,
@@ -66,13 +64,6 @@ import {
   parseResolutionStrict,
   getFirstFilesOnDiskSeasonGap,
 } from "./src/flexgetScore.js";
-import { subsSearch, subsCountEpisodes } from "./src/opensubtitles.js";
-import {
-  encodeFileIdBase32,
-  deleteSubFiles,
-  getSubFileIds,
-  offsetSubFiles,
-} from "./src/subFiles.js";
 import {
   wss,
   connectedClients,
@@ -92,6 +83,7 @@ import {
   tvTvGet,
 } from "./src/tvRemoteKey.js";
 import * as subsQueue from "./src/subsQueue.js";
+import * as subs from "./src/subs.js";
 import * as stills from "./src/stills.js";
 import * as recode from "./src/recode.js";
 
@@ -106,22 +98,6 @@ registerLocalChannel("lastViewed", {
 });
 view.onLastViewedChange((lastViewed) => {
   publishChannelDelta("lastViewed", lastViewed);
-});
-
-const getChksrtSnapshot = () => ({
-  count: subsState.subQueueChkSrt.length,
-  path: subsState.subQueueChkSrt[0]?.videoFilePath,
-});
-
-const publishChksrtState = () => {
-  const snapshot = getChksrtSnapshot();
-  notifyClients("chksrt-count", snapshot.count);
-  publishChannelDelta("chksrt", snapshot);
-  return snapshot;
-};
-
-registerLocalChannel("chksrt", {
-  snapshot: getChksrtSnapshot,
 });
 
 const getFlexgetSnapshot = () => ({
@@ -246,38 +222,16 @@ subsQueue.init({ syncBatchMsgs });
 const { subsState } = subsQueue;
 const {
   persistSubQueue,
-  persistSubQueueChkSrt,
-  cleanChkSrtQueue,
   persistAsrQueue,
-  appendAsrLog,
   addToAsrQueue,
   abortAsr,
   enqueueSubQueue,
-  enqueueSubQueueChkSrt,
   loadQueues,
-  loadChksrtHistory,
-  persistChksrtHistory,
-  loadChksrtSnoozed,
-  persistChksrtSnoozed,
-  getChksrtSnoozedForShow,
-  addToChksrtSnoozed,
-  removeFromChksrtSnoozed,
-  loadOpnCheckHistory,
-  persistOpnCheckHistory,
-  fileNeedsSubChecked,
-  generateEmbSrts,
-  applyOpenSubSrts,
-  generateSrtWithAsr,
+  sweepWantsVideo,
+  extractEmbSrts,
   doSubQueueNow,
-  processSubQueueEntry,
   startSubQueueLoop,
   startAsrQueueLoop,
-  resetOpnDailyCountIfNeeded,
-  getOpnSidecarPath,
-  hasOpnSidecar,
-  tryDownloadOpnSrtForVideo,
-  checkAndDownloadOpnSrt,
-  processChksrtSnoozedForShow,
 } = subsQueue;
 
 const tvdbIdByName = (name) => {
@@ -330,16 +284,6 @@ function syncBatchMsgs() {
     });
   } else {
     setGlobalMessage({ id: "Asr", action: "hide" });
-  }
-  // ChkSrt (Chk) — files awaiting human srt review
-  if (subsState.subQueueChkSrt.length > 0) {
-    setGlobalMessage({
-      id: "ChkSrt",
-      text: `Chk:${subsState.subQueueChkSrt.length}`,
-      position: 2006,
-    });
-  } else {
-    setGlobalMessage({ id: "ChkSrt", action: "hide" });
   }
   // Recode — library files being replaced with h264 the tv can play
   const recodePending = recode.getRecodePending();
@@ -523,36 +467,6 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     if (tvdbRecord.inLibrary) {
       removeFromSnoozeByShow(showName, tvdbRecord.tvdbId);
     }
-    // Subtitle scan for inLibrary shows
-    if (tvdbRecord.inLibrary) {
-      const showFolderName = showPaths.showFolderFor(showName, tvdbRecord);
-      const showFolder = path.join(tvDir, showFolderName);
-      try {
-        const seasonDirs = fs.readdirSync(showFolder);
-        for (const seasonDir of seasonDirs) {
-          const seasonPath = path.join(showFolder, seasonDir);
-          try {
-            if (!fs.statSync(seasonPath).isDirectory()) continue;
-          } catch {
-            continue;
-          }
-          const files = fs.readdirSync(seasonPath);
-          for (const f of files) {
-            if (!videoFileExtensions.includes(f.split(".").pop())) continue;
-            const fp = path.join(seasonPath, f);
-            if (await fileNeedsSubChecked(fp, showName)) {
-              enqueueSubQueue(
-                { videoFilePath: fp, fromUI: false, lowPriority: true },
-                false,
-              );
-            }
-          }
-        }
-        persistSubQueue();
-      } catch (e) {
-        unilog(539, `subtitle scan error for ${showName}: ${e.message}`);
-      }
-    }
     // Disk check, date/size/noFiles, filesOnDisk/fileQuality/quality and
     // episodeData are all refreshed by refreshEpisodeData (called from the tvdb
     // loop before this callback), so no separate disk scan is needed here.
@@ -701,13 +615,6 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
       if (!options?.suppressNotify) {
         unilog(29, `${showName}: no changes`);
       }
-    }
-    // Background OpenSubtitles check: download one missing .opnXXXXX.srt per show
-    try {
-      await checkAndDownloadOpnSrt(showName, tvdbRecord);
-      await processChksrtSnoozedForShow(showName, tvdbRecord);
-    } catch (e) {
-      unilog(543, "error for", showName, e.message);
     }
     return { hasChanges: push2Changes.length > 0, changes: push2Changes };
   } catch (e) {
@@ -1711,7 +1618,6 @@ app.post("/api/getStreamProviders", apiWrapper(tmdb.getStreamProviders));
 // a time as the list is scrolled.
 app.get("/api/getBackdrop", apiWrapper(tmdb.getBackdrop));
 app.post("/api/getFile", apiWrapper(getFile));
-app.post("/api/getSubFileIds", apiWrapper(getSubFileIds));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post("/api/getPoster", apiWrapper(tvdb.getPoster));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
@@ -2264,7 +2170,7 @@ app.get("/api/qbt-open", async (req, res) => {
 
 // Video streaming with codec-aware ffmpeg transcoding (see src/routes/media.js)
 registerMediaRoutes(app);
-// Film-strip stills and on-click video windows for intro/chksrt (see src/stills.js)
+// Film-strip stills and on-click video windows for intro (see src/stills.js)
 registerStillsRoutes(app);
 
 // File operations
@@ -2291,88 +2197,6 @@ app.post(
   }),
 );
 
-// Subtitles
-app.post("/api/subsSearch", apiWrapper(subsSearch));
-app.post("/api/subsCountEpisodes", apiWrapper(subsCountEpisodes));
-app.post("/api/opn/search", async (req, res) => {
-  const { videoPaths } = req.body || {};
-  if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
-    res.status(400).json({ error: "videoPaths required" });
-    return;
-  }
-  const moviesDir = "/mnt/media/movies";
-  const results = [];
-  for (const vp of videoPaths) {
-    const isMovie = vp.startsWith(moviesDir + "/");
-    let searchParams;
-    if (isMovie) {
-      const filename = path.basename(vp, path.extname(vp));
-      const yearMatch = filename.match(/\b(19|20)\d{2}\b/);
-      const year = yearMatch ? yearMatch[0] : null;
-      const parsed = parseTorrentTitle(filename);
-      const title =
-        parseTitleFromFilename(filename, "", parsed) ||
-        filename.replace(/\./g, " ");
-      searchParams = { query: title, year };
-    } else {
-      const showName = showNameFromFilePath(vp);
-      const tvdbAll = tvdb.getAllTvdbSync?.();
-      let tvdbRec = tvdbAll?.[showName];
-      if (!tvdbRec?.imdbId) {
-        // Try to find the TVDB record via parseTitleFromFilename + smartTitleMatch
-        const fname = path.basename(vp);
-        const ptt = parseTorrentTitle(fname);
-        const title = parseTitleFromFilename(fname, showName, ptt);
-        if (title) {
-          const matched = smartTitleMatch(
-            title,
-            Object.values(tvdbAll),
-            null,
-            false,
-          );
-          if (matched?.imdbId) tvdbRec = matched;
-        }
-      }
-      const parsed = parseFileSeasonEpisode(vp);
-      if (tvdbRec?.imdbId) {
-        searchParams = {
-          imdb_id: tvdbRec.imdbId,
-          season: parsed?.season,
-          episode: parsed?.episode,
-        };
-      } else {
-        searchParams = {
-          query: showName,
-          season: parsed?.season,
-          episode: parsed?.episode,
-        };
-      }
-    }
-    try {
-      const data = await subsSearch(searchParams);
-      const items = Array.isArray(data?.data) ? data.data : [];
-      results.push({
-        videoPath: vp,
-        items: items.map((r) => {
-          const fid = r.file_id || r.attributes?.files?.[0]?.file_id;
-          return {
-            file_id: fid,
-            tag: encodeFileIdBase32(fid),
-            release:
-              r.attributes?.release ||
-              r.attributes?.files?.[0]?.cd_number ||
-              String(fid || ""),
-          };
-        }),
-      });
-    } catch (e) {
-      results.push({ videoPath: vp, items: [], error: e.message });
-    }
-  }
-  res.json({ results });
-});
-app.post("/api/deleteSubFiles", apiWrapper(deleteSubFiles));
-app.post("/api/offsetSubFiles", apiWrapper(offsetSubFiles));
 app.post("/api/applySubOffset", async (req, res) => {
   const { videoPath, srtFile, offsetMs } = req.body || {};
   if (typeof videoPath !== "string" || !videoPath) {
@@ -2429,7 +2253,7 @@ app.post("/api/applySubOffset", async (req, res) => {
       `${msToSrtTime(Math.max(0, startMs + offsetMs))}${m[2]}${msToSrtTime(Math.max(0, endMs + offsetMs))}${m[4] || ""}`;
   }
   try {
-    fs.writeFileSync(resolvedSrt, lines.join("\n"), "utf8");
+    fs.writeFileSync(resolvedSrt, cleanSrt(lines.join("\n")), "utf8");
   } catch (e) {
     res.status(500).json({ error: "write failed: " + e.message });
     return;
@@ -2445,13 +2269,6 @@ app.post("/api/asr/subs/enqueue", (req, res) => {
     return;
   }
   for (const vp of [...videoPaths].reverse()) {
-    const chosenPath = vp.replace(/\.[^.]+$/, "") + ".mb.chosen";
-    try {
-      fs.unlinkSync(chosenPath);
-    } catch (e) {
-      if (e.code !== "ENOENT")
-        unilog(1366, `chosen marker delete failed: ${e.message}`);
-    }
     enqueueSubQueue(
       { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false },
       true,
@@ -2498,7 +2315,7 @@ app.post("/api/asr/emb/generate", async (req, res) => {
   }
   res.json({ ok: true, queued: videoPaths.length });
   for (const vp of videoPaths) {
-    await generateEmbSrts(vp, null, null, null, true).catch((e) =>
+    await extractEmbSrts(vp, true).catch((e) =>
       unilog(598, "", e.message),
     );
   }
@@ -2513,322 +2330,11 @@ app.get("/api/queues", async (req, res) => {
       sub: subsQueue.getSubQueueStatus(),
       asr: subsQueue.getAsrQueueStatus(),
       recode: await recode.getRecodeQueueStatus(),
-      chksrt: subsQueue.getChkSrtQueueStatus(),
     });
   } catch (e) {
     unilog(2042, `queues snapshot failed: ${e.message}`);
     res.status(500).json({ error: e.message });
   }
-});
-
-app.get("/api/asr/chksrt/list", (req, res) => {
-  cleanChkSrtQueue();
-  const snapshot = publishChksrtState();
-  syncBatchMsgs();
-  res.json(snapshot);
-});
-
-app.post("/api/asr/chksrt/enqueue", (req, res) => {
-  const { videoPaths } = req.body || {};
-  if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
-    res.status(400).json({ error: "videoPaths required" });
-    return;
-  }
-  for (const vp of videoPaths) {
-    enqueueSubQueueChkSrt(
-      { videoFilePath: vp, fromUI: true, lowPriority: false },
-      false,
-    );
-  }
-  cleanChkSrtQueue();
-  persistSubQueueChkSrt();
-  publishChksrtState();
-  syncBatchMsgs();
-  res.json({ ok: true, queued: videoPaths.length });
-});
-
-app.post("/api/asr/chksrt/ok", (req, res) => {
-  const { videoPath } = req.body || {};
-  if (!videoPath) {
-    res.status(400).json({ error: "videoPath required" });
-    return;
-  }
-  const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
-  const dir = path.dirname(videoPath);
-  const basename = path.basename(base);
-  let hasSrt = false;
-  try {
-    hasSrt = fs
-      .readdirSync(dir)
-      .some((f) => f.startsWith(basename) && f.endsWith(".srt"));
-  } catch (e) {
-    unilog(1367, `srt scan failed for ${dir}: ${e.message}`);
-  }
-  if (!hasSrt) {
-    try {
-      fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
-    } catch (e) {
-      unilog(1368, `chosen marker write failed for ${basename}: ${e.message}`);
-    }
-  }
-  const idx = subsState.subQueueChkSrt.findIndex(
-    (e) => e.videoFilePath === videoPath,
-  );
-  if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
-  cleanChkSrtQueue();
-  persistSubQueueChkSrt();
-  publishChksrtState();
-  syncBatchMsgs();
-  res.json({ ok: true });
-});
-
-// "All Off" — same handling as /ok, applied to every queued episode of a show:
-// leave the srt files alone, mark files that have none, drop them from the queue.
-app.post("/api/asr/chksrt/ok-show", (req, res) => {
-  const { showName } = req.body || {};
-  if (!showName) {
-    res.status(400).json({ error: "showName required" });
-    return;
-  }
-  const matches = subsState.subQueueChkSrt.filter(
-    (e) => showNameFromFilePath(e.videoFilePath) === showName,
-  );
-  for (const entry of matches) {
-    const videoPath = entry.videoFilePath;
-    const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
-    const dir = path.dirname(videoPath);
-    const basename = path.basename(base);
-    let hasSrt = false;
-    try {
-      hasSrt = fs
-        .readdirSync(dir)
-        .some((f) => f.startsWith(basename) && f.endsWith(".srt"));
-    } catch (e) {
-      unilog(1958, `srt scan failed for ${dir}: ${e.message}`);
-    }
-    if (!hasSrt) {
-      try {
-        fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
-      } catch (e) {
-        unilog(
-          1959,
-          `chosen marker write failed for ${basename}: ${e.message}`,
-        );
-      }
-    }
-    const idx = subsState.subQueueChkSrt.findIndex(
-      (e) => e.videoFilePath === videoPath,
-    );
-    if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
-  }
-  cleanChkSrtQueue();
-  persistSubQueueChkSrt();
-  publishChksrtState();
-  syncBatchMsgs();
-  res.json({ ok: true, count: matches.length });
-});
-
-app.post("/api/asr/chksrt/gensrt", (req, res) => {
-  const { videoPath } = req.body || {};
-  if (!videoPath) {
-    res.status(400).json({ error: "videoPath required" });
-    return;
-  }
-  const idx = subsState.subQueueChkSrt.findIndex(
-    (e) => e.videoFilePath === videoPath,
-  );
-  if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
-  const showName = showNameFromFilePath(videoPath);
-  const parsed = parseFileSeasonEpisode(videoPath);
-  addToAsrQueue([
-    {
-      videoPath,
-      showName,
-      season: parsed?.season ?? 0,
-      episode: parsed?.episode ?? 0,
-      fromUI: false,
-      lowPriority: false,
-      source: "chksrt player",
-      addedAt: Date.now(),
-    },
-  ]);
-  cleanChkSrtQueue();
-  persistSubQueueChkSrt();
-  publishChksrtState();
-  syncBatchMsgs();
-  res.json({ ok: true });
-});
-
-app.post("/api/asr/chksrt/unsnooze", (req, res) => {
-  const { videoPath } = req.body || {};
-  if (!videoPath) {
-    res.status(400).json({ error: "videoPath required" });
-    return;
-  }
-  const showName = showNameFromFilePath(videoPath);
-  if (removeFromChksrtSnoozed(showName, videoPath)) {
-    persistChksrtSnoozed();
-  }
-  res.json({ ok: true });
-});
-
-app.post("/api/asr/chksrt/snooze", (req, res) => {
-  const { videoPath } = req.body || {};
-  if (!videoPath) {
-    res.status(400).json({ error: "videoPath required" });
-    return;
-  }
-  const showName = showNameFromFilePath(videoPath);
-  const idx = subsState.subQueueChkSrt.findIndex(
-    (e) => e.videoFilePath === videoPath,
-  );
-  if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
-  addToChksrtSnoozed(showName, videoPath);
-  unilog(47, `chksrt snooze: ${videoPath}`);
-  cleanChkSrtQueue();
-  persistSubQueueChkSrt();
-  persistChksrtSnoozed();
-  publishChksrtState();
-  syncBatchMsgs();
-  res.json({ ok: true });
-});
-
-app.post("/api/asr/chksrt/select", (req, res) => {
-  const { videoPath, selectedSrtPath } = req.body || {};
-  if (!videoPath) {
-    res.status(400).json({ error: "videoPath required" });
-    return;
-  }
-  const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
-  const dir = path.dirname(videoPath);
-  let entries;
-  try {
-    entries = fs.readdirSync(dir);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-    return;
-  }
-  const basename = path.basename(base);
-  for (const f of entries) {
-    if (!/\.srt$/.test(f)) continue;
-    if (f.endsWith(".chosen")) continue;
-    const full = path.join(dir, f);
-    if (full === selectedSrtPath) continue;
-    if (f.startsWith(basename + ".")) {
-      try {
-        fs.unlinkSync(full);
-      } catch (e) {
-        unilog(1369, `srt delete failed for ${f}: ${e.message}`);
-      }
-    }
-  }
-  if (!selectedSrtPath) {
-    try {
-      fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
-    } catch (e) {
-      unilog(1370, `chosen marker write failed for ${basename}: ${e.message}`);
-    }
-  }
-  const idx = subsState.subQueueChkSrt.findIndex(
-    (e) => e.videoFilePath === videoPath,
-  );
-  if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
-  cleanChkSrtQueue();
-  persistSubQueueChkSrt();
-  publishChksrtState();
-  syncBatchMsgs();
-  res.json({ ok: true });
-});
-
-app.post("/api/asr/chksrt/select-show", (req, res) => {
-  const { showName } = req.body || {};
-  if (!showName) {
-    res.status(400).json({ error: "showName required" });
-    return;
-  }
-  const matches = subsState.subQueueChkSrt.filter(
-    (e) => showNameFromFilePath(e.videoFilePath) === showName,
-  );
-  for (const entry of matches) {
-    const videoPath = entry.videoFilePath;
-    const base = resStripAlt(videoPath).replace(/\.[^.]+$/, "");
-    const dir = path.dirname(videoPath);
-    const basename = path.basename(base);
-    let dirEntries;
-    try {
-      dirEntries = fs.readdirSync(dir);
-    } catch (e) {
-      unilog(1873, `srt scan failed for ${dir}: ${e.message}`);
-      dirEntries = [];
-    }
-    for (const f of dirEntries) {
-      if (!/\.srt$/.test(f)) continue;
-      if (f.endsWith(".chosen")) continue;
-      if (!f.startsWith(basename + ".")) continue;
-      try {
-        fs.unlinkSync(path.join(dir, f));
-      } catch (e) {
-        unilog(1874, `srt delete failed for ${f}: ${e.message}`);
-      }
-    }
-    try {
-      fs.writeFileSync(path.join(dir, basename + ".mb.chosen"), "", "utf8");
-    } catch (e) {
-      unilog(1875, `chosen marker write failed for ${basename}: ${e.message}`);
-    }
-    const idx = subsState.subQueueChkSrt.findIndex(
-      (e) => e.videoFilePath === videoPath,
-    );
-    if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
-  }
-  cleanChkSrtQueue();
-  persistSubQueueChkSrt();
-  publishChksrtState();
-  syncBatchMsgs();
-  res.json({ ok: true, count: matches.length });
-});
-
-app.get("/api/asr/chksrt/history", (req, res) => {
-  res.json(subsState.chksrtHistory);
-});
-
-app.post("/api/asr/chksrt/history/add", (req, res) => {
-  const {
-    showName,
-    videoFilename,
-    embeddedCounts,
-    openSubsCount,
-    choice,
-    embStreamIndex,
-    srtFile,
-  } = req.body || {};
-  if (!showName || !videoFilename || !choice) {
-    res.status(400).json({ error: "showName, videoFilename, choice required" });
-    return;
-  }
-  const entry = {
-    showName: String(showName),
-    videoFilename: String(videoFilename),
-    embeddedCounts:
-      embeddedCounts && typeof embeddedCounts === "object"
-        ? embeddedCounts
-        : {},
-    openSubsCount: Number(openSubsCount) || 0,
-    choice: String(choice),
-    embStreamIndex: embStreamIndex != null ? Number(embStreamIndex) : null,
-    srtFile: srtFile ? String(srtFile) : null,
-    warned: false,
-  };
-  // Dedup: replace any entry with same showName + videoFilename
-  subsState.chksrtHistory = subsState.chksrtHistory.filter(
-    (h) =>
-      h.videoFilename !== entry.videoFilename || h.showName !== entry.showName,
-  );
-  subsState.chksrtHistory.unshift(entry);
-  if (subsState.chksrtHistory.length > 100)
-    subsState.chksrtHistory.length = 100;
-  persistChksrtHistory();
-  res.json({ ok: true });
 });
 
 // Intro: get first available video file for a show
@@ -3050,9 +2556,6 @@ const httpsOptions = {
 https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
   unilog(58, `HTTPS API listening on port ${HTTP_PORT}`);
   loadQueues();
-  loadChksrtHistory();
-  loadChksrtSnoozed();
-  loadOpnCheckHistory();
   startSubQueueLoop();
   startAsrQueueLoop();
   // Build film-strip stills ahead of time for every episode intro marking
@@ -3069,10 +2572,9 @@ https.createServer(httpsOptions, app).listen(HTTP_PORT, () => {
 
 const INTRO_STILLS_SWEEP_MS = 5_000;
 
-// The episode intro marking will open, for every show with an entry in the
-// chksrt queue — in queue order — followed by every other show flagged
-// needsIntro. Their stills are built ahead of time so the strip is already up
-// when the Intro button is pressed. selectIntroFile lives in @tv/share so this
+// The episode intro marking will open, for every show flagged needsIntro.
+// Their stills are built ahead of time so the strip is already up when the
+// Intro button is pressed. selectIntroFile lives in @tv/share so this
 // picks exactly the episode the client will open.
 async function introEpisodePaths() {
   const allTvdb = tvdb.getAllTvdbSync() || {};
@@ -3087,12 +2589,6 @@ async function introEpisodePaths() {
     const result = epd.selectIntroFile(record);
     if (result?.path) out.push(result.path);
   };
-  for (const entry of subsState.subQueueChkSrt) {
-    const videoFilePath = entry?.videoFilePath;
-    if (!videoFilePath) continue;
-    const showName = showNameFromFilePath(videoFilePath);
-    if (showName) await consider(allTvdb[showName]);
-  }
   for (const record of Object.values(allTvdb)) {
     if (record?.needsIntro) await consider(record);
   }
@@ -3175,55 +2671,6 @@ app.post("/internal/tv-state", (req, res) => {
       color: "red",
     });
   else setGlobalMessage({ id: "TvAdb", action: "hide" });
-  res.json({ ok: true });
-});
-
-function findChksrtPreferred(showName, episodeCode) {
-  for (const h of subsState.chksrtHistory) {
-    if (h.showName !== showName) continue;
-    const m = (h.videoFilename || "").match(/[Ss](\d+)[Ee](\d+)/);
-    if (!m) continue;
-    const hCode = `S${m[1].padStart(2, "0")}E${m[2].padStart(2, "0")}`;
-    if (hCode !== episodeCode) continue;
-    return h;
-  }
-  return null;
-}
-
-app.get("/internal/chksrt/preferred", (req, res) => {
-  const { showName, episodeCode } = req.query;
-  if (!showName || !episodeCode) {
-    res.status(400).json({ error: "showName and episodeCode required" });
-    return;
-  }
-  const entry = findChksrtPreferred(showName, episodeCode);
-  if (!entry) {
-    res.json(null);
-    return;
-  }
-  res.json({
-    embStreamIndex: entry.embStreamIndex ?? null,
-    srtFile: entry.srtFile ?? null,
-    warned: entry.warned ?? false,
-  });
-});
-
-app.post("/internal/chksrt/mark-warned", (req, res) => {
-  const { showName, episodeCode } = req.body || {};
-  if (!showName || !episodeCode) {
-    res.status(400).json({ error: "showName and episodeCode required" });
-    return;
-  }
-  for (const h of subsState.chksrtHistory) {
-    if (h.showName !== showName) continue;
-    const m = (h.videoFilename || "").match(/[Ss](\d+)[Ee](\d+)/);
-    if (!m) continue;
-    const hCode = `S${m[1].padStart(2, "0")}E${m[2].padStart(2, "0")}`;
-    if (hCode !== episodeCode) continue;
-    h.warned = true;
-    persistChksrtHistory();
-    break;
-  }
   res.json({ ok: true });
 });
 
@@ -3343,39 +2790,20 @@ function nextUpEpisode(ed) {
   return found;
 }
 
-// The file's subtitles. subs is every .srt in the folder for the episode --
-// the file's own and any an alt release of it left -- as urls (tv-srvr hands
-// them out as vtt), labelled by their tag (mb4, opnXXXXX, ...). The one to
-// start on: chksrt's embedded pick as subIndex, a stream index for the player
-// to pick itself, because extracting one here takes ffmpeg a pass over the
-// whole file; else subPick, the index in subs of chksrt's .srt or the file's
-// own. chksrt keys its history by the show's folder name.
-function subsForFile(file, season, episode) {
-  const folder = file.slice(tvDir.length + 1).split("/")[0];
-  const pref = findChksrtPreferred(folder, fmtSeasonEpisode(season, episode));
-  const stem = epd.vidStripAlt(path.basename(file)).replace(/\.[^.]+$/, "");
-  const sameEpisode = (f) => {
-    const m = f.match(/[Ss](\d+)[Ee](\d+)/);
-    return !!m && Number(m[1]) === season && Number(m[2]) === episode;
-  };
-  const srts = fs
-    .readdirSync(path.dirname(file))
-    .filter((f) => f.endsWith(".srt") && (f.startsWith(stem) || sameEpisode(f)));
-  const pick =
-    pref?.embStreamIndex != null
-      ? -1
-      : srts.includes(pref?.srtFile)
-        ? srts.indexOf(pref.srtFile)
-        : srts.findIndex((f) => f.startsWith(stem));
+// The file's subtitles: its sidecar .srt files as urls (tv-srvr hands them out
+// as vtt), each with the subtitle panel's label, and subPick, the index of the
+// one to start on, -1 with none. Embedded tracks are never offered.
+function subsForFile(showId, file, season, episode) {
+  const sidecars = subs.listSidecars(file);
   return {
-    subs: srts.map((f) => ({
+    subs: sidecars.map((s) => ({
       url:
         `${SRVR_PUBLIC_URL}/api/subtitle?path=${encodeURIComponent(file)}` +
-        `&file=${encodeURIComponent(f)}`,
-      label: f.slice(0, -".srt".length).split(".").pop(),
+        `&file=${encodeURIComponent(s.file)}`,
+      label: s.label,
+      file: s.file,
     })),
-    subPick: pick,
-    subIndex: pref?.embStreamIndex ?? null,
+    subPick: subs.pickSidecar(showId, season, episode, sidecars),
   };
 }
 
@@ -3399,6 +2827,12 @@ async function getPlayUrl({ showName, season: s, episode: e, web }) {
   const intro = tvdb.getSeasonIntro(rec, season);
   const posMs = epd.getPos(ed, season, episode);
   const trimPosMs = Math.max(0, Math.round(intro.trimPos || 0));
+  // Started before the wait on the subtitle downloads, which is no reason to
+  // hold the stills back.
+  const playStills = web
+    ? null
+    : stills.playStills(file, posMs > 0 ? posMs : trimPosMs);
+  await subs.subsBeforePlay(rec, season, episode, file);
   return {
     url: `${TV_URL}/${rel.split("/").map(encodeURIComponent).join("/")}`,
     showName,
@@ -3409,21 +2843,22 @@ async function getPlayUrl({ showName, season: s, episode: e, web }) {
     seasonEps: ed[season]?.length ?? 0,
     trimPosMs,
     skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),
-    ...subsForFile(file, season, episode),
+    ...subsForFile(String(rec.id), file, season, episode),
     ...(web
       ? {
           path: file,
           durMs: Math.round((await stills.probePlay(file)).durationSec * 1000),
         }
-      : { stills: stills.playStills(file, posMs > 0 ? posMs : trimPosMs) }),
+      : { stills: playStills }),
   };
 }
 
 // tvapp's player reports when it starts, every few seconds while it is up, on
 // pause, and when it stops or runs to the end. The record keeps the resume
-// position and, at the end, the watched mark. The browser's player
-// (/api/play) reports the same way, as device "browser".
-async function playProgress({ showName, season, episode, posMs, durMs, state, device = TVAPP_DEVICE }) {
+// position and, at the end, the watched mark. sub is the subtitle file that
+// is showing. The browser's player (/api/play) reports the same way, as
+// device "browser".
+async function playProgress({ showName, season, episode, posMs, durMs, state, sub, device = TVAPP_DEVICE }) {
   const rec = tvdb.getAllTvdbSync()?.[showName];
   if (!rec) throw new Error(`playProgress: no show ${showName}`);
   const ed = rec.episodeData;
@@ -3455,6 +2890,18 @@ async function playProgress({ showName, season, episode, posMs, durMs, state, de
       ended ? { watched: true, pos } : earlyStop ? { watched: false, pos } : { pos },
     );
   if (ended || earlyStop) rec.watchedCount = epd.countWatched(ed);
+  // The subtitle showing when the video stops is the one chosen for the
+  // episode. A stop that counts as never played chooses nothing.
+  if (stopped && !earlyStop && sub) {
+    const file = epd.getFullPath(
+      ed,
+      showPaths.showFolderFor(showName, rec),
+      season,
+      episode,
+      tvDir,
+    );
+    if (file) subs.subStopped(String(rec.id), season, episode, file, sub);
+  }
   if (started || stopped) {
     rec.lastPlayedDate = util.toPstDateTimeMs(new Date());
     rec.lastPlayedEpisode = code;
@@ -4254,6 +3701,37 @@ async function handleShowDiskChange(showName) {
   }
 }
 
+// A subtitle file that arrived beside a video, under whatever name it came
+// with: its episode's video goes through the sub queue, which names the file
+// as one of the video's S files. Sidecars tv-srvr names itself are not
+// arrivals. With no video there yet, the video's own arrival picks the file up.
+function subFileAdded(filePath) {
+  if (subsQueue.NAMED_SIDECAR_RE.test(filePath)) return;
+  const showName = showNameFromFilePath(filePath);
+  if (!tvdb.getAllTvdbSync?.()?.[showName]?.inLibrary) return;
+  const dir = path.dirname(filePath);
+  const se = parseFileSeasonEpisode(
+    path.basename(filePath),
+    path.basename(dir),
+  );
+  if (se?.season == null || se?.episode == null) return;
+  const video = resFindEpisodeVideos(dir, se.season, se.episode).find(
+    (v) => !v.alt,
+  );
+  if (!video) return;
+  enqueueSubQueue(
+    {
+      videoFilePath: path.join(dir, video.name),
+      fromUI: false,
+      lowPriority: false,
+      renameS: true,
+    },
+    false,
+  );
+  persistSubQueue();
+  doSubQueueNow();
+}
+
 // Start watching TV directory
 const watcher = chokidar.watch(tvDir, {
   ignored: /(^|[\/\\])\../, // ignore dotfiles
@@ -4270,6 +3748,10 @@ const watcher = chokidar.watch(tvDir, {
 watcher
   .on("add", async (filePath) => {
     const ext = filePath.split(".").pop();
+    if (ext === "srt") {
+      subFileAdded(filePath);
+      return;
+    }
     if (!videoFileExtensions.includes(ext)) return;
 
     const showName = showNameFromFilePath(filePath);
@@ -4310,7 +3792,7 @@ watcher
         if (tvdbRec && tvdbRec.inLibrary) {
           let queued = false;
           for (const fp of videoFiles) {
-            // Enforce one active video per episode before chksrt: a replacement
+            // Enforce one active video per episode before its subs: a replacement
             // download that raced the old file can leave two active files. Demote
             // the lower-res one; if fp itself was the loser, skip enqueuing it.
             const fpSeasonDir = path.dirname(fp);
@@ -4327,19 +3809,20 @@ watcher
               if (demoted.has(fp)) continue;
             }
             // A file the tv's player stalls on is replaced before anything else
-            // looks at it: the subs and the chksrt mirror belong to the recoded
+            // looks at it: the subs belong to the recoded
             // file, not to the one about to be moved aside. The recode's own
             // output lands back here as a fresh add and takes this path then.
             if (await recode.enqueueRecode(fp)) continue;
-            const needs = await fileNeedsSubChecked(fp, showName);
-            unilog(682, `fileNeedsSubChecked(${path.basename(fp)}) = ${needs}`);
-            if (needs) {
-              enqueueSubQueue(
-                { videoFilePath: fp, fromUI: false, lowPriority: false },
-                false,
-              );
-              queued = true;
-            }
+            enqueueSubQueue(
+              {
+                videoFilePath: fp,
+                fromUI: false,
+                lowPriority: false,
+                renameS: true,
+              },
+              false,
+            );
+            queued = true;
           }
           if (queued) {
             persistSubQueue();
@@ -4393,17 +3876,19 @@ unilog(91, `Watching ${tvDir} for file changes...`);
 
 //////////////////  SUBTITLE BACKSTOP SWEEP  //////////////////
 //
-// The file watcher is what normally puts a new download in front of chksrt,
+// The file watcher is what normally puts a new download in the sub queue,
 // and for months it silently did not: it took the show name from the folder,
 // missed every show whose folder differs from its tvdb name, and dropped those
 // files without a trace. That specific bug is fixed, but the shape of it --
 // one gate on the only path to the sub queue -- is worth a second route that
 // does not depend on any lookup being right.
 //
-// So this walks the library and enqueues any active video with no subtitle
-// sidecar at all. fileNeedsSubChecked does the real work: it already skips
-// files that are queued, snoozed, or have an .srt / .mb.chosen next to them,
-// so a settled library adds nothing and the sweep is just a directory walk.
+// So this walks the library and enqueues any unwatched video of a library show
+// with no subtitle sidecar at all. That is also how the videos already on disk
+// get their embedded text tracks copied out. sweepWantsVideo does the real
+// work: it skips files that are queued, have been through the queue, or have
+// an .srt next to them, so a settled library adds nothing and the sweep is
+// just a directory walk.
 const SUB_BACKSTOP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const SUB_BACKSTOP_START_DELAY_MS = 10 * 60 * 1000;
 
@@ -4439,16 +3924,12 @@ async function runSubBackstopSweep() {
           const showName = showNameFromFilePath(fp);
           const rec = tvdb.getAllTvdbSync?.()?.[showName];
           if (!rec?.inLibrary) continue;
-          if (!(await fileNeedsSubChecked(fp, showName))) continue;
+          if (!sweepWantsVideo(fp, showName)) continue;
           enqueueSubQueue(
             { videoFilePath: fp, fromUI: false, lowPriority: true },
             false,
           );
           queued++;
-          unilog(
-            2165,
-            `${showName}: ${f} had no subtitles and was never queued — the watcher missed it`,
-          );
         }
       }
     }
@@ -4474,9 +3955,8 @@ setTimeout(() => {
 // that races the file it replaces can leave two active videos: worker.js
 // renames the pre-existing SxxExx file to .old only once, at rsync start, so a
 // same-episode file that lands mid-download is never demoted. When that happens the
-// lower-resolution active file is demoted to .old and its chksrt entry / mp4
-// mirror are dropped, so chksrt only ever resolves against the surviving active
-// file. Returns the Set of absolute paths that were demoted. See down-coll-plan.md.
+// lower-resolution active file is demoted to .old, sidecars included. Returns
+// the Set of absolute paths that were demoted. See down-coll-plan.md.
 function reconcileDuplicateEpisodeVideos(seasonDir, season, episode) {
   const demoted = new Set();
   const actives = resFindEpisodeVideos(seasonDir, season, episode).filter(
@@ -4507,16 +3987,6 @@ function reconcileDuplicateEpisodeVideos(seasonDir, season, episode) {
       1538,
       `demoted duplicate ${loser.res}p episode video to .old (keeping ${bestRes}p): ${loser.name}`,
     );
-    const idx = subsState.subQueueChkSrt.findIndex(
-      (e) => e.videoFilePath === src,
-    );
-    if (idx !== -1) subsState.subQueueChkSrt.splice(idx, 1);
-  }
-  if (demoted.size > 0) {
-    cleanChkSrtQueue();
-    persistSubQueueChkSrt();
-    publishChksrtState();
-    syncBatchMsgs();
   }
   return demoted;
 }
@@ -4528,8 +3998,7 @@ const WATCHDOG_HEARTBEAT_MS = 2 * 60 * 1000;
 setInterval(() => {
   unilog(
     1206,
-    `hb subQ=${subsState.subQueue.length} chkQ=${subsState.subQueueChkSrt.length} ` +
-      `asrQ=${subsState.asrQueue.length} ` +
+    `hb subQ=${subsState.subQueue.length} asrQ=${subsState.asrQueue.length} ` +
       `flex=${flexget.isFlexgetRunning() ? 1 : 0} ` +
       `sweep=${librarySweepRunning ? 1 : 0} clients=${connectedClients.size} ` +
       `subDone=${subsState.subDone} asrDone=${subsState.asrDone} ` +

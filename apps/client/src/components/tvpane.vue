@@ -923,7 +923,7 @@ export default {
     powerBarStyle() {
       return POWER_BAR;
     },
-    // Apply shifts a .srt file, so not an embedded track or none, and only
+    // Apply shifts the .srt that is on, so not with none on, and only
     // when the offset has moved since the last one.
     subApplyOk() {
       const l = this.subList;
@@ -947,10 +947,9 @@ export default {
       };
     },
     subRows() {
-      const typeChar = { pgs: "*", sdh: "H", embedded: "T", forced: "F" };
       return [{ label: "None", index: -1 }].concat(
         (this.subList?.tracks ?? []).map((sub, index) => ({
-          label: `${typeChar[sub.type] ?? "S"}: ${(sub.label || "").replace(/\bdefault\b/gi, "Def")}`,
+          label: sub.label,
           index,
         })),
       );

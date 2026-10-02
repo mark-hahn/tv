@@ -172,6 +172,58 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   videos in under the record named like it.
 - episodeData tuples are `[aired, watched, file, res, pos]`, `pos` in ms.
 
+## Subtitles
+
+- Every subtitle is a sidecar `.srt` beside its video. Embedded tracks are
+  never shown or served; the text ones are copied out to sidecars. chksrt no
+  longer exists.
+- Every subtitle file written anywhere, for any reason, goes through
+  `cleanSrt()` (`packages/share/src/srt.js`) first.
+- Types, from the suffix between the video's name and `.srt`
+  (`sidecarType()` in `apps/srvr/src/subOrigin.js`):
+  - `T<n>` / `H<n>` (T, H): a copy of embedded text track n, H when it is
+    flagged as describing music and sound. A legacy `mb<n>` counts as T.
+  - `opn<TAG>` (V): an OpenSubtitles download; TAG is its file_id in base32.
+  - `asr` (+): ASR's.
+  - `S<n>` and anything else (S): a file that arrived beside the video.
+  - PGS and forced embedded tracks are never copied out.
+- `apps/srvr/data/subs.db` (`apps/srvr/src/subs.js`, tv-srvr the only
+  writer):
+  - `subs`: every OpenSubtitles search result ever returned, with
+    `downloaded` and `chosen`.
+  - `picks`: the sidecar each episode showed at its last stop.
+  - `processed`: videos the add-to-disk steps have handled.
+- Nothing is downloaded from OpenSubtitles except in `getPlayUrl`
+  (`subsBeforePlay`), for tvapp and the browser player alike:
+  - Only when the episode has fewer than 3 downloaded: search, then download
+    until it has 3 or no candidate is left.
+  - A candidate is the first result from the same origin as a chosen file of
+    the show, else the first that is not foreign-parts-only.
+  - Play waits at most 4 s. Slow or failed, it plays anyway and `subError`
+    puts a pop-up on the phones and the web client.
+- The start pick (`pickSidecar`): the file the episode last showed, else the
+  type the show last showed (for V, the one from the same origin as a chosen
+  one), else the first in the order T, H, V, S, +.
+- The player sends the showing file as `sub` in `playProgress`. At a stop
+  that is not an early stop it becomes the episode's pick and `chosen`.
+- Same origin (`sameOrigin()`): two results for different episodes match when
+  `hearing_impaired`, `hd`, `foreign_parts_only`, `ai_translated` and
+  `machine_translated` are all equal, `fps` is equal unless either is 0, and:
+  - a real uploader: same `uploader_id` and upload dates within 1 hour;
+  - an anonymous or bot uploader (3282 os-auto, 119465 os_robot, 2 system):
+    `release` equal once the episode marker and episode title are removed,
+    or `comments` equal and not empty.
+- When a video or an S file lands on disk the watcher queues the video
+  (`apps/srvr/src/subsQueue.js`): T and H copied out, an arriving `.srt`
+  named `S<n>`, a replaced (`.old`) video's subtitles taken over, a search
+  with no download, and ASR when the video has no embedded T or H, no usable
+  search result and no `.asr.srt`.
+- The 6-hourly sweep queues unwatched library videos that have no sidecar at
+  all and have not been through those steps.
+- tv-down takes a `.srt` from usb when its episode's video is on disk or on
+  its way.
+- Movies get no subtitle processing.
+
 ## tvapp and tvapprc
 
 - `apps/tvapp` is a native Java Android TV app (package `com.hahnca.tvapp`,
@@ -352,7 +404,7 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-09-29**. tvapp (`apps/tvapp`, native Java, package
+Current as of **2026-10-01**. tvapp (`apps/tvapp`, native Java, package
 `com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
 (`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
@@ -412,14 +464,15 @@ because the TV is unreachable from any wireless host here.
   and plays the file straight off nginx in Media3 ExoPlayer.
 - It starts at the resume point, or past the intro (`trimPosMs`) if there is
   none.
-- Subtitles: every `.srt` for the episode is sideloaded (served as vtt),
-  alt releases' included. It starts on the embedded track chksrt picked,
-  else chksrt's `.srt` or the file's own, else the first English embedded
-  track. Embedded tracks in other languages are never listed.
+- Subtitles: the video's sidecar `.srt` files are sideloaded (served as
+  vtt). Embedded tracks are never shown. It starts on the one `getPlayUrl`
+  picked (`subPick`); with none, subtitles are off. See Subtitles.
 - It POSTs `/api/playProgress` on start, every 10 s, on pause/resume, on stop
   and at the end. tv-srvr then:
   - stores `pos` and sets watched at the end;
   - stamps the last-played fields on start and stop;
+  - takes the subtitle file showing at a stop (`sub`) as the episode's
+    chosen one;
   - feeds now-playing.
 
 **Video keys** — while a video is up, the tvapprc arrows and OK drive it:
@@ -441,7 +494,7 @@ because the TV is unreachable from any wireless host here.
   - tvapp sends the video's text tracks as `l,<json>` on every change, and
     when the remote asks with `l`.
   - A tap sends `t,<n>`; `-1` turns subtitles off.
-  - The switch lasts for the current play only; chksrt's pick is untouched.
+  - The one showing when the video stops becomes the episode's chosen one.
 - The camera overlay pauses a playing video. The video resumes when the
   camera comes off, unless the Shows key took it off, since that closes the
   video too.

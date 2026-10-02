@@ -181,3 +181,9 @@ export function sanitizeSrt(raw) {
   }
   return null;
 }
+
+// The text every subtitle file is written as: sanitized, or as it came when
+// there was nothing to fix.
+export function cleanSrt(raw) {
+  return sanitizeSrt(raw) ?? raw;
+}

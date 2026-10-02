@@ -353,23 +353,6 @@
             Intro
           </button>
           <button
-            @click.stop="handleMapChksrtClick"
-            :disabled="!firstSelectedCellPath"
-            :style="{
-              opacity: firstSelectedCellPath ? 1 : 0.35,
-              cursor: firstSelectedCellPath ? 'pointer' : 'default',
-            }"
-            style="
-              font-size: 13.5px;
-              cursor: pointer;
-              margin: 4.5px 0 4.5px 4.5px;
-              max-height: 21.5px;
-              border-radius: 7px;
-            "
-          >
-            Chksrt
-          </button>
-          <button
             @click.stop="onGapchkClick"
             :disabled="!mapShow?.id"
             :style="{
@@ -2309,25 +2292,6 @@ export default {
         );
       if (episodes.length === 0) return;
       evtBus.emit("torSearchEpisodes", { show: this.mapShow, episodes });
-    },
-    async handleMapChksrtClick() {
-      if (this.selectedCells.size === 0) return;
-      if (this.selectedCells.size === 1) {
-        const firstKey = Array.from(this.selectedCells)[0];
-        const { season, episode } = this.parseCellKey(firstKey);
-        const path = this.seriesMap?.[season]?.[episode]?.path || null;
-        if (!path) return;
-        evtBus.emit("openChksrt", path);
-        return;
-      }
-      const paths = [];
-      for (const key of this.selectedCells) {
-        const { season, episode } = this.parseCellKey(key);
-        const p = this.seriesMap?.[season]?.[episode]?.path || null;
-        if (p) paths.push(p);
-      }
-      if (paths.length === 0) return;
-      await srvr.enqueueChksrt(paths);
     },
     async handleClearPositions() {
       if (!this.mapShow?.name) return;

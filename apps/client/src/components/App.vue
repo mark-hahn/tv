@@ -145,22 +145,6 @@
               {{ t.label }}
             </button>
             <button
-              v-if="chksrtCount > 0"
-              @click.stop="clickChksrt"
-              :style="{
-                fontSize: '13px',
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                marginLeft: '4px',
-                border: '1px solid #c88',
-                backgroundColor: '#faa',
-                color: 'black',
-              }"
-            >
-              Chksrt {{ chksrtCount }}
-            </button>
-            <button
               v-if="introCount > 0"
               @click.stop="clickIntro"
               :style="{
@@ -359,7 +343,6 @@
     <VideoPlayer
       :path="videoPlayerPath"
       :mode="videoPlayerMode"
-      :chksrtCount="chksrtCount"
       :introCount="introCount"
       :introShow="videoPlayerIntroShow"
       :introShows="allShows"
@@ -367,8 +350,6 @@
       :introEpisode="videoPlayerMapEpisode"
       :introSource="videoPlayerSource"
       @close="handleVideoPlayerClose"
-      @chksrt-next="handleChksrtNext"
-      @chksrt-sel="handleChksrtSel"
       @intro-next="handleIntroNext"
       @intro-sel="handleIntroSel"
     />
@@ -463,6 +444,53 @@
         </div>
         <button
           @click.stop.prevent="missingEpWarning = null"
+          @pointerdown.stop.prevent
+          style="
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 7px;
+            padding: 6px 18px;
+            border: 1px solid #cc0000;
+            background-color: whitesmoke;
+          "
+        >
+          Close
+        </button>
+      </div>
+    </div>
+    <!-- Subtitle download error modal -->
+    <div
+      v-if="subError"
+      @click.stop.prevent
+      @pointerdown.stop
+      style="
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 3000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        @click.stop.prevent
+        @pointerdown.stop
+        style="
+          background-color: #ffcccc;
+          border: 2px solid #cc0000;
+          border-radius: 10px;
+          padding: 24px 28px;
+          max-width: 480px;
+          width: calc(100% - 40px);
+          font-size: 16px;
+          font-weight: bold;
+        "
+      >
+        <div style="margin-bottom: 16px">{{ subError }}</div>
+        <button
+          @click.stop.prevent="subError = null"
           @pointerdown.stop.prevent
           style="
             font-size: 16px;
@@ -611,8 +639,6 @@ export default {
       videoPlayerSource: null,
       videoPlayerMapSeason: null,
       videoPlayerMapEpisode: null,
-      chksrtCount: 0,
-      _chksrtChannel: null,
       introCount: 0,
       browseTabHasMore: false,
       _browseHasMoreChannel: null,
@@ -648,6 +674,7 @@ export default {
       tvdbMismatchText: "",
 
       missingEpWarning: null,
+      subError: null,
 
       helpDialogOpen: false,
 
@@ -969,8 +996,7 @@ export default {
       evtBus.off("missingEpisodeWarning", this._onMissingEpWarning);
     evtBus.off("playEpisodePath", this._onPlayEpisodePath);
     evtBus.off("playSimplePath", this._onPlaySimplePath);
-    evtBus.off("openChksrt", this._onOpenChksrt);
-    evtBus.off("chksrt-count", this._onChksrtCount);
+    evtBus.off("subError", this._onSubError);
     if (this._onIntroCount) evtBus.off("intro-count", this._onIntroCount);
     if (this._onBrowseHasMoreChanged)
       evtBus.off("browseHasMoreChanged", this._onBrowseHasMoreChanged);
@@ -986,7 +1012,6 @@ export default {
       window.removeEventListener("keydown", this._onArrowKey);
     this.stopQbtPolling();
     this.cancelDownInactiveTimer();
-    this.stopChksrtPolling();
     this.stopBrowseTabPolling();
   },
   methods: {
@@ -1000,7 +1025,6 @@ export default {
       this.videoPlayerMapSeason = null;
       this.videoPlayerMapEpisode = null;
       evtBus.emit("introPaneClosed");
-      this.fetchChksrtCount();
       if (closingIntro && introShow) {
         const hasConfiguredSeasonIntro =
           introShow.seasonIntros != null &&
@@ -1030,47 +1054,10 @@ export default {
         this.introCount = this.allShows.filter((s) => s.needsIntro).length;
       }
     },
-    async handleChksrtNext() {
-      try {
-        const list = await srvr.getChksrtList();
-        this.chksrtCount = list?.count ?? 0;
-        if (list?.path) {
-          this.videoPlayerMode = "chksrt";
-          this.videoPlayerPath = list.path;
-        } else {
-          this.videoPlayerPath = null;
-          this.videoPlayerMode = null;
-        }
-      } catch (e) {
-        this.videoPlayerPath = null;
-        this.videoPlayerMode = null;
-        this.fetchChksrtCount();
-      }
-    },
-    handleChksrtSel(path) {
-      this.videoPlayerPath = null;
-      this.videoPlayerMode = null;
-      if (!path) return;
-      const TV_DIR = "/mnt/media/tv/";
-      const showName = path.startsWith(TV_DIR)
-        ? path.slice(TV_DIR.length).split("/")[0]
-        : null;
-      if (showName) {
-        evtBus.emit("selectShowFromCardTitle", showName);
-      }
-    },
     handleIntroSel(name) {
       this.handleVideoPlayerClose();
       if (name) {
         evtBus.emit("selectShowFromCardTitle", name);
-      }
-    },
-    async fetchChksrtCount() {
-      try {
-        const list = await srvr.getChksrtList();
-        this.chksrtCount = list?.count ?? 0;
-      } catch (e) {
-        this.chksrtCount = 0;
       }
     },
     startBrowseTabPolling() {
@@ -1087,39 +1074,12 @@ export default {
       this._browseHasMoreChannel?.close();
       this._browseHasMoreChannel = null;
     },
-    startChksrtPolling() {
-      if (this._chksrtChannel) return;
-      const applyChksrt = (payload) => {
-        this.chksrtCount = payload?.count ?? 0;
-      };
-      this._chksrtChannel = srvr.openChannel("chksrt", {
-        onSnapshot: applyChksrt,
-        onDelta: applyChksrt,
-      });
-    },
-    stopChksrtPolling() {
-      this._chksrtChannel?.close();
-      this._chksrtChannel = null;
-    },
     // needsIntro shows in list order.
     introQueue(from = null) {
       const shows = this.allShows;
       if (!Array.isArray(shows)) return [];
       const start = from ? shows.findIndex((s) => s.name === from.name) + 1 : 0;
       return shows.slice(start).filter((s) => s?.needsIntro);
-    },
-    async clickChksrt() {
-      if (this.chksrtCount === 0) return;
-      try {
-        const list = await srvr.getChksrtList();
-        this.chksrtCount = list?.count ?? 0;
-        if (list?.path) {
-          this.videoPlayerMode = "chksrt";
-          this.videoPlayerPath = list.path;
-        }
-      } catch (e) {
-        unilog(893, "clickChksrt error:", e);
-      }
     },
 
     // Select intro file (see intro-file-selection.md). Always the built-in
@@ -1966,7 +1926,7 @@ export default {
     updateFaviconBadge() {
       const shouldShowBadge =
         !this.simpleMode &&
-        (this.browseTabHasMore || this.introCount > 0 || this.chksrtCount > 0);
+        (this.browseTabHasMore || this.introCount > 0);
 
       // Remove any existing favicon links
       const oldLinks = document.querySelectorAll("link[rel*='icon']");
@@ -2106,6 +2066,10 @@ export default {
       this.missingEpWarning = data;
     };
     evtBus.on("missingEpisodeWarning", this._onMissingEpWarning);
+    this._onSubError = (data) => {
+      this.subError = data?.text ?? null;
+    };
+    evtBus.on("subError", this._onSubError);
     this._onPlayEpisodePath = (path) => {
       this.videoPlayerMode = null;
       this.videoPlayerPath = path;
@@ -2116,35 +2080,10 @@ export default {
       this.videoPlayerPath = path;
     };
     evtBus.on("playSimplePath", this._onPlaySimplePath);
-    this._onOpenChksrt = (path) => {
-      this.videoPlayerMode = "chksrt";
-      this.videoPlayerPath = path;
-    };
-    evtBus.on("openChksrt", this._onOpenChksrt);
-    this._onChksrtCount = (count) => {
-      const prev = this.chksrtCount;
-      this.chksrtCount = Number(count) || 0;
-      if (prev === 0 && this.chksrtCount > 0) {
-        /*
-        this.showNotification({
-          title: 'Subtitles',
-          body: `${this.chksrtCount} subtitle(s) ready to check`,
-          icon: '/images/srt.png',
-          requireInteraction: true,
-          onclick: {
-            action: 'navigate',
-            url: '/down?tab=chksrt'
-          }
-        });
-        */
-      }
-    };
-    evtBus.on("chksrt-count", this._onChksrtCount);
     this._onIntroCount = (count) => {
       this.introCount = Number(count) || 0;
     };
     evtBus.on("intro-count", this._onIntroCount);
-    this.startChksrtPolling();
     this.startQbtPolling();
 
     this._onBrowseHasMoreChanged = (val) => {
@@ -2158,9 +2097,6 @@ export default {
       this.updateFaviconBadge();
     });
     this.$watch("introCount", () => {
-      this.updateFaviconBadge();
-    });
-    this.$watch("chksrtCount", () => {
       this.updateFaviconBadge();
     });
     // Initial badge update

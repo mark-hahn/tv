@@ -205,20 +205,6 @@
             Intro
           </button>
           <button
-            @click.stop="doSubsClick"
-            :disabled="chksrtQueueCountForShow === 0"
-            :style="{
-              fontSize: '13px',
-              cursor: chksrtQueueCountForShow > 0 ? 'pointer' : 'default',
-              marginTop: '3px',
-              maxHeight: '24px',
-              borderRadius: '7px',
-              opacity: chksrtQueueCountForShow > 0 ? 1 : 0.4,
-            }"
-          >
-            Subs
-          </button>
-          <button
             @click.stop="playClick"
             :disabled="!hasVideoFiles"
             :style="{
@@ -709,8 +695,6 @@ export default {
       twoLocalFolders: false,
       nowPlayingDevices: [],
       crewLines: [],
-      chksrtQueueEntries: [],
-      _chksrtQueueChannel: null,
       showCommentDialog: false,
       commentText: "",
     };
@@ -745,11 +729,6 @@ export default {
         if (fits || cnt === parts.length) return lines;
       }
       return [txt];
-    },
-    chksrtQueueCountForShow() {
-      const name = this.show?.name;
-      if (!name) return 0;
-      return this.chksrtQueueEntries.filter((e) => e.showName === name).length;
     },
     lastWatchedDate() {
       return (
@@ -890,39 +869,6 @@ export default {
         unilog(922, `introClick error for ${this.show.name}:`, e);
         window.alert("Intro failed to open.");
       }
-    },
-
-    async doSubsClick() {
-      const count = this.chksrtQueueCountForShow;
-      const showName = this.show?.name;
-      if (count === 0 || !showName) return;
-      if (
-        !window.confirm(
-          `Select embedded subtitle for all ${count} episodes of ${showName}?`,
-        )
-      )
-        return;
-      try {
-        await srvr.chksrtSelectShow(showName);
-      } catch (e) {
-        unilog(1877, `chksrt select-show failed for ${showName}: ${e.message}`);
-      }
-    },
-
-    openChksrtQueueChannel() {
-      if (this._chksrtQueueChannel) return;
-      const apply = (entries) => {
-        this.chksrtQueueEntries = Array.isArray(entries) ? entries : [];
-      };
-      this._chksrtQueueChannel = srvr.openChannel("chksrtQueue", {
-        onSnapshot: apply,
-        onDelta: apply,
-      });
-    },
-
-    closeChksrtQueueChannel() {
-      this._chksrtQueueChannel?.close();
-      this._chksrtQueueChannel = null;
     },
 
     // Plays the first unwatched episode (else the first one) in the browser.
@@ -1867,7 +1813,6 @@ export default {
     evtBus.on("previewMode", this.onPreviewMode);
     evtBus.on("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.on("addPreviewShowDone", this.onAddPreviewShowDone);
-    this.openChksrtQueueChannel();
 
     this._onNowPlaying = ({ playing } = {}) => {
       const name = this.show?.name;
@@ -2020,7 +1965,6 @@ export default {
     evtBus.off("localFoldersChanged", this.recheckTwoLocalFolders);
     if (this._onPaneChanged) evtBus.off("paneChanged", this._onPaneChanged);
     if (this._onInfoDelKey) evtBus.off("infoDelKey", this._onInfoDelKey);
-    this.closeChksrtQueueChannel();
   },
 };
 </script>

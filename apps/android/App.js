@@ -268,6 +268,8 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [lockInfo, setLockInfo] = useState(null);
   const [missingEpWarning, setMissingEpWarning] = useState(null);
+  // tv-srvr's text when a video's subtitle downloads were slow or failed.
+  const [subError, setSubError] = useState(null);
   const [layoutOption, setLayoutOption] = useState("mark");
   useEffect(() => {
     layoutOptionRef.current = layoutOption;
@@ -548,6 +550,8 @@ export default function App() {
           msg.notification === "missingEpisodeWarning"
         ) {
           setMissingEpWarning(msg.data);
+        } else if (msg.id === 0 && msg.notification === "subError") {
+          setSubError(msg.data?.text ?? null);
         } else if (msg.id === 0 && msg.notification === "nowPlaying") {
           const { showName, playing } = msg.data ?? {};
           const s = playing?.[0]?.season ?? null;
@@ -1295,17 +1299,6 @@ export default function App() {
     sendTvapprc(`${CMD_SUBTITLE},${index}`);
   };
 
-  const subTypeChar = (type) => {
-    if (type === "pgs") return "*";
-    if (type === "sdh") return "H";
-    if (type === "embedded") return "T";
-    if (type === "forced") return "F";
-    return "S";
-  };
-
-  const subShortLabel = (label) =>
-    (label || "").replace(/\bdefault\b/gi, "Def");
-
   // Reconnects tv-tv's adb to the TV. Port and code come from the TV's
   // Developer options > Wireless debugging > Pair device with pairing code;
   // left empty, tv-tv only hunts for the port wireless debugging moved to.
@@ -1860,7 +1853,7 @@ export default function App() {
   ];
 
   if (showSubCtrl) {
-    // Apply shifts a .srt file, so not an embedded track or none, and only
+    // Apply shifts the .srt that is on, so not with none on, and only
     // when the offset has moved since the last one.
     const subApplyOk =
       subList?.tracks[subList.selected]?.type === "srt" &&
@@ -1883,7 +1876,7 @@ export default function App() {
             [{ label: "None", index: -1 }]
               .concat(
                 subList.tracks.map((sub, index) => ({
-                  label: `${subTypeChar(sub.type)}: ${subShortLabel(sub.label)}`,
+                  label: sub.label,
                   index,
                 })),
               )
@@ -3282,6 +3275,21 @@ export default function App() {
             </Text>
             <TouchableOpacity
               onPress={() => setMissingEpWarning(null)}
+              style={missingEpStyles.closeBtn}
+            >
+              <Text style={missingEpStyles.closeBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+      {subError && (
+        <View style={missingEpStyles.overlay}>
+          <View style={missingEpStyles.box}>
+            <Text style={[missingEpStyles.text, { marginBottom: 20 }]}>
+              {subError}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setSubError(null)}
               style={missingEpStyles.closeBtn}
             >
               <Text style={missingEpStyles.closeBtnText}>Close</Text>

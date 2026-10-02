@@ -98,10 +98,8 @@
           {{ inflight.file }}
         </div>
       </div>
-      <!-- ChkSrt is a review queue with nothing ever running on the server, so
-           the idle line would be noise there. -->
       <div
-        v-else-if="selected !== 'chksrt'"
+        v-else
         style="margin: 6px 0 10px 0; font-size: 15.6px; color: #666"
       >
         nothing running
@@ -196,12 +194,11 @@ export default {
       selFlash: false,
       copyFlashPath: null,
       error: "",
-      data: { sub: null, asr: null, recode: null, chksrt: null },
+      data: { sub: null, asr: null, recode: null },
       queueDefs: [
         { key: "sub", label: "Sub" },
         { key: "asr", label: "Asr" },
         { key: "recode", label: "Recode" },
-        { key: "chksrt", label: "ChkSrt" },
       ],
       timer: null,
       introPaths: new Set(),

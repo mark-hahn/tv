@@ -21,7 +21,6 @@
           showEmb ||
           showFix ||
           showInfo ||
-          showOpn ||
           showText ||
           showHist
             ? '0 0 50%'
@@ -31,7 +30,6 @@
           showEmb ||
           showFix ||
           showInfo ||
-          showOpn ||
           showText ||
           showHist
             ? '1px solid #ddd'
@@ -96,19 +94,6 @@
               }"
             >
               EmbSub
-            </button>
-
-            <button
-              @click="clickOpn"
-              :style="{
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                backgroundColor: showOpn ? '#ddd' : 'whitesmoke',
-              }"
-            >
-              OpnSub
             </button>
 
             <button
@@ -418,19 +403,6 @@
             </button>
 
             <button
-              @click="clickOpn"
-              :style="{
-                cursor: 'pointer',
-                borderRadius: '7px',
-                padding: '4px 10px',
-                border: '1px solid #bbb',
-                backgroundColor: showOpn ? '#ddd' : 'whitesmoke',
-              }"
-            >
-              OpnSub
-            </button>
-
-            <button
               @click="clickAsr"
               :style="{
                 cursor: 'pointer',
@@ -714,154 +686,6 @@
         "
       >
         {{ embLogs }}
-      </div>
-    </div>
-
-    <!-- Open (OpenSubtitles search) Pane -->
-    <div
-      id="opnPane"
-      v-show="showOpn"
-      :style="{
-        flex: '1 1 50%',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        backgroundColor: '#fafafa',
-        color: '#000',
-        fontFamily: 'monospace',
-        padding: '10px',
-        borderLeft: '1px solid #ddd',
-      }"
-    >
-      <div
-        style="
-          flex: 0 0 auto;
-          border-bottom: 1px solid #ddd;
-          padding-bottom: 5px;
-          margin-bottom: 5px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <div>
-          <strong>OpenSubs Search</strong>
-          <span v-if="opnBusy"> (Searching...)</span>
-        </div>
-        <div>
-          <button
-            @click="applyOpn"
-            :disabled="opnBusy"
-            :style="{
-              cursor: opnBusy ? 'not-allowed' : 'pointer',
-              borderRadius: '4px',
-              padding: '2px 8px',
-              border: '1px solid #bbb',
-              backgroundColor: 'whitesmoke',
-              marginRight: '5px',
-              opacity: opnBusy ? 0.6 : 1,
-            }"
-          >
-            Apply
-          </button>
-          <button
-            @click="clearOpn"
-            :style="{
-              cursor: 'pointer',
-              borderRadius: '4px',
-              padding: '2px 8px',
-              border: '1px solid #bbb',
-              backgroundColor: 'whitesmoke',
-              marginRight: '5px',
-            }"
-          >
-            Clear
-          </button>
-          <button
-            @click="showOpn = false"
-            title="Close"
-            :style="{
-              cursor: 'pointer',
-              borderRadius: '4px',
-              padding: '2px 8px',
-              border: '1px solid #bbb',
-              backgroundColor: 'whitesmoke',
-              fontWeight: 'bold',
-              marginLeft: '5px',
-            }"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-      <div
-        style="
-          flex: 1 1 auto;
-          overflow: auto;
-          background-color: #fff;
-          border: 1px solid #eee;
-          padding: 4px;
-        "
-      >
-        <div
-          v-if="opnBusy"
-          style="color: #888; padding: 8px"
-        >
-          Searching...
-        </div>
-        <div
-          v-else-if="!opnSearched"
-          style="color: #888; padding: 8px"
-        >
-          Press Apply to search
-        </div>
-        <div
-          v-else-if="opnResults.length === 0"
-          style="color: #888; padding: 8px"
-        >
-          No results
-        </div>
-        <template v-else>
-          <div
-            v-for="group in opnResults"
-            :key="group.videoPath"
-            style="margin-bottom: 12px"
-          >
-            <div
-              style="
-                font-weight: bold;
-                margin-bottom: 4px;
-                word-break: break-all;
-              "
-            >
-              {{ group.videoPath.split("/").pop() }}
-            </div>
-            <div
-              v-if="group.error"
-              style="color: red; padding-left: 8px"
-            >
-              {{ group.error }}
-            </div>
-            <div
-              v-else-if="group.items.length === 0"
-              style="color: #888; padding-left: 8px"
-            >
-              No results
-            </div>
-            <div
-              v-else
-              v-for="item in group.items"
-              :key="item.file_id"
-              style="
-                padding: 2px 8px;
-                border-bottom: 1px solid #f0f0f0;
-                font-size: 0.92em;
-              "
-            >
-              {{ item.release }} <span style="color: #888">{{ item.tag }}</span>
-            </div>
-          </div>
-        </template>
       </div>
     </div>
 
@@ -1409,7 +1233,6 @@ import {
   abortAsr,
   openChannel,
   removeFromAsrQueue,
-  searchOpn,
   toggleBadGroup,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
@@ -1468,10 +1291,6 @@ export default {
       embLogChannel: null,
 
       // Open (OpenSubtitles search)
-      showOpn: false,
-      opnResults: [],
-      opnBusy: false,
-      opnSearched: false,
 
       // Fix (ffmpeg)
       showFix: false,
@@ -2371,7 +2190,6 @@ export default {
       this.showAsr = !this.showAsr;
       if (this.showAsr) {
         this.showEmb = false;
-        this.showOpn = false;
         this.showFix = false;
         this.showInfo = false;
         this.showText = false;
@@ -2532,7 +2350,6 @@ export default {
       if (this.showFix) {
         this.showAsr = false;
         this.showEmb = false;
-        this.showOpn = false;
         this.showInfo = false;
         this.showText = false;
         this.showHist = false;
@@ -2739,7 +2556,6 @@ export default {
       this.showEmb = !this.showEmb;
       if (this.showEmb) {
         this.showAsr = false;
-        this.showOpn = false;
         this.showFix = false;
         this.showInfo = false;
         this.showText = false;
@@ -2751,7 +2567,6 @@ export default {
       this.embBusy = true;
       this.showEmb = true;
       this.showAsr = false;
-      this.showOpn = false;
       this.showFix = false;
       this.showInfo = false;
 
@@ -2807,45 +2622,6 @@ export default {
       this.embLogChannel?.close();
       this.embLogChannel = null;
     },
-    clickOpn() {
-      this.showOpn = !this.showOpn;
-      if (this.showOpn) {
-        this.showAsr = false;
-        this.showEmb = false;
-        this.showFix = false;
-        this.showInfo = false;
-        this.showText = false;
-        this.showHist = false;
-      }
-    },
-    async applyOpn() {
-      if (this.opnBusy) return;
-      const mediaRoot = this.movieMode ? "/mnt/media/movies" : "/mnt/media/tv";
-      const videoPaths = this.collectFilePaths()
-        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
-        .map((p) => `${mediaRoot}/${p}`);
-      if (videoPaths.length === 0) {
-        this.opnResults = [
-          { videoPath: "", items: [], error: "No video files selected" },
-        ];
-        this.opnSearched = true;
-        return;
-      }
-      this.opnBusy = true;
-      try {
-        const res = await searchOpn(videoPaths);
-        this.opnResults = res?.results ?? [];
-      } catch (e) {
-        this.opnResults = [{ videoPath: "", items: [], error: e.message }];
-      } finally {
-        this.opnBusy = false;
-        this.opnSearched = true;
-      }
-    },
-    clearOpn() {
-      this.opnResults = [];
-      this.opnSearched = false;
-    },
     async badGrpClick() {
       // Check if exactly one file is selected
       if (this.selectedFiles.size === 0) {
@@ -2898,7 +2674,6 @@ export default {
       this.showInfo = true;
       this.showAsr = false;
       this.showEmb = false;
-      this.showOpn = false;
       this.showFix = false;
       this.showText = false;
       this.showHist = false;
@@ -2913,7 +2688,6 @@ export default {
       this.showHist = true;
       this.showAsr = false;
       this.showEmb = false;
-      this.showOpn = false;
       this.showFix = false;
       this.showInfo = false;
       this.showText = false;
@@ -2928,7 +2702,6 @@ export default {
       this.showText = true;
       this.showAsr = false;
       this.showEmb = false;
-      this.showOpn = false;
       this.showFix = false;
       this.showInfo = false;
       this.showHist = false;

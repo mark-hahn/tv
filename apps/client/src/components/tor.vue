@@ -1666,8 +1666,7 @@ export default {
         const rB = resNum(b);
         if (rA !== rB) return rB - rA;
 
-        // 5b. At equal resolution, hevc loses — it needs a full transcode for
-        // chksrt, where h264 only needs a remux.
+        // 5b. At equal resolution, hevc loses.
         const hA = this.torrentIsHevc(a) ? 1 : 0;
         const hB = this.torrentIsHevc(b) ? 1 : 0;
         if (hA !== hB) return hA - hB;

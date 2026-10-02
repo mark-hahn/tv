@@ -59,16 +59,9 @@
           `E${String(p.episode).padStart(2, "0")}`;
         document.title = `${p.showName} ${code}`;
         const startSec = (p.posMs > 0 ? p.posMs : p.trimPosMs) / 1000;
-        // Subtitles, in the player's subtitle menu: chksrt's embedded pick,
-        // then every .srt of the episode. Each loads when first turned on.
-        const subs = p.subs.map((s, i) => ({ ...s, on: i === p.subPick }));
-        if (p.subIndex != null)
-          subs.unshift({
-            label: "embedded",
-            url: `subtitle?path=${encodeURIComponent(p.path)}&index=${p.subIndex}`,
-            on: true,
-          });
-        for (const s of subs) {
+        // Subtitles, in the player's subtitle menu: the episode's .srt files,
+        // starting on the one tv-srvr picked. Each loads when first turned on.
+        p.subs.forEach((s, i) => {
           const el = document.createElement("track");
           Object.assign(el, {
             kind: "subtitles",
@@ -77,8 +70,8 @@
             src: s.url,
           });
           vid.append(el);
-          el.track.mode = s.on ? "showing" : "disabled";
-        }
+          el.track.mode = i === p.subPick ? "showing" : "disabled";
+        });
 
         // The video is /api/stream from a point in the file, keeping the
         // file's timestamps (copyts), fed into a MediaSource with the whole
@@ -211,6 +204,12 @@
                   posMs: Math.round(vid.currentTime * 1000),
                   durMs: p.durMs,
                   state,
+                  // The subtitle file that is showing; tv-srvr keeps the one
+                  // showing at the stop as the episode's chosen one.
+                  sub:
+                    p.subs[
+                      [...vid.textTracks].findIndex((t) => t.mode === "showing")
+                    ]?.file ?? "",
                   device: "browser",
                 }),
               ],

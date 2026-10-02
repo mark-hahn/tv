@@ -2574,6 +2574,8 @@ async function main() {
         var _de = _activeDownloads[_di];
         if (!_de || _de.error || _de.status === "finished") continue;
         var _deTitle = _de.destTitle || _de.title || "";
+        // Only a video occupies its episode; a subtitle file on its way does not.
+        if (!isVideoEpisodeFile(_deTitle)) continue;
         var _deSeMatch = _deTitle.match(/S(\d{2})E(\d{2})/i);
         if (!_deSeMatch) continue;
         var _deSeStr = "S" + _deSeMatch[1] + "E" + _deSeMatch[2];
@@ -3436,6 +3438,31 @@ async function main() {
       }
     }
 
+    // A subtitle file follows its episode's video: it is taken when that video
+    // is on disk or on its way, and none of the video gates below apply to it.
+    // tv-srvr names it as one of the video's S files once it lands.
+    var isSrtFile = /\.srt$/i.test(fname);
+    if (isSrtFile && !processingForced) {
+      var srtSeStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+      var srtSeRe = new RegExp(srtSeStr, "i");
+      var srtVideoOnDisk =
+        fs.existsSync(tvSeasonPath) &&
+        fs.readdirSync(tvSeasonPath).some(function (f) {
+          return srtSeRe.test(f) && isVideoEpisodeFile(f);
+        });
+      var srtVideoComing =
+        (inProgressSeIndex &&
+          String(tvSeasonPath).replace(/\/+$/, "") + "\x00" + srtSeStr in
+            inProgressSeIndex) ||
+        (cycleSeMap && cycleSeMap[(seriesName || "") + "\x00" + srtSeStr]);
+      if (!srtVideoOnDisk && !srtVideoComing) {
+        existsCount++;
+        if (skipLoggedOnce(usbFilePath))
+          unilog(2688, `${seriesName || "unknown show"} ${srtSeStr}: no video for subtitle file "${fname}", skipping`);
+        return process.nextTick(checkFile);
+      }
+    }
+
     // For flex downloads (automatic, not forced, not from tor): block if the
     // episode already has a file under any name in the season folder, or if the
     // episode is already watched.
@@ -3444,6 +3471,7 @@ async function main() {
     var fromFlex = !processingForced && !fromTor;
     if (
       fromFlex &&
+      !isSrtFile &&
       Number.isInteger(season) &&
       season > 0 &&
       Number.isInteger(episode) &&
@@ -3680,6 +3708,7 @@ async function main() {
     // otherwise the first-seen wins.
     if (
       fromFlex &&
+      !isSrtFile &&
       Number.isInteger(season) &&
       season > 0 &&
       Number.isInteger(episode) &&
@@ -3761,6 +3790,7 @@ async function main() {
       if (
         cycleSeMap &&
         fromFlex &&
+        !isSrtFile &&
         Number.isInteger(season) &&
         season > 0 &&
         Number.isInteger(episode) &&

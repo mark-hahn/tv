@@ -3,6 +3,7 @@ export * from "./unilog.js";
 export * from "./showFolder.js";
 export * from "./showFilterSort.js";
 export * from "./videoFiles.js";
+export * from "./srt.js";
 
 export const TV_BLOCKED = {
   sample: true,
@@ -633,7 +634,7 @@ export function resolutionDigit(height) {
 }
 
 // True when a title/filename is hevc (x265/h265). Browsers can't play hevc, so
-// chksrt has to fully transcode these to get a seekable mp4 mirror (minutes of
+// the browser's player has to fully transcode these (minutes of
 // cpu), while h264 only needs a lossless remux (seconds). Everywhere download
 // priority is decided, an hevc release therefore loses to an equal-quality
 // non-hevc one — see mpfour.js.

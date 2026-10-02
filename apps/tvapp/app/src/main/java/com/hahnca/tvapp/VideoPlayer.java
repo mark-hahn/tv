@@ -44,6 +44,9 @@ import org.json.JSONObject;
  * tv-srvr owns the play state: getPlayUrl says where to start, and this
  * reports back how far it got -- the resume point, and the watched mark when
  * the video runs to its end.
+ *
+ * Subtitles are the episode's .srt files only, sideloaded; the file's embedded
+ * tracks are never shown.
  */
 class VideoPlayer extends FrameLayout {
 
@@ -56,7 +59,7 @@ class VideoPlayer extends FrameLayout {
 
   private static final String TAG = "tvapp";
   private static final String PROGRESS_URL = "https://hahnca.com/tv-srvr/api/playProgress";
-  // The chksrt pane's .srt timing shift, which the subtitle panel's Apply uses too.
+  // The .srt timing shift the subtitle panel's Apply uses.
   private static final String SHIFT_SUBS_URL = "https://hahnca.com/tv-srvr/api/applySubOffset";
   // How often a playing video tells tv-srvr where it is: the resume point if
   // the tv goes off mid-play, and the phone's progress bar.
@@ -176,8 +179,8 @@ class VideoPlayer extends FrameLayout {
         ready = false;
         close();
       };
-  // The video's text tracks, in the order the remote's subtitle panel lists
-  // them.
+  // The video's sideloaded text tracks, in the order the remote's subtitle
+  // panel lists them.
   private final List<Tracks.Group> textGroups = new ArrayList<>();
   // The text track that was on when reload reopened the video, turned back on
   // once the reopened video has its tracks.
@@ -240,9 +243,8 @@ class VideoPlayer extends FrameLayout {
    * (resume point), res (the file's height, null if unknown), seasonEps
    * (the episode count of its season), trimPosMs (where the show starts past its intro), skipDurMs
    * (the Skip key's jump), subs (the episode's .srt files as vtt, [{url,
-   * label}]), subIndex (the embedded subtitle stream chksrt chose) and subPick
-   * (the index in subs to start on otherwise, -1 for none) and stills (the
-   * scrub stills, {urlBase, gapMs}, see Stills). show is the
+   * label, file}]), subPick (the index in subs to start on, -1 for none) and
+   * stills (the scrub stills, {urlBase, gapMs}, see Stills). show is the
    * list's record of the show, for the time bar's show-wide parts.
    */
   void play(JSONObject p, Shows.Show show) {
@@ -314,7 +316,7 @@ class VideoPlayer extends FrameLayout {
             for (Tracks.Group g : tracks.getGroups()) {
               if (g.getType() != C.TRACK_TYPE_TEXT) continue;
               Format f = g.getTrackFormat(0);
-              if (isSideloaded(f) || isEnglish(f)) textGroups.add(g);
+              if (isSideloaded(f)) textGroups.add(g);
             }
             events.onSubtitles(subtitleList());
           }
@@ -639,8 +641,8 @@ class VideoPlayer extends FrameLayout {
         Tracks.Group g = textGroups.get(i);
         Format f = g.getTrackFormat(0);
         JSONObject t = new JSONObject();
-        t.put("label", f.label != null ? f.label : f.language != null ? f.language : "Track " + (i + 1));
-        t.put("type", trackType(f));
+        t.put("label", f.label != null ? f.label : "Track " + (i + 1));
+        t.put("type", "srt");
         tracks.put(t);
         if (g.isSelected()) selected = i;
       }
@@ -694,15 +696,12 @@ class VideoPlayer extends FrameLayout {
   /**
    * The panel's Apply: tv-srvr shifts the playing .srt on disk by what subOfs
    * has moved since the last Apply, oldSubOfs catches up, and the video
-   * reloads to show it. An embedded track, or none, has no file to shift.
+   * reloads to show it. With no subtitle on there is no file to shift.
    */
   void applySubOfs() {
     int sel = selectedSub();
     if (exo == null || shifting || sel < 0 || subOfs == oldSubOfs) return;
-    Format f = textGroups.get(sel).getTrackFormat(0);
-    if (!isSideloaded(f)) return;
-    int i = Integer.parseInt(f.id.substring(f.id.indexOf(SUBS_ID) + SUBS_ID.length()));
-    Uri sub = Uri.parse(playing.optJSONArray("subs").optJSONObject(i).optString("url"));
+    Uri sub = Uri.parse(playingSub(sel).optString("url"));
     double target = subOfs;
     JSONObject body = new JSONObject();
     try {
@@ -737,61 +736,39 @@ class VideoPlayer extends FrameLayout {
         .start();
   }
 
-  // The kinds the remote's panel marks each track with.
-  private static String trackType(Format f) {
-    if (isSideloaded(f)) return "srt";
-    if (f.sampleMimeType != null && f.sampleMimeType.contains("pgs")) return "pgs";
-    if ((f.selectionFlags & C.SELECTION_FLAG_FORCED) != 0) return "forced";
-    if ((f.roleFlags & C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND) != 0) return "sdh";
-    return "embedded";
+  // getPlayUrl's entry for the text track at this index in textGroups.
+  private JSONObject playingSub(int index) {
+    String id = textGroups.get(index).getTrackFormat(0).id;
+    int i = Integer.parseInt(id.substring(id.indexOf(SUBS_ID) + SUBS_ID.length()));
+    return playing.optJSONArray("subs").optJSONObject(i);
   }
 
   private static boolean isSideloaded(Format f) {
     return f.id != null && f.id.contains(SUBS_ID);
   }
 
-  // Embedded tracks in other languages are left off the panel and never
-  // started on. Untagged ones are kept.
-  private static boolean isEnglish(Format f) {
-    String lang = f.language;
-    return lang == null || lang.isEmpty() || "und".equals(lang) || "en".equals(lang) || lang.startsWith("en-");
-  }
-
   /**
-   * The text track to show: the embedded one chksrt chose, else the .srt
-   * tv-srvr said to start on, else the file's first English embedded one.
-   * Subtitles are always on.
+   * The text track to show: the .srt tv-srvr said to start on. With none,
+   * subtitles are off, so the player never falls back on an embedded track.
    */
   private void pickSubs(Tracks tracks) {
-    int subIndex = playing.isNull("subIndex") ? -1 : playing.optInt("subIndex", -1);
-    // ponytail: Media3 ids a Matroska track by its 1-based track number, which
-    // is ffprobe's 0-based stream index + 1 in mkvmerge's files. Match on
-    // language/codec instead if some other muxer breaks that.
-    String embeddedId = String.valueOf(subIndex + 1);
+    if (tracks.isEmpty()) return;
     String pickId = SUBS_ID + playing.optInt("subPick", -1);
     Tracks.Group chosen = null;
-    Tracks.Group sideloaded = null;
-    Tracks.Group firstEmbedded = null;
     for (Tracks.Group g : tracks.getGroups()) {
       if (g.getType() != C.TRACK_TYPE_TEXT) continue;
-      String id = g.getTrackFormat(0).id;
-      if (isSideloaded(g.getTrackFormat(0))) {
-        if (id.endsWith(pickId)) sideloaded = g;
-        continue;
-      }
-      if (firstEmbedded == null && isEnglish(g.getTrackFormat(0))) firstEmbedded = g;
-      if (subIndex >= 0 && id != null && (id.equals(embeddedId) || id.endsWith(":" + embeddedId)))
-        chosen = g;
+      Format f = g.getTrackFormat(0);
+      if (isSideloaded(f) && f.id.endsWith(pickId)) chosen = g;
     }
-    if (chosen == null) chosen = sideloaded != null ? sideloaded : firstEmbedded;
-    if (chosen == null) return;
     subsPicked = true;
-    exo.setTrackSelectionParameters(
-        exo.getTrackSelectionParameters()
-            .buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
-            .setOverrideForType(new TrackSelectionOverride(chosen.getMediaTrackGroup(), 0))
-            .build());
+    TrackSelectionParameters.Builder b = exo.getTrackSelectionParameters().buildUpon();
+    if (chosen == null) {
+      b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true);
+    } else {
+      b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+          .setOverrideForType(new TrackSelectionOverride(chosen.getMediaTrackGroup(), 0));
+    }
+    exo.setTrackSelectionParameters(b.build());
   }
 
   /**
@@ -868,6 +845,10 @@ class VideoPlayer extends FrameLayout {
       body.put("posMs", exo.getCurrentPosition());
       body.put("durMs", exo.getDuration());
       body.put("state", state);
+      // The .srt that is showing; tv-srvr keeps the one showing at the stop as
+      // the episode's chosen one.
+      int sel = selectedSub();
+      body.put("sub", sel < 0 ? "" : playingSub(sel).optString("file"));
     } catch (JSONException e) {
       Log.e(TAG, "playProgress body failed: " + e);
       return;

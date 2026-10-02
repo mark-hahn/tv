@@ -317,18 +317,21 @@ const main = () => {
     const { dst } = makeSrcDst();
     const localDir = path.dirname(dst);
     const seMatch = (entry.destTitle || title).match(/S(\d{2})E(\d{2})/i);
-    if (seMatch) {
+    const videoExts = new Set([
+      "mkv",
+      "mp4",
+      "avi",
+      "mov",
+      "m4v",
+      "wmv",
+      "ts",
+      "m2ts",
+    ]);
+    // Only a video replaces a video: a subtitle file landing beside one must
+    // leave it where it is.
+    const incomingExt = (entry.destTitle || title).split(".").pop().toLowerCase();
+    if (seMatch && videoExts.has(incomingExt)) {
       const seRe = new RegExp(`S${seMatch[1]}E${seMatch[2]}`, "i");
-      const videoExts = new Set([
-        "mkv",
-        "mp4",
-        "avi",
-        "mov",
-        "m4v",
-        "wmv",
-        "ts",
-        "m2ts",
-      ]);
       try {
         const existing = fs.readdirSync(localDir);
         for (const f of existing) {

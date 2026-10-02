@@ -1,4 +1,4 @@
-// Film-strip stills and on-click video windows for the intro and chksrt panes
+// Film-strip stills and on-click video windows for the intro pane
 // (see src/stills.js).
 
 import * as path from "node:path";

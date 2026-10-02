@@ -29,8 +29,8 @@ function makeSerialQueue() {
 }
 
 // Embedded-subtitle extraction (subsQueue.js). A seconds-long text-stream copy —
-// no video decode — but it feeds subQueue -> subQueueChkSrt, so it is serialized
-// among itself so a freshly-grabbed season can't fan out into N concurrent
+// no video decode — but it runs once per text track of every new video, so it
+// is serialized among itself so a freshly-grabbed season can't fan out into N concurrent
 // ffmpegs. It runs in parallel with mpfour's own mp4-mirror loop (mpfour.js).
 export const subExtractQueue = makeSerialQueue();
 

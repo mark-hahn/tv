@@ -16,7 +16,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
-import { unilog, setUnilogSink, logHere } from "@tv/share";
+import { unilog, setUnilogSink, logHere, cleanSrt } from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -546,7 +546,7 @@ function writeSRT(segments, outputPath) {
     srtContent += `${toSrtTime(seg.start)} --> ${toSrtTime(seg.end)}\n`;
     srtContent += `${seg.text}\n\n`;
   }
-  fs.writeFileSync(outputPath, srtContent, "utf8");
+  fs.writeFileSync(outputPath, cleanSrt(srtContent), "utf8");
   pane(`Wrote: ${path.basename(outputPath)}`);
 }
 

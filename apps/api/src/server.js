@@ -537,6 +537,8 @@ const DUMP_INFO = false;
 let qbtChannelPeer = null;
 let qbtChannelPollTimer = null;
 let qbtChannelLastJson = "";
+// Log a qbt poll outage once when it starts and once when it ends, not every poll.
+let qbtChannelPollFailing = false;
 let browseHasMoreChannelPollTimer = null;
 let browseHasMoreChannelLastJson = "";
 // Hard-wired (no env vars per repo convention): emit CORS headers for direct
@@ -865,6 +867,10 @@ const getQbtChannelSnapshot = async () => {
 const pollQbtChannel = async () => {
   try {
     const info = await getQbtInfoPayload();
+    if (qbtChannelPollFailing) {
+      qbtChannelPollFailing = false;
+      unilog(2670, `qbtInfo poll recovered`);
+    }
     const json = JSON.stringify(info);
     if (json !== qbtChannelLastJson) {
       qbtChannelLastJson = json;
@@ -877,7 +883,9 @@ const pollQbtChannel = async () => {
       ? QBT_CHANNEL_POLL_DOWNLOADING_MS
       : QBT_CHANNEL_POLL_MS;
   } catch (e) {
-    unilog(1498, `qbtInfo poll failed: ${e.message}`);
+    if (!qbtChannelPollFailing)
+      unilog(1498, `qbtInfo poll failed: ${e.message}`);
+    qbtChannelPollFailing = true;
     return QBT_CHANNEL_POLL_MS;
   }
 };

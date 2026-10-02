@@ -2470,6 +2470,9 @@ async function main() {
     }
   };
 
+  // Log a findUsb outage once when it starts and once when it ends, not every cycle.
+  var findUsbFailing = false;
+
   checkFiles = async () => {
     var j, len, usbLine;
 
@@ -2489,8 +2492,13 @@ async function main() {
       try {
         var { stdout: findOut } = await execAsync(findUsb, { timeout: 300000 });
         findLines = findOut.split("\n");
+        if (findUsbFailing) {
+          findUsbFailing = false;
+          unilog(2672, `findUsb recovered`);
+        }
       } catch (e) {
-        err("findUsb failed:", e.message || e);
+        if (!findUsbFailing) err("findUsb failed:", e.message || e);
+        findUsbFailing = true;
         findLines = [];
       }
       // Split the single scan: DVD files for the DVD pass, everything the scan

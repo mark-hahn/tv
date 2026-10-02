@@ -1,7 +1,98 @@
 
+there are too many tv-watchdog and tv app errors and warnings since noon today
+
+# new subtitle logic
+- the current subtitle processing is too complicated
+  - replace most of the logic
+
+## subtitle types
+- subtitle types will be referenced in these instructions by one-letter codes
+- these are the one-letter codes:
+  - *	PGS (image-based embedded)
+  - H	SDH (embedded, flagged as describing music and sound)
+  - T	embedded text track
+  - F	forced (embedded)
+  - +	ASR-generated .asr.srt
+  - V <TAG>	.opn<TAG>.srt, where the tag is 5 chars
+  - S	any other .srt (sideloaded)
+
+## what to remove
+- remove all chksrt code, this includes, but is not limited to:
+  - the chksrt video pane
+  - the chksrt queue
+  - code to delete srt files
+  - chksrt comments
+  - etc.
+- remove all subtitle processing in tvdb update
+- remove all opensubtitles file processing
+  - except when downloading before playing video (see below)
+
+## what to keep
+- keep asr queue and processing
+- keep asr button in local pane
+- keep legacy subtitle sidecar files in disk
+- keep subtitle pane in tvapprc in remote
+
+## search result values to store
+- a record subSearchInfo is defined for every opensubtitles search result file
+- these are fields of subSearchInfo, most are from data[].attributes:
+  - subtitle_id, not from attributes
+  - episode, not from attributes
+  - chosen, not from attributes defaults to false
+  - hearing_impaired
+  - hd
+  - foreign_parts_only
+  - ai_translated
+  - machine_translated
+  - fps
+  - uploader.uploader_id
+  - upload_date
+  - release
+  - comments
+  - feature_details.title
+- keep a list subSearchResults containing subSearchInfo for every sub file ever returned from a search
+  
+## when to download a subtitle file
+- keep a list subsDownloaded containing subSearchInfo for every sub file downloadeded
+- before a video starts playing then needed subtitles are downloaded
+  - a subtitle is needed when there are less that 3 entries in subsDownloaded for the episode
+- keep downloading until no subtitles are needed or none are left to choose
+
+## choosing files from opensubtitles search to download for an episode
+- when a video stops playing for any reason set chosen field of a subsDownloaded entry to true
+  - this is the subsDownloaded entry for the subtitle file that was showing
+    - it is assumed the last subtitle file playing was chosen as best
+- when a subtitle is needed for downloading then choose a file from subSearchResults based on this logic:
+  - the entry in subSearchResults isn't the same file as one already downloaded in subsDownloaded
+  - choose the first entry in subSearchResults that matches the origin of any file in subsChosen
+    - see logic for when two subtitles are from the same origin earlier in this conversation
+  - if none are same-origin then chose the first that doesn't have one of these:
+    - hearing_impaired true
+    - or foreign_parts_only true
+  - if there are still none then none are chosen to be downloaded
+
+## subtitle file processing when video or S subtitle file is added to disk
+- extract embedded subtitle types T and H
+  - do not extract * or F
+  - write sanitized subtitle text to sidecar files
+    - use file suffixes .T<N>.srt or .H<N>.srt
+      - N should be index in file
+- rename S file to .S<N>.srt
+  - N is max N in .S<N>.srt sidecar files already in disk plus one
+- search for episode in opensubtitles.com
+  - do not get link from /download
+  - do not download any subtitle files
+- put file in asr generate queue when both of these are true:
+  - there are no embedded subtitle types T or H
+  - opensubtitles.com search found no subtitle to download based on choosing rules above
+
+## actions
+- if these instructions are ambiguous, incomplete, contradictory, or you think there is a better way to do this then:
+  - write the problems to claude2-sublogic.md and stop
+  - make no changes other than writing to claude2-sublogic.md
+- otherwise implement these instructions immediately
 
 
-# new subtitles processing
 
 .mb2.srt
 remove the `aired within the last year` gate.  

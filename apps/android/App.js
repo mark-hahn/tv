@@ -242,7 +242,33 @@ const SCREEN_MARGIN = 45;
 // the next key). Module scope so it survives Fast Refresh re-renders.
 const CLIENT_ID = Math.random().toString(36).slice(2);
 
+// tv-srvr's text when a video's subtitle downloads were slow or failed. Held
+// out here so its pop-up stays over every screen of the remote until Close.
 export default function App() {
+  const [subError, setSubError] = useState(null);
+  return (
+    <View style={{ flex: 1 }}>
+      <Remote setSubError={setSubError} />
+      {subError && (
+        <View style={missingEpStyles.overlay}>
+          <View style={missingEpStyles.box}>
+            <Text style={[missingEpStyles.text, { marginBottom: 20 }]}>
+              {subError}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setSubError(null)}
+              style={missingEpStyles.closeBtn}
+            >
+              <Text style={missingEpStyles.closeBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function Remote({ setSubError }) {
   // The grid's measured size rather than the cell size worked out from it: the
   // row count changes with tvapprc mode, which is not a layout change, so the
   // cells have to be derived on every render instead of on measure.
@@ -268,8 +294,6 @@ export default function App() {
   const [locked, setLocked] = useState(false);
   const [lockInfo, setLockInfo] = useState(null);
   const [missingEpWarning, setMissingEpWarning] = useState(null);
-  // tv-srvr's text when a video's subtitle downloads were slow or failed.
-  const [subError, setSubError] = useState(null);
   const [layoutOption, setLayoutOption] = useState("mark");
   useEffect(() => {
     layoutOptionRef.current = layoutOption;
@@ -3275,21 +3299,6 @@ export default function App() {
             </Text>
             <TouchableOpacity
               onPress={() => setMissingEpWarning(null)}
-              style={missingEpStyles.closeBtn}
-            >
-              <Text style={missingEpStyles.closeBtnText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      {subError && (
-        <View style={missingEpStyles.overlay}>
-          <View style={missingEpStyles.box}>
-            <Text style={[missingEpStyles.text, { marginBottom: 20 }]}>
-              {subError}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setSubError(null)}
               style={missingEpStyles.closeBtn}
             >
               <Text style={missingEpStyles.closeBtnText}>Close</Text>

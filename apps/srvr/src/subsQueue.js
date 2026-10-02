@@ -632,7 +632,8 @@ function doSubQueueNow() {
 // pane's Subs button names it: its text tracks copied out, new subtitle files
 // named, a replaced video's subtitles taken over, an opensubtitles search
 // (nothing is downloaded until the video plays), and ASR when that leaves it
-// with nothing.
+// with nothing: no embedded text track, no usable search result and no
+// subtitle file at all.
 async function processSubQueueEntry() {
   // Only one entry at a time. startSubQueueLoop serializes itself by awaiting,
   // but doSubQueueNow can fire between ticks, and the entry now stays at the
@@ -694,8 +695,12 @@ async function processSubQueueEntry() {
       unilog(2683, `${showName}: no opensubtitles search for ${path.basename(videoFilePath)}, ${isEpisode ? "the show has no imdb id" : "it has no season and episode"}`);
     }
     setSubStage("choosing next queue");
-    const base = videoFilePath.replace(/\.[^.]+$/, "");
-    if (!hasEmbText && !usable && !fs.existsSync(`${base}.asr.srt`)) {
+    // Any subtitle file beside it, of any type, keeps it out of ASR.
+    if (
+      !hasEmbText &&
+      !usable &&
+      subs.listSidecars(videoFilePath).length === 0
+    ) {
       addToAsrQueue([
         {
           videoPath: videoFilePath,

@@ -1,31 +1,39 @@
 
-don't trust db for downloaded files
-'A Woman of Substance (2026)/Season 1/bravery-a.woman.of.substance.2026.s01e01.1080p.bluray.h264.mkv'
-can't get subs
-
-OpenSubtitles rate limit
 
 remove '' from all alt-copies
 
-status pill in footer should show light-green background when lower-case w is showing
-
-the subtitle error check when starting playing should include having no subtitles as an error and show pop-up
-
-there are too many tv-watchdog and tv app errors and warnings since noon today
-
-
-
-
-.mb2.srt
-remove the `aired within the last year` gate.  
-change the `downloads at most one missing .opn srt for the show` rule to `download all missing .opn srt for the show`
-aired date within the last year
+describe the `aired within the last year` gate.  i don't know what/where it is
 
 ????????????????????????
 .opnXXXXX naming
 clnup info in tvapp
 back up pause based on pause length
 =================
+
+Loose ends found while writing this
+
+is intro check the only user of in-app video overlay? it should not use any subtitle
+
+we should remove our OpenSubtitles daily quota check.  just let them check the 1000
+
+every result an OpenSubtitles
+
+does ASR queue have it's own srt file sanitizing logic?  it should share the normal one
+
+remove srt from tv-down scan's excluded extensions -- normal scans should not drop .srt files
+
+can the 3 downloads be done in parallel -- time that to see if it an improvement
+
+The play start waits for the job for at most 4 seconds now which is too short. do a one-time test now to see how long searching and finding three subtitles take to download. then set play-start waiting time to twice that.
+
+the subtitle error check when starting playing should include having no subtitles as an error
+
+subtitle error on play should show over any pane in the phone -- it should always be visible until dismissed
+
+ you said `If it is a download, its search result becomes the episode's only chosen row; if it is any other type, none of the episode's rows stay chosen`. any choice from any source should be persisted. if we created new subs rows to just hold chosen would that break anything else?
+
+right now subs table and downloaded field only exist for opensubtitles downloads.  does any code rely on downloaded field to see if a video file has any existing .srt files of any type?
+status pill in footer should show light-green background when lower-case w is showing
 
 subtitles with hearing_impaired set should not be skipped in nextCandidate()
 

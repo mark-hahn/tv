@@ -832,6 +832,11 @@ export function playInTab(show, season, episode) {
   window.open(`${HTTP_URL}/api/play?${q}`, "_blank");
 }
 
+// The local pane's Play: the episode of a video file, played the same way.
+export function playPathInTab(path) {
+  window.open(`${HTTP_URL}/api/play?${new URLSearchParams({ path })}`, "_blank");
+}
+
 export function getAsrLog() {
   return httpCall("/api/asr/log");
 }

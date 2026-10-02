@@ -1040,6 +1040,8 @@ export default {
       }
     },
     async _fetchSubtitleList(filePath) {
+      // The intro check shows no subtitles.
+      if (this.mode === "intro") return;
       try {
         const resp = await fetch(
           `${TV_SRVR_URL}/api/subtitle-list?path=${encodeURIComponent(filePath)}`,

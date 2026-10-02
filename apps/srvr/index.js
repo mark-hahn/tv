@@ -84,6 +84,7 @@ import {
 } from "./src/tvRemoteKey.js";
 import * as subsQueue from "./src/subsQueue.js";
 import * as subs from "./src/subs.js";
+import { subsCountEpisodes } from "./src/opensubtitles.js";
 import * as stills from "./src/stills.js";
 import * as recode from "./src/recode.js";
 
@@ -2197,6 +2198,9 @@ app.post(
   }),
 );
 
+// The torrent pane's Chk Subs, through tv-api: OpenSubtitles release counts.
+app.post("/api/subsCountEpisodes", apiWrapper(subsCountEpisodes));
+
 app.post("/api/applySubOffset", async (req, res) => {
   const { videoPath, srtFile, offsetMs } = req.body || {};
   if (typeof videoPath !== "string" || !videoPath) {
@@ -2810,7 +2814,19 @@ function subsForFile(showId, file, season, episode) {
 // The named episode (season and episode both given), else next-up. web is the
 // browser's player (/api/play): it has no scrub stills, and its stream through
 // /api/stream needs the file's path and doesn't know how long the file is.
-async function getPlayUrl({ showName, season: s, episode: e, web }) {
+async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath }) {
+  // The local pane's Play names a video file instead: its episode.
+  if (filePath) {
+    showName = showNameFromFilePath(filePath);
+    const se = parseFileSeasonEpisode(
+      path.basename(filePath),
+      path.basename(path.dirname(filePath)),
+    );
+    if (se?.season == null || se?.episode == null)
+      throw new Error(`getPlayUrl: no season and episode in ${filePath}`);
+    s = se.season;
+    e = se.episode;
+  }
   const rec = tvdb.getAllTvdbSync()?.[showName];
   if (!rec) throw new Error(`getPlayUrl: no show ${showName}`);
   const ed = rec.episodeData;
@@ -3701,6 +3717,31 @@ async function handleShowDiskChange(showName) {
   }
 }
 
+// The subs.db episode a file in a season folder belongs to, as {showId,
+// season, episode}, or null when it is no episode of a known show.
+function subsEpisodeOf(filePath) {
+  const rec = tvdb.getAllTvdbSync?.()?.[showNameFromFilePath(filePath)];
+  const se = parseFileSeasonEpisode(
+    path.basename(filePath),
+    path.basename(path.dirname(filePath)),
+  );
+  if (!rec || se?.season == null || se?.episode == null) return null;
+  return { showId: String(rec.id), season: se.season, episode: se.episode };
+}
+
+// A subtitle file came or went: its episode's downloaded marks follow the
+// opn files now beside the episode's videos.
+function subFileChanged(filePath) {
+  const ep = subsEpisodeOf(filePath);
+  if (ep)
+    subs.syncDownloaded(
+      ep.showId,
+      ep.season,
+      ep.episode,
+      path.dirname(filePath),
+    );
+}
+
 // A subtitle file that arrived beside a video, under whatever name it came
 // with: its episode's video goes through the sub queue, which names the file
 // as one of the video's S files. Sidecars tv-srvr names itself are not
@@ -3749,6 +3790,7 @@ watcher
   .on("add", async (filePath) => {
     const ext = filePath.split(".").pop();
     if (ext === "srt") {
+      subFileChanged(filePath);
       subFileAdded(filePath);
       return;
     }
@@ -3837,6 +3879,10 @@ watcher
   })
   .on("unlink", (filePath) => {
     const ext = filePath.split(".").pop();
+    if (ext === "srt") {
+      subFileChanged(filePath);
+      return;
+    }
     if (!videoFileExtensions.includes(ext)) return;
 
     const showName = showNameFromFilePath(filePath);
@@ -3889,12 +3935,19 @@ unilog(91, `Watching ${tvDir} for file changes...`);
 // work: it skips files that are queued, have been through the queue, or have
 // an .srt next to them, so a settled library adds nothing and the sweep is
 // just a directory walk.
+//
+// The walk also sets every episode's downloaded marks in subs.db from the opn
+// files on disk, for changes the watcher never saw (made while tv-srvr was
+// down). Episodes with no video left lose theirs only after a walk that read
+// every folder and found videos, so a disk outage clears nothing.
 const SUB_BACKSTOP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const SUB_BACKSTOP_START_DELAY_MS = 10 * 60 * 1000;
 
 async function runSubBackstopSweep() {
   let scanned = 0;
   let queued = 0;
+  let unread = 0;
+  const episodes = [];
   try {
     for (const showFolder of fs.readdirSync(tvDir)) {
       if (showFolder.startsWith(".")) continue;
@@ -3904,6 +3957,7 @@ async function runSubBackstopSweep() {
         if (!fs.statSync(showDir).isDirectory()) continue;
         seasonDirs = fs.readdirSync(showDir);
       } catch {
+        unread++;
         continue;
       }
       for (const seasonDir of seasonDirs) {
@@ -3914,6 +3968,7 @@ async function runSubBackstopSweep() {
           if (!fs.statSync(seasonPath).isDirectory()) continue;
           files = fs.readdirSync(seasonPath);
         } catch {
+          unread++;
           continue;
         }
         for (const f of files) {
@@ -3921,6 +3976,11 @@ async function runSubBackstopSweep() {
           if (!videoFileExtensions.includes(f.split(".").pop())) continue;
           const fp = path.join(seasonPath, f);
           scanned++;
+          const ep = subsEpisodeOf(fp);
+          if (ep) {
+            episodes.push(ep);
+            subs.syncDownloaded(ep.showId, ep.season, ep.episode, seasonPath);
+          }
           const showName = showNameFromFilePath(fp);
           const rec = tvdb.getAllTvdbSync?.()?.[showName];
           if (!rec?.inLibrary) continue;
@@ -3937,6 +3997,9 @@ async function runSubBackstopSweep() {
       persistSubQueue();
       doSubQueueNow();
     }
+    if (!unread && scanned > 0) subs.clearDownloadedWithout(episodes);
+    else
+      unilog(2695, `subtitle backstop read ${scanned} video(s) with ${unread} unreadable folder(s), downloaded marks of episodes with no video kept`);
     unilog(
       2166,
       `subtitle backstop swept ${scanned} video(s), queued ${queued}`,

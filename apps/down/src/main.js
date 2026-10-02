@@ -1392,7 +1392,6 @@ async function main() {
     "txt",
     "sub",
     "idx",
-    "srt",
     "bup",
     "ifo",
     "vob",
@@ -2872,6 +2871,14 @@ async function main() {
 
       // Provide a clear reason when the parser can't produce S/E.
       if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
+        // A subtitle file with no episode of its own is skipped, never an
+        // error entry: those share names like "2_eng,English.srt", so one
+        // entry would block every other file of that name.
+        if (/\.srt$/i.test(fname)) {
+          if (skipLoggedOnce(usbFilePath))
+            unilog(2701, `${title || "unknown show"}: no season and episode for subtitle file "${usbFilePath}", skipping`);
+          return process.nextTick(checkFile);
+        }
         var detailParts = [];
         if (title) {
           detailParts.push(`title='${title}'`);

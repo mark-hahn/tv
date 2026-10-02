@@ -1234,6 +1234,7 @@ import {
   openChannel,
   removeFromAsrQueue,
   toggleBadGroup,
+  playPathInTab,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -2149,7 +2150,10 @@ export default {
         .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
         .map((p) => `${mediaRoot}/${p}`)[0];
       if (!videoPath) return;
-      evtBus.emit("playEpisodePath", videoPath);
+      // An episode plays in tv-srvr's browser player, with tvapp's subtitle
+      // logic; a movie, which has none, in the in-app player.
+      if (this.movieMode) evtBus.emit("playEpisodePath", videoPath);
+      else playPathInTab(videoPath);
     },
     clickSubs() {
       const mediaRoot = this.movieMode ? "/mnt/media/movies" : "/mnt/media/tv";

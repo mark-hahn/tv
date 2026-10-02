@@ -204,17 +204,32 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 - `apps/srvr/data/subs.db` (`apps/srvr/src/subs.js`, tv-srvr the only
   writer):
   - `subs`: every OpenSubtitles search result ever returned, with
-    `downloaded` and `chosen`.
+    `downloaded` and `chosen`. Rows are never added for anything else; an
+    `opn` file from before the db needs no row.
+  - `downloaded` follows the disk (`syncDownloaded`): a row is 1 only while
+    its `opn` file sits beside one of the episode's active, non-sample
+    videos. It is set on every `.srt` add or delete the watcher sees, on
+    every search, and in the 6-hourly sweep. The sweep also clears episodes
+    with no video left, but only after a walk that read every folder and
+    found videos, so a disk outage clears nothing.
   - `picks`: the sidecar each episode showed at its last stop.
   - `processed`: videos the add-to-disk steps have handled.
 - Nothing is downloaded from OpenSubtitles except in `getPlayUrl`
   (`subsBeforePlay`), for tvapp and the browser player alike:
   - Only when the episode has fewer than 3 downloaded: search, then download
-    until it has 3 or no candidate is left.
+    all it still needs at once (`fetchSubs`), then replacements for any that
+    failed, until it has 3, 3 have failed, or no candidate is left.
   - A candidate is the first result from the same origin as a chosen file of
     the show, else the first that is not foreign-parts-only.
-  - Play waits at most 4 s. Slow or failed, it plays anyway and `subError`
-    puts a pop-up on the phones and the web client.
+  - Play waits at most 3 s (`PLAY_WAIT_MS`, about twice a measured search
+    plus 3 parallel downloads). Slow, failed, or with no subtitle file at all
+    after the wait ("no subtitles"), it plays anyway and `subError` puts one
+    pop-up, problems joined by "; ", on the phones and the web client. The
+    pop-up sits over every screen and pane until Close is pressed.
+  - The API allows 5 requests a second. A search or download answered 429 is
+    retried after its `retry-after` (1 s). One play alone sends 4.
+  - There is no daily download quota check of our own; OpenSubtitles enforces
+    its 1000 a day, and past it downloads fail like any other.
 - The start pick (`pickSidecar`): the file the episode last showed, else the
   type the show last showed (for V, the one from the same origin as a chosen
   one), else the first in the order T, H, V, S, +.
@@ -231,12 +246,31 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   (`apps/srvr/src/subsQueue.js`): T and H copied out, an arriving `.srt`
   named `S<n>`, a replaced (`.old`) video's subtitles taken over, a search
   with no download, and ASR when the video has no embedded T or H, no usable
-  search result and no `.asr.srt`.
+  search result and no subtitle file of any type beside it. Manual ASR from
+  the ASR pane is not limited by this.
 - The 6-hourly sweep queues unwatched library videos that have no sidecar at
   all and have not been through those steps.
 - tv-down takes a `.srt` from usb when its episode's video is on disk or on
-  its way.
+  its way. Its scan does not exclude `.srt`. A `.srt` whose name and top
+  folder give no season and episode (the `Subs/<episode>/2_eng,English.srt`
+  layout) is skipped with a log line, never an error entry, since those
+  share one name and tv-down keys by name.
 - Movies get no subtitle processing.
+- Players: tvapp; tv-srvr's browser player (`play.html` at `/api/play`),
+  opened by the info and map panes' Play and by the local pane's Play for an
+  episode (`/api/play?path=<video>`; `getPlayUrl` takes `path` and plays that
+  file as its episode). The browser player uses the same `getPlayUrl` and
+  `playProgress` subtitle logic as tvapp, switching through the browser's
+  captions menu. The client's in-app overlay (`video-player.vue`) shows no
+  subtitles for the intro check, and plays the local pane's movies.
+- Timing offset: set only from the remotes' subtitle panel (`so`/`sa`, see
+  Video keys) and applied only by rewriting the `.srt` on disk. No offset is
+  stored anywhere; `/api/subtitle` serves the file as it is.
+- `/api/subsCountEpisodes` (the torrent pane's Chk Subs, through tv-api):
+  per episode, the distinct OpenSubtitles releases, a hearing-impaired copy
+  counting with its release. It searches 3 at a time, finds an IMDb id by
+  show name when it has none, and writes nothing to `subs.db`.
+- `all-sub.md` describes all the subtitle logic in prose.
 
 ## tvapp and tvapprc
 
@@ -509,6 +543,14 @@ because the TV is unreachable from any wireless host here.
     when the remote asks with `l`.
   - A tap sends `t,<n>`; `-1` turns subtitles off.
   - The one showing when the video stops becomes the episode's chosen one.
+  - Timing: the panel's +/- buttons send `so,<sec>` (±1, ±0.5), which moves
+    tvapp's `subOfs`; nothing shifts until Apply (`sa`). Apply has tv-srvr's
+    `/api/applySubOffset` rewrite the showing `.srt` on disk, shifted by
+    what moved since the last Apply (through `cleanSrt()`, never below 0),
+    and tvapp reloads the video at its position. The shift is permanent.
+    A new video or another track resets the offset to 0.
+  - Holding the Apps key in tvapprc mode sends `k,reload`, which reloads the
+    playing video so an edited subtitle file is fetched again.
 - The camera overlay pauses a playing video. The video resumes when the
   camera comes off, unless the Shows key took it off, since that closes the
   video too.
@@ -576,12 +618,15 @@ actor filter → filter text → top of list. At the top Back goes to the TV's h
 | `v,<url>` / `v,off` | camera on / off |
 | `l` | send the subtitle list (`l,<json>`) |
 | `t,<n>` | turn on subtitle track n; `t,-1` turns them off |
+| `so,<sec>` | move the subtitle offset by sec; shifts nothing yet |
+| `sa` | apply the offset: shift the showing `.srt` on disk and reload |
+| `k,reload` | reload the playing video at its position |
 
 `s` is held until the list has loaded, and `e`/`p` wait behind it.
 
 **Commands back to the remote** — `z`, `c,<count>`, `a,<name>`, `i,<0|1>`,
-`l,<json>` (subtitle tracks `{title, tracks: [{label, type}], selected}`, or
-`null` with no video up).
+`l,<json>` (subtitle tracks `{title, tracks: [{label, type}], selected,
+subOfs, oldSubOfs}`, or `null` with no video up).
 The bridge adds `u`/`d` (tvapp up/down). Those two, and the bridge socket
 closing, are the only things that set or clear tvapprc mode. The phone sends
 the bridge `o` to open tvapp.
@@ -592,7 +637,8 @@ the bridge `o` to open tvapp.
 - The top-right cell is Hide/Unhide (`h`), in place of Home.
 - Row 3's left cell is Search: the phone-only filter input screen, which
   sends `f,<text>`. Its right cell is Skip (`k,skip`). Back sends `b`.
-- Holding Vol+ opens the subtitle panel.
+- Holding Vol+ opens the subtitle panel. Holding Apps sends `k,reload`; a
+  short press still opens the streaming list.
 - No phone key sends `e`.
 - Outside tvapprc mode row 3's left cell is Emby, which launches the Emby
   app (Google TV input only), and its right cell is Input, the set's

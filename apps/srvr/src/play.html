@@ -1,7 +1,8 @@
 <!doctype html>
 <!--
   The browser's player for the info and map panes' Play button (client srvr.js
-  playInTab), served by tv-srvr at /api/play?showName&season&episode. Like
+  playInTab), served by tv-srvr at /api/play?showName&season&episode, and for
+  the local pane's (playPathInTab) at /api/play?path=<video file>. Like
   tvapp's VideoPlayer it plays getPlayUrl's answer: it starts at the resume
   point, else past the intro, has Skip for the intro and the episode's
   subtitles in the browser's own subtitle menu, and reports to playProgress,

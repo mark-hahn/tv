@@ -1,5 +1,4 @@
 
-when caption is chosen before apply is pressed then clear the caption list and start showing captions in that list pane.  the captions should appear there at the time to align to voice on tv at that time -- in other words i want to be able to look at captions on the phone and listen to audio to check whether they line up -- explain in detail what you think i meant with the instructions.
 
 
 ????????????????????????
@@ -7,6 +6,8 @@ when caption is chosen before apply is pressed then clear the caption list and s
 clnup info in tvapp
 back up pause based on pause length
 =================
+
+when caption is chosen before apply is pressed then clear the caption list and start showing captions in that list pane.  the captions should appear there at the time to align to voice on tv at that time -- in other words i want to be able to look at captions on the phone and listen to audio to check whether they line up -- explain in detail what you think i meant with the instructions.
 
 # measure the subtitle timing adjustment
 

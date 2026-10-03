@@ -1,11 +1,12 @@
 
-the show `The Power of Parker/Season 2/The.Power.Of.Parker.S02E01.Out.On.The.Razz.1080p.HDTV.H264-ORGANiC.mkv` shows a busy indicator forever when opened in client player -- the scrub bar says all 27.55 is loaded
 
 ????????????????????????
 .opnXXXXX naming
 clnup info in tvapp
 back up pause based on pause length
 =================
+
+the show `The Power of Parker/Season 2/The.Power.Of.Parker.S02E01.Out.On.The.Razz.1080p.HDTV.H264-ORGANiC.mkv` shows a busy indicator forever when opened in client player -- the scrub bar says all 27.55 is loaded
 
 # adj sub timing from web client
 - when playing a video in a web browser i want to be able to adjust timing offset

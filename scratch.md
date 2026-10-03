@@ -1,4 +1,12 @@
 
+the show `The Power of Parker/Season 2/The.Power.Of.Parker.S02E01.Out.On.The.Razz.1080p.HDTV.H264-ORGANiC.mkv` shows a busy indicator forever when opened in client player -- the scrub bar says all 27.55 is loaded
+
+????????????????????????
+.opnXXXXX naming
+clnup info in tvapp
+back up pause based on pause length
+=================
+
 # adj sub timing from web client
 - when playing a video in a web browser i want to be able to adjust timing offset
   - the same as when playing in tvapp with subs pane in remote control
@@ -10,13 +18,6 @@
     - a button to the left of skip to toggle the controls on/off
   - show controls over main window of web client app and show two web browser tabs at once
 - i need suggestions on how to do this
-
-
-????????????????????????
-.opnXXXXX naming
-clnup info in tvapp
-back up pause based on pause length
-=================
 
 describe the `aired within the last year` gate.  i don't know what/where it is
 

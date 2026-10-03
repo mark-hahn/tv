@@ -71,6 +71,10 @@
       // A seek up to this far past what the stream has delivered waits for it
       // rather than reopening the stream there.
       const SEEK_WAIT_SECS = 10;
+      // How far past its start a stream's first frame may land: a transcode
+      // starts a little late, and some files' video starts seconds after
+      // their audio (The Power of Parker S02E01, 1.2 s).
+      const LATE_START_SECS = 5;
       // The most appended at once. A read hands over all the stream that came
       // in since the last one, soon more than Firefox's whole buffer (150 MiB),
       // which it never takes, and the video froze when the buffer ran out.
@@ -125,12 +129,13 @@
           },
           { once: true },
         );
-        // The buffered range holding t, or starting within 1 s after it: a
-        // transcoded stream's first frame lands a little past its start.
+        // The buffered range holding t, or starting within LATE_START_SECS
+        // after it.
         const rangeAt = (t) => {
           const b = sb.buffered;
           for (let i = 0; i < b.length; i++)
-            if (b.start(i) <= t + 1 && t <= b.end(i)) return [b.start(i), b.end(i)];
+            if (b.start(i) <= t + LATE_START_SECS && t <= b.end(i))
+              return [b.start(i), b.end(i)];
           return null;
         };
         vid.addEventListener("seeking", () => {
@@ -194,7 +199,10 @@
               // Never cue before the first frame, or the video waits there
               // for data that never comes.
               if (first) vid.currentTime = Math.max(sec, r[0] + 0.01);
-              else if (vid.currentTime < r[0] && vid.currentTime > r[0] - 1)
+              else if (
+                vid.currentTime < r[0] &&
+                vid.currentTime > r[0] - LATE_START_SECS
+              )
                 vid.currentTime = r[0] + 0.01;
             }
             if (ms.readyState === "open") ms.endOfStream();

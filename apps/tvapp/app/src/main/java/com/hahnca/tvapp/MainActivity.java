@@ -870,6 +870,21 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     ui.post(video::applySubOfs);
   }
 
+  @Override
+  public void onSubVoice() {
+    ui.post(video::voice);
+  }
+
+  @Override
+  public void onSubCaption(int index) {
+    ui.post(() -> video.pickCap(index));
+  }
+
+  @Override
+  public void onSubClear() {
+    ui.post(video::subClear);
+  }
+
   /**
    * The phone's Shows button, held, opens its own show pane on whatever show is
    * active here, so the phone is told the name on every change and again as

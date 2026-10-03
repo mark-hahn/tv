@@ -78,6 +78,18 @@ const CMD_SUBTITLE = "t";
 // list's subOfs), CMD_SUB_APPLY shifts the playing .srt by it and reloads.
 const CMD_SUB_OFFSET = "so";
 const CMD_SUB_APPLY = "sa";
+// Voice, a tap on the empty caption pane as a line starts to be heard: tvapp
+// stamps the position and
+// lists the captions around it (the list's caps), each press its own;
+// CMD_SUB_CAP,<n> then picks the line heard, which sets subOfs to start it on
+// the last press and clears the list, as any other panel command does. The
+// pick starts a test: the list's test is the one caption that offset puts at
+// the video's position, shown in the list's place until Apply or any panel
+// command but + and -, which move it.
+const CMD_SUB_VOICE = "sv";
+const CMD_SUB_CAP = "sc";
+// Clear: no list, no test, and the offset back to 0.
+const CMD_SUB_CLEAR = "sx";
 const CMD_OPEN_TVAPP = "o";
 const CMD_BACK = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -1879,9 +1891,8 @@ function Remote({ setSubError }) {
   if (showSubCtrl) {
     // Apply shifts the .srt that is on, so not with none on, and only
     // when the offset has moved since the last one.
-    const subApplyOk =
-      subList?.tracks[subList.selected]?.type === "srt" &&
-      subList.subOfs !== subList.oldSubOfs;
+    const subOn = subList?.tracks[subList.selected]?.type === "srt";
+    const subApplyOk = subOn && subList.subOfs !== subList.oldSubOfs;
     return (
       <View style={styles.container}>
         <StatusBar hidden />
@@ -1931,6 +1942,52 @@ function Remote({ setSubError }) {
               ))
           )}
         </ScrollView>
+        {subList?.test == null && !subList?.caps?.length ? (
+          // On press-in, not release: the press is the timing.
+          <TouchableOpacity
+            disabled={!subOn}
+            onPressIn={() => sendTvapprc(CMD_SUB_VOICE)}
+            style={subCtrlStyles.caps}
+          />
+        ) : (
+          <ScrollView style={subCtrlStyles.caps}>
+            {subList.test != null ? (
+              <Text style={subCtrlStyles.testText}>{subList.test}</Text>
+            ) : (
+              subList.caps.map((text, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => sendTvapprc(`${CMD_SUB_CAP},${index}`)}
+                  style={subCtrlStyles.capRow}
+                >
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="clip"
+                    style={subCtrlStyles.capText}
+                  >
+                    {text}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        )}
+        <View style={subCtrlStyles.voiceRow}>
+          <TouchableOpacity
+            disabled={!subList}
+            onPress={() => sendTvapprc(CMD_SUB_CLEAR)}
+            style={subCtrlStyles.ofsBtn}
+          >
+            <Text
+              style={[
+                subCtrlStyles.ofsBtnText,
+                !subList && subCtrlStyles.ofsBtnTextOff,
+              ]}
+            >
+              Clear
+            </Text>
+          </TouchableOpacity>
+        </View>
         <View style={subCtrlStyles.ofsRow}>
           <View style={subCtrlStyles.ofsBtn}>
             <Text style={subCtrlStyles.ofsBtnText}>
@@ -3588,9 +3645,43 @@ const subCtrlStyles = StyleSheet.create({
     fontSize: fs(20),
     fontWeight: "bold",
   },
+  // The tracks take what they need, the captions below them the rest.
   list: {
+    flexGrow: 0,
+    flexShrink: 1,
+    backgroundColor: "#fff",
+  },
+  caps: {
     flex: 1,
     backgroundColor: "#fff",
+    borderTopWidth: 2,
+    borderTopColor: "#333",
+  },
+  capRow: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderColor: "#ddd",
+    overflow: "hidden",
+  },
+  // Wider than the row, so a caption is cut at the edge, mid-word.
+  capText: {
+    width: 1000,
+    fontSize: fs(22),
+    color: "#000",
+  },
+  // A test's caption, whole.
+  testText: {
+    padding: 16,
+    fontSize: fs(27),
+    color: "#000",
+    textAlign: "center",
+  },
+  // Clear's button is 1.2 times Apply's (ofsRow's 64 less the 8 of margin).
+  voiceRow: {
+    flexDirection: "row",
+    height: (64 - 8) * 1.2 + 8,
+    flexShrink: 0,
   },
   closeBtn: {
     backgroundColor: "white",

@@ -244,7 +244,8 @@
       >
         {{ subList?.title ?? "No video playing" }}
       </div>
-      <div style="overflow-y: auto; flex: 1">
+      <!-- The tracks take what they need, the captions below them the rest -->
+      <div style="overflow-y: auto; flex: 0 1 auto">
         <div v-if="!subList" style="padding: 16px; color: #666">
           No video playing
         </div>
@@ -269,6 +270,51 @@
           >
             {{ sub.label }}
           </div>
+        </div>
+      </div>
+      <div style="overflow-y: auto; flex: 1; border-top: 2px solid #333">
+        <div
+          v-if="subList?.test != null"
+          style="padding: 14px; font-size: 22px; text-align: center"
+        >
+          {{ subList.test }}
+        </div>
+        <template v-else-if="subList?.caps?.length">
+          <div
+            v-for="(text, index) in subList.caps"
+            :key="index"
+            @mousedown.prevent="subPickCap(index)"
+            @touchstart.prevent="subPickCap(index)"
+            :style="{
+              padding: '7.5px 14px',
+              borderBottom: '1px solid #eee',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              fontSize: '17px',
+              backgroundColor: '#fff',
+            }"
+          >
+            {{ text }}
+          </div>
+        </template>
+        <div
+          v-else
+          @mousedown.prevent="subVoice"
+          @touchstart.prevent="subVoice"
+          style="height: 100%; cursor: pointer"
+        ></div>
+      </div>
+      <!-- Clear is 1.2 times Apply's height (its row's 10% less 8px of margin) -->
+      <div
+        style="display: flex; height: calc(1.2 * (10% - 8px) + 8px); flex-shrink: 0"
+      >
+        <div
+          @mousedown.prevent="subClear"
+          @touchstart.prevent="subClear"
+          :style="{ ...subOfsBtn, color: subList ? '#000' : '#bbb' }"
+        >
+          Clear
         </div>
       </div>
       <!-- Timing rows: the offset and Apply, then + and - -->
@@ -775,6 +821,18 @@ const CMD_SUBTITLE = "t";
 // list's subOfs), CMD_SUB_APPLY shifts the playing .srt by it and reloads.
 const CMD_SUB_OFFSET = "so";
 const CMD_SUB_APPLY = "sa";
+// Voice, a tap on the empty caption pane as a line starts to be heard: tvapp
+// stamps the position and
+// lists the captions around it (the list's caps), each press its own;
+// CMD_SUB_CAP,<n> then picks the line heard, which sets subOfs to start it on
+// the last press and clears the list, as any other panel command does. The
+// pick starts a test: the list's test is the one caption that offset puts at
+// the video's position, shown in the list's place until Apply or any panel
+// command but + and -, which move it.
+const CMD_SUB_VOICE = "sv";
+const CMD_SUB_CAP = "sc";
+// Clear: no list, no test, and the offset back to 0.
+const CMD_SUB_CLEAR = "sx";
 const CMD_OPEN_TVAPP = "o";
 const CMD_BACK = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -925,9 +983,12 @@ export default {
     },
     // Apply shifts the .srt that is on, so not with none on, and only
     // when the offset has moved since the last one.
-    subApplyOk() {
+    subOn() {
       const l = this.subList;
-      return l?.tracks[l.selected]?.type === "srt" && l.subOfs !== l.oldSubOfs;
+      return l?.tracks[l.selected]?.type === "srt";
+    },
+    subApplyOk() {
+      return this.subOn && this.subList.subOfs !== this.subList.oldSubOfs;
     },
     // The timing rows' buttons.
     subOfsBtn() {
@@ -1650,6 +1711,18 @@ export default {
 
     subApply() {
       if (this.subApplyOk) this.sendTvapprc(CMD_SUB_APPLY);
+    },
+
+    subVoice() {
+      if (this.subOn) this.sendTvapprc(CMD_SUB_VOICE);
+    },
+
+    subClear() {
+      if (this.subList) this.sendTvapprc(CMD_SUB_CLEAR);
+    },
+
+    subPickCap(index) {
+      this.sendTvapprc(`${CMD_SUB_CAP},${index}`);
     },
 
     subSelectTrack(index) {

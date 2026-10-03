@@ -1,8 +1,5 @@
 
-
-# measured subtitle timing adjustment
-- current method of adjusting timings
-
+when caption is chosen before apply is pressed then clear the caption list and start showing captions in that list pane.  the captions should appear there at the time to align to voice on tv at that time -- in other words i want to be able to look at captions on the phone and listen to audio to check whether they line up -- explain in detail what you think i meant with the instructions.
 
 
 ????????????????????????
@@ -10,6 +7,43 @@
 clnup info in tvapp
 back up pause based on pause length
 =================
+
+# measure the subtitle timing adjustment
+
+- current method of adjusting timing offest isn't accurate
+  - i have to estimate offset by watching subs and listening to voice
+  - i want to be able to measure timing by pressing a button when i hear the voice
+
+## ui layout button and list
+- in subs pane of tvapprc add:
+  - add a button `Voice` that is the width of the pane and height of apply button times 1.2
+    - the bottom of voice button should align to the top of the apply button
+    - when voice is clicked save position of the video in tvapp
+  - between the voice button and bottom of subtitle choices button put a scrolling pane
+    - it should be width of pane
+    - it should list subtitle text lines
+      - each line should be a list of subtitle text
+        - the list is captions from 3 earlier to the 3 later
+      - the line should be truncated chars without `...`
+
+## action sequence
+- I will click on voice button exactly at the beginning of the caption by listening
+  - you should save the video time postion when clicked into voicePos
+- i will scroll the captions list and select the caption that was heard
+  - from the subtitle file that is playing set the caption time in capPos
+- set the offset timing display to the voicePos minus the capPos
+- click to apply button to change all timings in the sub file as it already does
+- i can repeat the sequence and revert the old timing by clicking on the voice button again
+
+## implementation challenge
+- the tvapprc remote will need to know the video position in the tvapp accurately in real time
+- the list will need to be obtained from the subtitle file live position
+
+## actions
+- if these instructions are ambiguous, incomplete, contradictory, or you think there is a better way to do this then:
+  - write the problems to tv-autoofs.md and stop
+  - make no changes other than writing to tv-autoofs.md
+- otherwise implement these instructions immediately
 
 the show `The Power of Parker/Season 2/The.Power.Of.Parker.S02E01.Out.On.The.Razz.1080p.HDTV.H264-ORGANiC.mkv` shows a busy indicator forever when opened in client player -- the scrub bar says all 27.55 is loaded
 

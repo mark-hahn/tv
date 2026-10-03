@@ -263,9 +263,10 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   `playProgress` subtitle logic as tvapp, switching through the browser's
   captions menu. The client's in-app overlay (`video-player.vue`) shows no
   subtitles for the intro check, and plays the local pane's movies.
-- Timing offset: set only from the remotes' subtitle panel (`so`/`sa`, see
-  Video keys) and applied only by rewriting the `.srt` on disk. No offset is
-  stored anywhere; `/api/subtitle` serves the file as it is.
+- Timing offset: set from the remotes' subtitle panel (`so`/`sa`, see Video
+  keys) and from the browser player's Subs bar, and applied only by
+  rewriting the `.srt` on disk (`/api/applySubOffset`). No offset is stored
+  anywhere; `/api/subtitle` serves the file as it is.
 - `/api/subsCountEpisodes` (the torrent pane's Chk Subs, through tv-api):
   per episode, the distinct OpenSubtitles releases, a hearing-impaired copy
   counting with its release. It searches 3 at a time, finds an IMDb id by

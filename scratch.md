@@ -1,4 +1,15 @@
 
+# adj sub timing from web client
+- when playing a video in a web browser i want to be able to adjust timing offset
+  - the same as when playing in tvapp with subs pane in remote control
+  - with controls ofs, apply, and +/- buttons
+- the only things I can think of are: 
+  - have the remote subtitles pane work on the tab pane
+    - a bad idea, this would be a major change to tvapprc only working on tvapp
+  - put controls over video at the middle top
+    - a button to the left of skip to toggle the controls on/off
+  - show controls over main window of web client app and show two web browser tabs at once
+- i need suggestions on how to do this
 
 
 ????????????????????????

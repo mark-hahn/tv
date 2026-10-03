@@ -5,8 +5,9 @@
   the local pane's (playPathInTab) at /api/play?path=<video file>. Like
   tvapp's VideoPlayer it plays getPlayUrl's answer: it starts at the resume
   point, else past the intro, has Skip for the intro and the episode's
-  subtitles in the browser's own subtitle menu, and reports to playProgress,
-  which keeps the resume point (partial) and the watched mark.
+  subtitles in the browser's own subtitle menu, with a Subs bar for their
+  timing like the remotes' subtitle panel, and reports to playProgress, which
+  keeps the resume point (partial) and the watched mark.
 
   The video comes through /api/stream, a live remux/transcode that starts at
   its start param and can't seek, fed into a MediaSource (see load()).
@@ -28,6 +29,36 @@
         display: block;
         width: 100%;
         height: 100%;
+      }
+      /* The buttons over the video (see the end of play()). */
+      [popover] {
+        position: fixed;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        z-index: 2147483647;
+        gap: 6px;
+      }
+      [popover]:popover-open {
+        display: flex;
+      }
+      .corner {
+        inset: 10px 14px auto auto;
+      }
+      .bar {
+        inset: 10px 0 auto 0;
+        margin: 0 auto;
+      }
+      .btn {
+        color: white;
+        font: 13px sans-serif;
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid #666;
+        cursor: pointer;
+        user-select: none;
+        background: rgba(0, 0, 0, 0.5);
       }
     </style>
   </head>
@@ -231,42 +262,132 @@
           if (played && !vid.ended) report("stopped");
         });
 
-        if (!(p.skipDurMs > 0)) return;
-        let lastSkip = 0;
-        const skip = () => {
-          if (Date.now() - lastSkip < SKIP_REPEAT_MS) return;
-          lastSkip = Date.now();
-          vid.currentTime += p.skipDurMs / 1000;
+        if (!p.subs.length && !(p.skipDurMs > 0)) return;
+        // The buttons over the video: Subs, which toggles the subtitle timing
+        // bar at the top middle, and Skip for the intro, at the top right.
+        // They are in popovers so they can be put above a fullscreen video in
+        // the top layer. btns pairs each one with what a click on it does.
+        const btns = [];
+        const pops = [];
+        const pop = (cls) => {
+          const el = document.createElement("div");
+          el.popover = "manual";
+          el.className = cls;
+          document.body.appendChild(el);
+          pops.push(el);
+          return el;
         };
-        // Skip is a popover so it can be put above a fullscreen video in the
-        // top layer.
-        const btn = document.createElement("div");
-        btn.popover = "manual";
-        btn.textContent = "Skip";
-        btn.style.cssText =
-          "position: fixed; inset: 10px 14px auto auto; margin: 0; z-index: 2147483647;" +
-          "color: white; font: 13px sans-serif; padding: 2px 8px;" +
-          "border-radius: 4px; border: 1px solid #666; cursor: pointer;" +
-          "user-select: none; background: rgba(0, 0, 0, 0.5);";
-        // Clicks are taken by where they land, not off the button: a
-        // fullscreen video makes the rest of the page inert (Firefox), so a
-        // click on Skip goes to the video. Firefox's video controls swallow
-        // the downs, ups and clicks on the video, only moves get through, so
-        // in fullscreen the controls are off while the pointer is over Skip;
-        // the click then reaches the page and doesn't pause the video.
-        const onBtn = (e) => {
-          const r = btn.getBoundingClientRect();
-          return (
-            e.clientX >= r.left &&
-            e.clientX <= r.right &&
-            e.clientY >= r.top &&
-            e.clientY <= r.bottom
+        const button = (parent, text, onClick) => {
+          const el = document.createElement("div");
+          el.className = "btn";
+          el.textContent = text;
+          parent.appendChild(el);
+          btns.push([el, onClick]);
+          return el;
+        };
+        const corner = pop("corner");
+
+        if (p.subs.length) {
+          // The timing bar, like the remotes' subtitle panel. ofs is how far
+          // the showing track's cues have been moved since it was picked, so
+          // a move shows at once; applied is how much of that its .srt on
+          // disk has been shifted by, which Apply has tv-srvr catch up. Both
+          // go back to 0 when another track is picked, and a move not
+          // applied is undone.
+          const bar = pop("bar");
+          let ofsTrack = [...vid.textTracks].find((t) => t.mode === "showing");
+          let ofs = 0;
+          let applied = 0;
+          let applying = false;
+          const shiftCues = (t, sec) => {
+            for (const c of t?.cues ?? []) {
+              c.startTime += sec;
+              c.endTime += sec;
+            }
+          };
+          const move = (sec) => {
+            if (!ofsTrack) return;
+            shiftCues(ofsTrack, sec);
+            ofs += sec;
+            render();
+          };
+          const apply = async () => {
+            const t = ofsTrack;
+            if (!t || applying || ofs === applied) return;
+            const target = ofs;
+            applying = true;
+            const res = await fetch("applySubOffset", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                videoPath: p.path,
+                srtFile: p.subs[[...vid.textTracks].indexOf(t)].file,
+                offsetMs: Math.round((target - applied) * 1000),
+              }),
+            }).catch(() => null);
+            applying = false;
+            applyBtn.textContent = res?.ok ? "Apply" : "Failed";
+            if (res?.ok && t === ofsTrack) applied = target;
+            render();
+          };
+          button(corner, "Subs", () =>
+            bar.matches(":popover-open") ? bar.hidePopover() : bar.showPopover(),
           );
-        };
+          button(bar, "-1", () => move(-1));
+          button(bar, "-0.5", () => move(-0.5));
+          const ofsEl = button(bar, "", () => {});
+          ofsEl.style.cursor = "default";
+          button(bar, "+0.5", () => move(0.5));
+          button(bar, "+1", () => move(1));
+          const applyBtn = button(bar, "Apply", apply);
+          const render = () => {
+            ofsEl.textContent = ofs.toFixed(1);
+            applyBtn.style.color = ofs !== applied ? "white" : "#888";
+          };
+          render();
+          vid.textTracks.addEventListener("change", () => {
+            const t = [...vid.textTracks].find((t) => t.mode === "showing");
+            if (t === ofsTrack) return;
+            shiftCues(ofsTrack, applied - ofs);
+            ofsTrack = t;
+            ofs = applied = 0;
+            render();
+          });
+        }
+
+        if (p.skipDurMs > 0) {
+          let lastSkip = 0;
+          button(corner, "Skip", () => {
+            if (Date.now() - lastSkip < SKIP_REPEAT_MS) return;
+            lastSkip = Date.now();
+            vid.currentTime += p.skipDurMs / 1000;
+          });
+        }
+
+        // Clicks are taken by where they land, not off the buttons: a
+        // fullscreen video makes the rest of the page inert (Firefox), so a
+        // click on a button goes to the video. Firefox's video controls
+        // swallow the downs, ups and clicks on the video, only moves get
+        // through, so in fullscreen the controls are off while the pointer is
+        // over a button; the click then reaches the page and doesn't pause the
+        // video. A hidden button has no size. A click between the buttons
+        // does nothing.
+        for (const el of pops) btns.push([el, () => {}]);
+        const hit = (e) =>
+          btns.find(([el]) => {
+            const r = el.getBoundingClientRect();
+            return (
+              r.width > 0 &&
+              e.clientX >= r.left &&
+              e.clientX <= r.right &&
+              e.clientY >= r.top &&
+              e.clientY <= r.bottom
+            );
+          });
         addEventListener(
           "pointermove",
           (e) => {
-            const over = document.fullscreenElement === vid && onBtn(e);
+            const over = document.fullscreenElement === vid && !!hit(e);
             if (vid.controls === over) vid.controls = !over;
           },
           true,
@@ -274,19 +395,23 @@
         addEventListener(
           "click",
           (e) => {
-            if (!onBtn(e)) return;
+            const b = hit(e);
+            if (!b) return;
             e.stopPropagation();
             e.preventDefault();
-            skip();
+            b[1]();
           },
           true,
         );
-        document.body.appendChild(btn);
-        btn.showPopover();
-        // A video going fullscreen lands on top of the top layer, over Skip.
+        corner.showPopover();
+        // A video going fullscreen lands on top of the top layer, over the
+        // buttons.
         document.addEventListener("fullscreenchange", () => {
-          btn.hidePopover();
-          btn.showPopover();
+          for (const el of pops)
+            if (el.matches(":popover-open")) {
+              el.hidePopover();
+              el.showPopover();
+            }
         });
       }
     </script>

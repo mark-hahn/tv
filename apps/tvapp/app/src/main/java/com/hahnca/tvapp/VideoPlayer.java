@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Formatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.json.JSONArray;
@@ -63,18 +64,12 @@ class VideoPlayer extends FrameLayout {
   private static final String PROGRESS_URL = "https://hahnca.com/tv-srvr/api/playProgress";
   // The .srt timing shift the subtitle panel's Apply uses.
   private static final String SHIFT_SUBS_URL = "https://hahnca.com/tv-srvr/api/applySubOffset";
-  // The subtitle panel's Voice lists this many captions either side of the
-  // one starting nearest the press.
-  private static final int VOICE_CAPS_AROUND = 3;
-  // Taken off the position a Voice press stamps: the press's trip here and
-  // the hand's lag behind the ear. Raise it if measured offsets come out late.
-  private static final long VOICE_LAG_MS = 250;
   // A cue's times in the served vtt: "00:01:02.345 --> 00:01:04.000".
   private static final Pattern CUE_TIMES =
       Pattern.compile(
           "(\\d+):(\\d{2}):(\\d{2})\\.(\\d{3})\\s*-->\\s*(\\d+):(\\d{2}):(\\d{2})\\.(\\d{3})");
-  // How often a test (see showTest) looks at the video's position.
-  private static final long TEST_STEP_MS = 50;
+  // How often the panel's caption line (see showCap) looks at the video's position.
+  private static final long CAP_STEP_MS = 50;
   // How often a playing video tells tv-srvr where it is: the resume point if
   // the tv goes off mid-play, and the phone's progress bar.
   private static final long REPORT_MS = 10000;
@@ -199,32 +194,23 @@ class VideoPlayer extends FrameLayout {
   // The text track that was on when reload reopened the video, turned back on
   // once the reopened video has its tracks.
   private String reloadSubId;
-  // The remote subtitle panel's timing offset in seconds (subOfs), and what of
-  // it the playing .srt has been shifted by already (oldSubOfs). Both go back
-  // to 0 on a new video or subtitle pick, so subOfs is how far the file has
-  // moved since then.
+  // The remote subtitle panel's timing offset in seconds, not yet applied to
+  // the playing .srt. It goes back to 0 on Apply, a new video or another
+  // subtitle pick.
   private double subOfs;
-  private double oldSubOfs;
   // An Apply's shift is on its way to tv-srvr.
   private boolean shifting;
-  // The panel's Voice (see voice): the last press's position, the showing
-  // .srt's captions as that press read them (cueStarts, cueEnds, cueTexts),
-  // and the list of them around it the remote picks from (voiceCaps, from cue
-  // voiceFrom on). voiceSeq goes up on every press and every clear, so a list
-  // fetched for anything but the last press of the sequence going on is
-  // dropped.
-  private long voicePos;
+  // The showing .srt's captions (cueStarts, cueEnds, cueTexts), read from the
+  // track cueSubId names. cueSeq goes up on every read and every clear, so a
+  // read for a track no longer showing is dropped.
+  private String cueSubId;
   private List<Long> cueStarts = new ArrayList<>();
   private List<Long> cueEnds = new ArrayList<>();
   private List<String> cueTexts = new ArrayList<>();
-  private final List<String> voiceCaps = new ArrayList<>();
-  private int voiceFrom;
-  private int voiceSeq;
-  // A pick starts a test (see showTest), which the remote shows in place of
-  // the list: testText is the caption it shows now.
-  private boolean testing;
-  private String testText;
-  private final Runnable testStep = this::showTest;
+  private int cueSeq;
+  // The caption the panel's line shows now (see showCap).
+  private String capText = "";
+  private final Runnable capStep = this::showCap;
 
   VideoPlayer(Context context, Events events) {
     super(context);
@@ -295,8 +281,7 @@ class VideoPlayer extends FrameLayout {
         res > 0 ? String.valueOf(res) : "");
     subsPicked = false;
     subOfs = 0;
-    oldSubOfs = 0;
-    clearVoice();
+    clearCues();
     stills.open(p.optJSONObject("stills"));
     String url = p.optString("url");
     exo = new ExoPlayer.Builder(getContext()).build();
@@ -346,6 +331,7 @@ class VideoPlayer extends FrameLayout {
               Format f = g.getTrackFormat(0);
               if (isSideloaded(f)) textGroups.add(g);
             }
+            loadCues();
             events.onSubtitles(subtitleList());
           }
 
@@ -622,6 +608,7 @@ class VideoPlayer extends FrameLayout {
     if (exo == null) return;
     reloadSubId = null;
     for (Tracks.Group g : textGroups) if (g.isSelected()) reloadSubId = g.getTrackFormat(0).id;
+    clearCues();
     view.setKeepContentOnPlayerReset(true);
     exo.setMediaItem(exo.getCurrentMediaItem(), exo.getCurrentPosition());
   }
@@ -633,7 +620,7 @@ class VideoPlayer extends FrameLayout {
     ui.removeCallbacks(holdStep);
     ui.removeCallbacks(stillsDown);
     ui.removeCallbacks(upTap);
-    ui.removeCallbacks(testStep);
+    clearCues();
     upPending = false;
     seeking = false;
     holding = false;
@@ -683,9 +670,7 @@ class VideoPlayer extends FrameLayout {
       out.put("tracks", tracks);
       out.put("selected", selected);
       out.put("subOfs", subOfs);
-      out.put("oldSubOfs", oldSubOfs);
-      out.put("caps", new JSONArray(voiceCaps));
-      out.put("test", testing ? testText : JSONObject.NULL);
+      out.put("cap", capText);
     } catch (JSONException e) {
       Log.e(TAG, "subtitle list failed: " + e);
       return null;
@@ -695,16 +680,8 @@ class VideoPlayer extends FrameLayout {
 
   /** The remote's pick from subtitleList's tracks; -1 turns subtitles off. */
   void selectSubtitle(int index) {
-    if (exo == null) return;
-    clearVoice();
-    // The same track again changes no track, so nothing else sends the
-    // cleared list.
-    if (index == selectedSub()) {
-      events.onSubtitles(subtitleList());
-      return;
-    }
+    if (exo == null || index == selectedSub()) return;
     subOfs = 0;
-    oldSubOfs = 0;
     TrackSelectionParameters.Builder b = exo.getTrackSelectionParameters().buildUpon();
     if (index < 0 || index >= textGroups.size()) {
       b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true);
@@ -726,29 +703,25 @@ class VideoPlayer extends FrameLayout {
   void subOffset(double sec) {
     if (exo == null) return;
     subOfs += sec;
-    // A test goes on, its captions moved with the offset.
-    if (!testing) clearVoice();
+    capText = capNow();
     events.onSubtitles(subtitleList());
   }
 
   /**
-   * The panel's Apply: tv-srvr shifts the playing .srt on disk by what subOfs
-   * has moved since the last Apply, oldSubOfs catches up, and the video
-   * reloads to show it. With no subtitle on there is no file to shift.
+   * The panel's Apply: tv-srvr shifts the playing .srt on disk by subOfs, which
+   * goes back to 0, and the video reloads to show it. With no subtitle on there
+   * is no file to shift.
    */
   void applySubOfs() {
     int sel = selectedSub();
-    if (exo == null) return;
-    clearVoice();
-    events.onSubtitles(subtitleList());
-    if (shifting || sel < 0 || subOfs == oldSubOfs) return;
+    if (exo == null || shifting || sel < 0 || subOfs == 0) return;
     Uri sub = Uri.parse(playingSub(sel).optString("url"));
     double target = subOfs;
     JSONObject body = new JSONObject();
     try {
       body.put("videoPath", sub.getQueryParameter("path"));
       body.put("srtFile", sub.getQueryParameter("file"));
-      body.put("offsetMs", Math.round((target - oldSubOfs) * 1000));
+      body.put("offsetMs", Math.round(target * 1000));
     } catch (JSONException e) {
       Log.e(TAG, "subtitle shift body failed: " + e);
       return;
@@ -769,8 +742,10 @@ class VideoPlayer extends FrameLayout {
                   () -> {
                     shifting = false;
                     if (!shifted || playing != was) return;
-                    oldSubOfs = target;
+                    // A + or - pressed while the shift was on its way stays.
+                    subOfs -= target;
                     reload();
+                    events.onSubtitles(subtitleList());
                   });
             },
             "sub-shift")
@@ -778,24 +753,18 @@ class VideoPlayer extends FrameLayout {
   }
 
   /**
-   * The panel's Voice, a tap on its empty caption pane as a line starts to be
-   * heard: the position now,
-   * and the showing .srt's captions around it, for the remote to pick the line
-   * from (pickCap). The one sequence is one or more presses, each replacing
-   * the list with its own, then a pick; any other panel command clears the
-   * list and the sequence starts over. A press also zeroes the offset, so it
-   * counts from the file as it is now and Apply is off until a pick.
+   * Reads the showing .srt's captions for the panel's line, when the showing
+   * track is not the one last read. reload clears cueSubId, so an edited file
+   * is read again.
    */
-  void voice() {
+  private void loadCues() {
     int sel = selectedSub();
-    if (exo == null || shifting || sel < 0) return;
-    voicePos = exo.getCurrentPosition() - VOICE_LAG_MS;
-    long pos = voicePos;
-    subOfs = 0;
-    oldSubOfs = 0;
-    clearVoice();
-    int seq = voiceSeq;
-    events.onSubtitles(subtitleList());
+    String id = sel < 0 ? null : textGroups.get(sel).getTrackFormat(0).id;
+    if (Objects.equals(id, cueSubId)) return;
+    clearCues();
+    cueSubId = id;
+    if (id == null) return;
+    int seq = cueSeq;
     String url = playingSub(sel).optString("url");
     new Thread(
             () -> {
@@ -815,79 +784,56 @@ class VideoPlayer extends FrameLayout {
                   ends.add(cueMs(m, 5));
                 }
               } catch (Exception e) {
-                Log.e(TAG, "voice captions failed: " + e);
+                Log.e(TAG, "subtitle captions failed: " + e);
                 return;
               }
-              int near = 0;
-              for (int i = 1; i < starts.size(); i++)
-                if (Math.abs(starts.get(i) - pos) < Math.abs(starts.get(near) - pos)) near = i;
-              int from = Math.max(0, near - VOICE_CAPS_AROUND);
-              int to = Math.min(starts.size(), near + VOICE_CAPS_AROUND + 1);
               ui.post(
                   () -> {
-                    if (voiceSeq != seq || from >= to) return;
+                    if (cueSeq != seq) return;
                     cueStarts = starts;
                     cueEnds = ends;
                     cueTexts = texts;
-                    voiceFrom = from;
-                    voiceCaps.addAll(texts.subList(from, to));
-                    events.onSubtitles(subtitleList());
+                    showCap();
                   });
             },
-            "sub-voice")
+            "sub-cues")
         .start();
   }
 
-  /** The panel's Clear: no list and no test, and the offset back to 0. */
-  void subClear() {
+  /**
+   * The caption line's step: the captions now (see capNow), sent to the remote
+   * when they change. It follows a pause, a seek, and a + or -.
+   */
+  private void showCap() {
     if (exo == null) return;
-    subOfs = 0;
-    oldSubOfs = 0;
-    clearVoice();
-    events.onSubtitles(subtitleList());
-  }
-
-  /**
-   * The remote's pick from voice's captions, which ends the sequence: subOfs
-   * starts that caption on the last press, and a test starts.
-   */
-  void pickCap(int index) {
-    if (exo == null || index < 0 || index >= voiceCaps.size()) return;
-    subOfs = (voicePos - cueStarts.get(voiceFrom + index)) / 1000.0;
-    clearVoice();
-    testing = true;
-    testText = "";
-    events.onSubtitles(subtitleList());
-    showTest();
-  }
-
-  /**
-   * A test's step: the one caption the offset not yet applied puts at the
-   * video's position ("" for none), sent to the remote when it changes, so it
-   * can be checked against the voices before Apply. It follows a pause, a seek,
-   * and a + or -. Apply or any other panel command ends it.
-   */
-  private void showTest() {
-    if (exo == null || !testing) return;
-    long pos = exo.getCurrentPosition() - Math.round((subOfs - oldSubOfs) * 1000);
-    String text = "";
-    for (int i = 0; i < cueStarts.size(); i++)
-      if (cueStarts.get(i) <= pos && pos < cueEnds.get(i)) {
-        text = cueTexts.get(i);
-        break;
-      }
-    if (!text.equals(testText)) {
-      testText = text;
+    String text = capNow();
+    if (!text.equals(capText)) {
+      capText = text;
       events.onSubtitles(subtitleList());
     }
-    ui.postDelayed(testStep, TEST_STEP_MS);
+    ui.postDelayed(capStep, CAP_STEP_MS);
   }
 
-  private void clearVoice() {
-    voiceSeq++;
-    voiceCaps.clear();
-    testing = false;
-    ui.removeCallbacks(testStep);
+  // The captions the offset not yet applied puts at the video's position,
+  // joined, "" for none. At offset 0 they are the ones on screen.
+  private String capNow() {
+    if (exo == null) return "";
+    long pos = exo.getCurrentPosition() - Math.round(subOfs * 1000);
+    StringBuilder text = new StringBuilder();
+    for (int i = 0; i < cueStarts.size(); i++)
+      if (cueStarts.get(i) <= pos && pos < cueEnds.get(i))
+        text.append(text.length() > 0 ? " " : "").append(cueTexts.get(i));
+    return text.toString();
+  }
+
+  private void clearCues() {
+    cueSeq++;
+    cueSubId = null;
+    cueStarts = new ArrayList<>();
+    cueEnds = new ArrayList<>();
+    cueTexts = new ArrayList<>();
+    capText = "";
+    ui.removeCallbacks(capStep);
   }
 
   // The time in ms the four groups from g on in a CUE_TIMES match spell.

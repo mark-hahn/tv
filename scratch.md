@@ -1,11 +1,28 @@
 
 
+
+map col watched should set all
+
 i'm 172
 
 ????????????????????????
 .opnXXXXX naming
 back up pause based on pause length
 =================
+
+# simplified live subtitle timing offset
+- the subtitle live timing adjustment is complicated with a sequence of several modes
+  - i want it to be modeless
+- the subtitles pane in the remote should have these UI changes:
+  - remove the clear button and the scrolling pane above it
+  - add a single text line the width of the pane, it should be above the apply row
+    - this shows captions with the text truncated and no `...`
+- the captions line is always showing captions or blank lines between captions
+  - there is no other mode
+- the offset display, apply button, and +- buttons should work the same as always, except:
+  - when the apply button is used the offset should be reset to 0
+- the captions showing should match what tvapp is showing but with the offset
+  - this means when the offset is 0 the caption timing in the remote and on tv are in sync
 
 the show `Becker` with files like `Becker/Season 1/Becker.S01E05.My.Dinner.With.Becker.720p.WEB-DL.AAC2.0.H.264-squalor.mkv` doesn't match the speed of any downloaded subtitle file like `Becker/Season 1/Becker.S01E05.My.Dinner.With.Becker.720p.WEB-DL.AAC2.0.H.264-squalor.opnCXXA2.srt`. The captions start off correct but the continuously get later and later compared to video. since multiple downloaded subtitle files have the same problem ith must be the video file.  do you see anything wrong with it?
 

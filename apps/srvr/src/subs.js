@@ -295,13 +295,16 @@ export function hasUsableSub(showId, season, episode) {
   );
 }
 
+// Returns how long the API took to hand out the link, in ms.
 async function downloadSub(row, videoPath) {
   const login = loadSubsLogin();
+  const startedAt = Date.now();
   const dl = await openSubtitlesDownloadWithRetry({
     apiKey: login.apiKey,
     token: getSubsToken(),
     fileId: row.fileId,
   });
+  const apiMs = Date.now() - startedAt;
   if (!dl.resp.ok)
     throw new Error(`OpenSubtitles download HTTP ${dl.resp.status}`);
   const link = typeof dl.body?.link === "string" ? dl.body.link.trim() : "";
@@ -314,6 +317,7 @@ async function downloadSub(row, videoPath) {
     "utf8",
   );
   markDownloaded.run(row.showId, row.season, row.episode, row.fileId);
+  return apiMs;
 }
 
 // Search, then download until the episode has SUBS_PER_EPISODE or no candidate
@@ -322,12 +326,16 @@ async function downloadSub(row, videoPath) {
 async function fetchSubs(rec, season, episode, videoPath) {
   const showId = String(rec.id);
   const code = fmtCode(season, episode);
+  const startedAt = Date.now();
   try {
     await searchEpisode(rec, season, episode, videoPath);
   } catch (e) {
     unilog(2674, `${rec.name} ${code} search failed: ${e.message}`);
     return [`search failed: ${e.message}`];
   }
+  const searchMs = Date.now() - startedAt;
+  // How long each download took, failed ones too.
+  const downloadTimes = [];
   const errors = [];
   const failed = new Set();
   // Every file tried, so none is downloaded twice in one go.
@@ -345,17 +353,21 @@ async function fetchSubs(rec, season, episode, videoPath) {
     if (batch.length === 0) break;
     await Promise.all(
       batch.map(async (row) => {
+        const downloadAt = Date.now();
         try {
-          await downloadSub(row, videoPath);
+          const apiMs = await downloadSub(row, videoPath);
+          downloadTimes.push(`${Date.now() - downloadAt}ms (api ${apiMs}ms)`);
           unilog(2675, `${rec.name} ${code} downloaded opn${fileIdTag(row.fileId)}: ${row.release}`);
         } catch (e) {
           failed.add(row.fileId);
           errors.push(`download failed: ${e.message}`);
           unilog(2676, `${rec.name} ${code} download of opn${fileIdTag(row.fileId)} failed: ${e.message}`);
+          downloadTimes.push(`${Date.now() - downloadAt}ms failed`);
         }
       }),
     );
   }
+  unilog(2723, `${rec.name} ${code} search ${searchMs}ms, downloads ${downloadTimes.join(", ") || "none"}, all ${Date.now() - startedAt}ms`);
   return errors;
 }
 
@@ -363,8 +375,9 @@ const fetching = new Map();
 
 // Before a video plays: its downloads, then whether it has any subtitle at
 // all. Slow, failed or with none, the video plays anyway and the remotes put
-// up a pop-up. Returns the downloads still running when the wait ran out,
-// else null.
+// up a pop-up. Returns { late }: the downloads still running when the wait
+// ran out, else null. In an object, since an async function returning a
+// promise would wait for it.
 export async function subsBeforePlay(rec, season, episode, videoPath) {
   const problems = [await downloadBeforePlay(rec, season, episode, videoPath)];
   if (listSidecars(videoPath).length === 0) problems.push("no subtitles");
@@ -373,7 +386,7 @@ export async function subsBeforePlay(rec, season, episode, videoPath) {
     notifyClients("subError", {
       text: `${rec.name} ${fmtCode(season, episode)}: ${text}`,
     });
-  return fetching.get(`${rec.id} ${fmtCode(season, episode)}`) ?? null;
+  return { late: fetching.get(`${rec.id} ${fmtCode(season, episode)}`) ?? null };
 }
 
 // Bring the episode up to SUBS_PER_EPISODE downloads, waiting at most

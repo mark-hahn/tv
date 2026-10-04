@@ -7,6 +7,7 @@ import cors from "cors";
 import https from "https";
 import http from "http";
 import { rimraf } from "rimraf";
+import { Session } from "node:inspector/promises";
 import * as view from "./src/lastViewed.js";
 import * as utilNode from "util";
 import * as gaps from "./src/gaps.js";
@@ -1026,8 +1027,73 @@ setInterval(() => {
       1448,
       `event loop blocked ${lag}ms — all requests stalled for that long`,
     );
+    takeProfile()
+      .then((profile) => {
+        const stacks = blockStacks(profile, lag + LAG_SAMPLE_MS)
+          .map(([stack, ms]) => `${Math.round(ms)}ms ${stack}`)
+          .join(" | ");
+        unilog(2720, `block of ${lag}ms ran: ${stacks}`);
+      })
+      .catch((e) => {
+        unilog(2721, `block profile failed: ${e.message}`);
+      });
   }
 }, LAG_SAMPLE_MS);
+
+// What a block ran: V8's profiler samples the loop all the time, every
+// PROF_SAMPLE_US, and a block's samples are logged as the stacks that took
+// longest. Restarted every PROF_RESTART_MS so its samples never pile up.
+const PROF_SAMPLE_US = 10000;
+const PROF_RESTART_MS = 10 * 60 * 1000;
+const PROF_TOP = 3;
+const PROF_FRAMES = 6;
+const profSession = new Session();
+profSession.connect();
+let profChain = profSession
+  .post("Profiler.enable")
+  .then(() =>
+    profSession.post("Profiler.setSamplingInterval", { interval: PROF_SAMPLE_US }),
+  )
+  .then(() => profSession.post("Profiler.start"));
+// The profile so far; a new one starts at once.
+function takeProfile() {
+  const p = profChain.then(async () => {
+    const { profile } = await profSession.post("Profiler.stop");
+    await profSession.post("Profiler.start");
+    return profile;
+  });
+  profChain = p.catch(() => {});
+  return p;
+}
+setInterval(() => takeProfile().catch(() => {}), PROF_RESTART_MS);
+
+// The profile's last windowMs as [stack, ms], the PROF_TOP longest. A stack is
+// its innermost PROF_FRAMES frames, innermost first. Each sample counts for
+// the time since the one before it, so one held off by a blocking call still
+// counts for all of it.
+function blockStacks(profile, windowMs) {
+  const nodes = new Map(profile.nodes.map((n) => [n.id, n]));
+  const parents = new Map();
+  for (const n of profile.nodes)
+    for (const c of n.children ?? []) parents.set(c, n.id);
+  const from = profile.endTime - windowMs * 1000;
+  const total = new Map();
+  let t = profile.startTime;
+  profile.samples.forEach((id, i) => {
+    t += profile.timeDeltas[i];
+    if (t < from) return;
+    const frames = [];
+    for (let n = id; n != null && frames.length < PROF_FRAMES; n = parents.get(n)) {
+      const f = nodes.get(n).callFrame;
+      if (f.functionName === "(root)") break;
+      const file = f.url.split("/").slice(-2).join("/");
+      frames.push(`${f.functionName || "(anon)"}${file ? ` ${file}:${f.lineNumber + 1}` : ""}`);
+    }
+    const stack = frames.join(" < ");
+    total.set(stack, (total.get(stack) ?? 0) + profile.timeDeltas[i] / 1000);
+  });
+  return [...total].sort((a, b) => b[1] - a[1]).slice(0, PROF_TOP);
+}
 
 const app = express();
 
@@ -2844,7 +2910,7 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
   const playStills = web
     ? null
     : stills.playStills(file, posMs > 0 ? posMs : trimPosMs);
-  const lateSubs = await subs.subsBeforePlay(rec, season, episode, file);
+  const { late: lateSubs } = await subs.subsBeforePlay(rec, season, episode, file);
   // Downloads the play could not wait for: once they land, a player that
   // opened this episode with no .srt takes them up.
   lateSubs?.then(() =>

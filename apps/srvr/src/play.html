@@ -304,18 +304,26 @@
           // applied is undone.
           const bar = pop("bar");
           let ofsTrack = [...vid.textTracks].find((t) => t.mode === "showing");
+          // Its cue list, kept so a move can still be undone once another
+          // track is picked: a track turned off hands out no cues.
+          let ofsCues = ofsTrack?.cues;
           let ofs = 0;
           let applied = 0;
           let applying = false;
-          const shiftCues = (t, sec) => {
-            for (const c of t?.cues ?? []) {
+          // Each cue comes out of the track while it moves: Firefox never
+          // takes down a cue on screen whose times move off the playhead, and
+          // it stayed up under all the ones after it.
+          const shiftCues = (sec) => {
+            for (const c of [...(ofsCues ?? [])]) {
+              ofsTrack.removeCue(c);
               c.startTime += sec;
               c.endTime += sec;
+              ofsTrack.addCue(c);
             }
           };
           const move = (sec) => {
             if (!ofsTrack) return;
-            shiftCues(ofsTrack, sec);
+            shiftCues(sec);
             ofs += sec;
             render();
           };
@@ -356,8 +364,9 @@
           vid.textTracks.addEventListener("change", () => {
             const t = [...vid.textTracks].find((t) => t.mode === "showing");
             if (t === ofsTrack) return;
-            shiftCues(ofsTrack, applied - ofs);
+            shiftCues(applied - ofs);
             ofsTrack = t;
+            ofsCues = t?.cues;
             ofs = applied = 0;
             render();
           });

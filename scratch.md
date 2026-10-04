@@ -1,4 +1,6 @@
 
+
+
 i'm 172
 
 ????????????????????????
@@ -6,6 +8,8 @@ i'm 172
 clnup info in tvapp
 back up pause based on pause length
 =================
+
+in tvapp info in the top row next to the show name i want to change the info to match the info in the tvapp video time bar.  it should have the same order of what to drop when the text is too long
 
 when caption is chosen before apply is pressed then clear the caption list and start showing captions in that list pane.  the captions should appear there at the time to align to voice on tv at that time -- in other words i want to be able to look at captions on the phone and listen to audio to check whether they line up -- explain in detail what you think i meant with the instructions.
 

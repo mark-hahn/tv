@@ -89,23 +89,10 @@ class ShowListView extends ScrollView {
   // The band the description dissolves into the card over when it has more text
   // than cardMisc has room for.
   private static final float DESC_FADE_DP = 11f;
-  private static final int MAX_GENRES = 3;
-  // The steps NameRow shrinks its line by, in order, each one on top of the
-  // ones before it: shorten the word "Channel" to "Ch", clip the channel, drop the
-  // viewed count, clip the name, drop the channel, the status, the imdb
-  // rating, the runtime, then one genre per step from the end, and last of all
-  // the year and the country.
-  private static final int CHANNEL_SHORT_STEP = 1;
-  private static final int CHANNEL_CLIP_STEP = 2;
-  private static final int WATCHED_DROP_STEP = 3;
-  private static final int NAME_CLIP_STEP = 4;
-  private static final int CHANNEL_DROP_STEP = 5;
-  private static final int STATUS_DROP_STEP = 6;
-  private static final int IMDB_DROP_STEP = 7;
-  private static final int MINS_DROP_STEP = 8;
-  private static final int GENRE_STEP = 9;
-  private static final int CHANNEL_MAX_CHARS = 3;
-  private static final int NAME_MAX_CHARS = 25;
+  // The order NameRow drops its metadata in, one more per step, the same as the
+  // video time bar's: watched, seasons, status, years, country. Indexes into
+  // NameRow's parts.
+  private static final int[] INFO_DROP_ORDER = {4, 3, 5, 1, 0};
   // The name row's metadata, which stays as bright as the name beside it.
   private static final int FIELD_COLOR = 0xFFFFFFFF;
   // Everything in cardMisc below that row -- description, actor names, map
@@ -1303,23 +1290,21 @@ class ShowListView extends ScrollView {
 
   /**
    * The card's one-line header, which fits itself to the width it is given:
-   * when the name and its metadata are wider than the row, fields are clipped
-   * and then dropped a step at a time, in the fixed order below, until what is
-   * left fits. The order of what survives never changes, only how much of it
-   * there is.
+   * the name, then the time bar's parts -- country, years, episode, seasons,
+   * watched, status and resolution, the episode and resolution being those of
+   * the show's next-up. When they are wider than the row, parts are dropped
+   * a step at a time in INFO_DROP_ORDER until what is left fits; with all of
+   * them gone, the name's end is trimmed.
    */
   private class NameRow extends LinearLayout {
 
     private final Shows.Show show;
-    private final List<String> genres = new ArrayList<>();
     private TextView nameView;
     private TextView infoView;
 
     NameRow(Context context, Shows.Show show) {
       super(context);
       this.show = show;
-      String kept = firstGenres(show.genres);
-      if (!kept.isEmpty()) genres.addAll(Arrays.asList(kept.split(", ")));
     }
 
     void setNameView(TextView view) {
@@ -1332,46 +1317,22 @@ class ShowListView extends ScrollView {
 
     /** One step past the last one, which is the most stripped the row gets. */
     private int stepCount() {
-      return GENRE_STEP + genres.size() + 2;
-    }
-
-    private String nameFor(int step) {
-      // Clip the name -- the one step that touches it -- and mark the clip,
-      // unlike the channel's silent one.
-      if (step < NAME_CLIP_STEP || show.name.length() <= NAME_MAX_CHARS) return show.name;
-      return show.name.substring(0, NAME_MAX_CHARS) + "...";
+      return INFO_DROP_ORDER.length + 1;
     }
 
     String infoFor(int step) {
-      int genresGone = Math.min(genres.size(), Math.max(0, step - GENRE_STEP + 1));
-      int yearStep = GENRE_STEP + genres.size();
-      String channel = show.network;
-      if (step >= CHANNEL_DROP_STEP) {
-        channel = "";
-      } else {
-        // "Channel 4" is the same channel as "Ch 4" and shorter, which is the
-        // cheapest thing the row can give up.
-        if (step >= CHANNEL_SHORT_STEP) channel = channel.replaceAll("(?i)\\bChannel\\b", "Ch");
-        if (step >= CHANNEL_CLIP_STEP && channel.length() > CHANNEL_MAX_CHARS) {
-          channel = channel.substring(0, CHANNEL_MAX_CHARS).trim();
-        }
-      }
-      StringBuilder someGenres = new StringBuilder();
-      for (int i = 0; i < genres.size() - genresGone; i++) {
-        if (i > 0) someGenres.append(", ");
-        someGenres.append(genres.get(i));
-      }
-      return joinDash(
-        step >= yearStep + 1 ? "" : year(show.firstAired),
-        step >= STATUS_DROP_STEP ? "" : show.status,
-        step >= WATCHED_DROP_STEP ? "" : watchedText(show),
-        step >= yearStep + 2 ? "" : show.originalCountry.toUpperCase(Locale.US),
-        channel,
-        step >= MINS_DROP_STEP || show.averageRuntime <= 0
-          ? "" : show.averageRuntime + " Mins",
-        someGenres.toString(),
-        step >= IMDB_DROP_STEP || show.imdbRatings.isEmpty()
-          ? "" : "IMDB " + show.imdbRatings);
+      int[] up = nextUp(show.episodeData);
+      String[] parts = {
+        show.originalCountry.toUpperCase(Locale.US),
+        years(show),
+        up == null ? "" : episodeText(up[0], up[1], up[2]),
+        seasonsText(show),
+        watchedText(show),
+        show.status,
+        up == null || up[3] <= 0 ? "" : String.valueOf(up[3])
+      };
+      for (int i = 0; i < step; i++) parts[INFO_DROP_ORDER[i]] = "";
+      return joinSpaced(parts);
     }
 
     @Override
@@ -1388,12 +1349,10 @@ class ShowListView extends ScrollView {
         }
         int last = stepCount() - 1;
         for (int step = 0; step <= last; step++) {
-          String nameText = nameFor(step);
           String infoText = infoFor(step);
           float wide =
-            nameView.getPaint().measureText(nameText) + infoView.getPaint().measureText(infoText);
+            nameView.getPaint().measureText(show.name) + infoView.getPaint().measureText(infoText);
           if (step == last || Math.ceil(wide) <= avail) {
-            setTextIfNew(nameView, nameText);
             setTextIfNew(infoView, infoText);
             break;
           }
@@ -1532,40 +1491,62 @@ class ShowListView extends ScrollView {
     return card;
   }
 
-  private static String joinDash(String... parts) {
+  private static String joinSpaced(String... parts) {
     StringBuilder out = new StringBuilder();
     for (String part : parts) {
       if (part == null || part.isEmpty()) continue;
-      if (out.length() > 0) out.append(" - ");
+      if (out.length() > 0) out.append("    ");
       out.append(part);
     }
     return out.toString();
   }
 
-  private static String watchedText(Shows.Show show) {
-    if (show.episodeCount <= 0 || show.watchedCount < 0) return "";
-    if (show.watchedCount == show.episodeCount) {
-      return "Viewed all";
+  /**
+   * tv-srvr's next-up (nextUpEpisode): the first episode past season 0 with a
+   * file and not watched, as [season, episode, the season's episode count,
+   * res], or null with none.
+   */
+  private static int[] nextUp(JSONArray episodeData) {
+    for (int season = 1; episodeData != null && season < episodeData.length(); season++) {
+      JSONArray episodes = episodeData.optJSONArray(season);
+      for (int i = 0; episodes != null && i < episodes.length(); i++) {
+        JSONArray tuple = episodes.optJSONArray(i);
+        if (tuple == null || tuple.optInt(ED_WATCHED, 0) == 1) continue;
+        Object file = tuple.opt(ED_FILE);
+        if (!(file instanceof String) || ((String) file).isEmpty()) continue;
+        return new int[] {season, i + 1, episodes.length(), tuple.optInt(ED_RES, 0)};
+      }
     }
-    return "Viewed " + show.watchedCount + " of " + show.episodeCount;
+    return null;
+  }
+
+  // The parts the card's name row and the video time bar both show.
+  static String episodeText(int season, int episode, int seasonEps) {
+    return String.format(Locale.US, "S%02dE%02d", season, episode)
+        + (seasonEps > 0 ? "/" + seasonEps : "");
+  }
+
+  static String watchedText(Shows.Show show) {
+    if (show.episodeCount <= 0 || show.watchedCount < 0) return "";
+    return "Watched " + show.watchedCount + " of " + show.episodeCount;
+  }
+
+  static String seasonsText(Shows.Show show) {
+    if (show.seasonCount <= 0) return "";
+    return show.seasonCount == 1 ? "1 Season" : show.seasonCount + " Seasons";
+  }
+
+  /** "premiere year-last aired year", or whichever of the two the record has. */
+  static String years(Shows.Show show) {
+    String first = year(show.firstAired);
+    String last = year(show.lastAired);
+    if (first.equals(last)) return first;
+    return first.isEmpty() || last.isEmpty() ? first + last : first + "-" + last;
   }
 
   /** The year out of a "yyyy/MM/dd" date, or whatever was there if it is not one. */
   static String year(String date) {
     return date.length() >= 4 ? date.substring(0, 4) : date;
-  }
-
-  /** The first few genres of a ", "-joined list, the rest being more than a line wants. */
-  private static String firstGenres(String genres) {
-    if (genres.isEmpty()) return genres;
-    String[] parts = genres.split(", ");
-    if (parts.length <= MAX_GENRES) return genres;
-    StringBuilder out = new StringBuilder();
-    for (int i = 0; i < MAX_GENRES; i++) {
-      if (i > 0) out.append(", ");
-      out.append(parts[i]);
-    }
-    return out.toString();
   }
 
   private void renderAllMisc() {

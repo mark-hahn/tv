@@ -287,15 +287,10 @@ class VideoPlayer extends FrameLayout {
     title.setParts(
         p.optString("showName"),
         show.originalCountry.toUpperCase(Locale.US),
-        years(show),
-        String.format("S%02dE%02d", p.optInt("season"), p.optInt("episode"))
-            + (p.optInt("seasonEps") > 0 ? "/" + p.optInt("seasonEps") : ""),
-        show.seasonCount <= 0
-            ? ""
-            : show.seasonCount == 1 ? "1 Season" : show.seasonCount + " Seasons",
-        show.episodeCount <= 0 || show.watchedCount < 0
-            ? ""
-            : "Watched " + show.watchedCount + " of " + show.episodeCount,
+        ShowListView.years(show),
+        ShowListView.episodeText(p.optInt("season"), p.optInt("episode"), p.optInt("seasonEps")),
+        ShowListView.seasonsText(show),
+        ShowListView.watchedText(show),
         show.status,
         res > 0 ? String.valueOf(res) : "");
     subsPicked = false;
@@ -992,14 +987,6 @@ class VideoPlayer extends FrameLayout {
     private float partWidth(int i) {
       return parts[i].getPaddingLeft() + parts[i].getPaint().measureText(parts[i].getText().toString());
     }
-  }
-
-  /** "premiere year-last aired year", or whichever of the two the record has. */
-  private static String years(Shows.Show show) {
-    String first = ShowListView.year(show.firstAired);
-    String last = ShowListView.year(show.lastAired);
-    if (first.equals(last)) return first;
-    return first.isEmpty() || last.isEmpty() ? first + last : first + "-" + last;
   }
 
   private void report(String state) {

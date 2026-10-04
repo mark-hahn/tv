@@ -617,6 +617,10 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
         unilog(29, `${showName}: no changes`);
       }
     }
+    // A show watched lately has its next-up's subtitles ready before it plays.
+    const playedSince = util.toPstDateTimeMs(new Date(Date.now() - PREFETCH_PLAYED_MS));
+    if (tvdbRecord.inLibrary && tvdbRecord.lastPlayedDate >= playedSince)
+      prefetchNextSubs(showName, tvdbRecord);
     return { hasChanges: push2Changes.length > 0, changes: push2Changes };
   } catch (e) {
     unilog(544, "error for", showName, e.message);
@@ -2843,17 +2847,42 @@ const TV_URL = "https://hahnca.com/tv";
 const SRVR_PUBLIC_URL = "https://hahnca.com/tv-srvr";
 const TVAPP_DEVICE = "tvapp";
 const EARLY_STOP_MS = 10000;
+// A show played this recently has its next-up's subtitles downloaded in its
+// tvdb refresh.
+const PREFETCH_PLAYED_MS = 30 * 24 * 60 * 60 * 1000;
 const NEAR_END_MS = 4 * 60 * 1000;
 
-// Next-up: the first episode past season 0 with a file and not watched.
-function nextUpEpisode(ed) {
+// Next-up: the first episode past season 0 with a file and not watched, after
+// the episode `after` ({season, episode}) when it is given.
+function nextUpEpisode(ed, after = null) {
   let found = null;
   epd.forEachEpisode(ed, (season, episode) => {
     if (found || season <= 0) return;
+    if (
+      after &&
+      (season < after.season ||
+        (season === after.season && episode <= after.episode))
+    )
+      return;
     if (epd.hasFile(ed, season, episode) && !epd.isWatched(ed, season, episode))
       found = { season, episode };
   });
   return found;
+}
+
+// Start the subtitle downloads for the episode that plays next, so its play
+// has them at once: next-up, or the one after `after`, the episode playing.
+function prefetchNextSubs(showName, rec, after = null) {
+  const next = nextUpEpisode(rec.episodeData, after);
+  if (!next) return;
+  const file = epd.getFullPath(
+    rec.episodeData,
+    showPaths.showFolderFor(showName, rec),
+    next.season,
+    next.episode,
+    tvDir,
+  );
+  if (file) subs.prefetchSubs(rec, next.season, next.episode, file);
 }
 
 // The file's subtitles: its sidecar .srt files as urls (tv-srvr hands them out
@@ -2911,6 +2940,13 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
     ? null
     : stills.playStills(file, posMs > 0 ? posMs : trimPosMs);
   const { late: lateSubs } = await subs.subsBeforePlay(rec, season, episode, file);
+  // The episode after this one, once this one's downloads are done, so the
+  // two never share the API's 5 requests a second.
+  Promise.resolve(lateSubs)
+    .then(() => prefetchNextSubs(showName, rec, target))
+    .catch((e) => {
+      unilog(2728, `${showName} subtitles for the episode after ${fmtSeasonEpisode(target.season, target.episode)} not started: ${e.message}`);
+    });
   // Downloads the play could not wait for: once they land, a player that
   // opened this episode with no .srt takes them up.
   lateSubs?.then(() =>

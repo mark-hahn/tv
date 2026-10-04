@@ -1,7 +1,5 @@
 
-when a session is marked for a notification mode and that session finishes then don't show notification if vscode is on top and that session is focused
 
-what would be the impact if in tvdb update we downloaded the subtitles the same as if the player had started
 
 map col watched should set all
 
@@ -11,6 +9,10 @@ i'm 172
 .opnXXXXX naming
 back up pause based on pause length
 =================
+
+what would be the impact if in tvdb update we downloaded the subtitles the same as if the player had started
+
+increase the 3 sec wait to 5 secs
 
 # simplified live subtitle timing offset
 - the subtitle live timing adjustment is complicated with a sequence of several modes

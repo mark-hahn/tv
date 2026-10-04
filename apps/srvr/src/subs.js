@@ -23,11 +23,10 @@ import { sameOrigin, sidecarLabel, sidecarType } from "./subOrigin.js";
 import { resFindEpisodeVideos, resIsSampleName } from "./videoFiles.js";
 
 const SUBS_DB_PATH = path.join(SRVR_DATA_DIR, "subs.db");
-// Downloads an episode gets, and how long a video waits for them: about twice
-// what a search and three downloads at once took when measured (1.5 s on
-// 10-02).
+// Downloads an episode gets, and how long a video waits for them: a search
+// and three downloads at once took 4.1 s on 10-04 (1.5 s on 10-02).
 const SUBS_PER_EPISODE = 3;
-const PLAY_WAIT_MS = 3000;
+const PLAY_WAIT_MS = 5000;
 // The order a video's subtitles are listed in, and the first one is started
 // on when nothing has been chosen yet.
 const TYPE_ORDER = "THVS+";
@@ -373,6 +372,29 @@ async function fetchSubs(rec, season, episode, videoPath) {
 
 const fetching = new Map();
 
+// The episode's fetchSubs: the one already running, else a new one.
+function fetchJob(rec, season, episode, videoPath) {
+  const key = `${rec.id} ${fmtCode(season, episode)}`;
+  let job = fetching.get(key);
+  if (!job) {
+    job = fetchSubs(rec, season, episode, videoPath).finally(() =>
+      fetching.delete(key),
+    );
+    fetching.set(key, job);
+  }
+  return job;
+}
+
+// The downloads for an episode about to be played, made ahead of its play so
+// it has them at once. Nothing waits on them.
+export function prefetchSubs(rec, season, episode, videoPath) {
+  if (!rec.imdbId) return;
+  if (countDownloaded.get(String(rec.id), season, episode).n >= SUBS_PER_EPISODE)
+    return;
+  unilog(2727, `${rec.name} ${fmtCode(season, episode)} subtitles fetched ahead of its play`);
+  fetchJob(rec, season, episode, videoPath);
+}
+
 // Before a video plays: its downloads, then whether it has any subtitle at
 // all. Slow, failed or with none, the video plays anyway and the remotes put
 // up a pop-up. Returns { late }: the downloads still running when the wait
@@ -400,14 +422,7 @@ async function downloadBeforePlay(rec, season, episode, videoPath) {
     unilog(2677, `${rec.name} has no imdb id, ${code} was not searched`);
     return null;
   }
-  const key = `${showId} ${code}`;
-  let job = fetching.get(key);
-  if (!job) {
-    job = fetchSubs(rec, season, episode, videoPath).finally(() =>
-      fetching.delete(key),
-    );
-    fetching.set(key, job);
-  }
+  const job = fetchJob(rec, season, episode, videoPath);
   let timer;
   const errors = await Promise.race([
     job,

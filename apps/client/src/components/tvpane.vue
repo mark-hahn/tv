@@ -287,7 +287,7 @@
       <!-- Timing rows: the offset and Apply, then + and - -->
       <div style="display: flex; height: 10%; flex-shrink: 0">
         <div :style="{ ...subOfsBtn, cursor: 'default' }">
-          {{ (subList?.subOfs ?? 0).toFixed(2) }}
+          {{ (subList?.subOfs ?? 0).toFixed(1) }}
         </div>
         <div
           @mousedown.prevent="subApply"
@@ -299,8 +299,8 @@
       </div>
       <div
         v-for="row in [
-          ['+', 1, 0.25],
-          ['-', -1, -0.25],
+          ['+', 0.5, 0.1],
+          ['-', -0.5, -0.1],
         ]"
         :key="row[0]"
         style="display: flex; height: 10%; flex-shrink: 0"

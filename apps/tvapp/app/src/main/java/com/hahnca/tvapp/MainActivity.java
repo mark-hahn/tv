@@ -329,7 +329,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     if (showsLoadedAt != 0 || firstLoadFailed) reloadShows();
     // Only while on screen: a socket held open behind another app would reload a list
     // nobody is looking at, and tv-srvr would keep a client it cannot reach.
-    updates = new Updates(this::reloadShows);
+    updates = new Updates(this::reloadShows, video::addSubs);
     updates.start();
   }
 

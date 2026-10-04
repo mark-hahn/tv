@@ -363,7 +363,8 @@ const fetching = new Map();
 
 // Before a video plays: its downloads, then whether it has any subtitle at
 // all. Slow, failed or with none, the video plays anyway and the remotes put
-// up a pop-up; what is still downloading is there next time.
+// up a pop-up. Returns the downloads still running when the wait ran out,
+// else null.
 export async function subsBeforePlay(rec, season, episode, videoPath) {
   const problems = [await downloadBeforePlay(rec, season, episode, videoPath)];
   if (listSidecars(videoPath).length === 0) problems.push("no subtitles");
@@ -372,6 +373,7 @@ export async function subsBeforePlay(rec, season, episode, videoPath) {
     notifyClients("subError", {
       text: `${rec.name} ${fmtCode(season, episode)}: ${text}`,
     });
+  return fetching.get(`${rec.id} ${fmtCode(season, episode)}`) ?? null;
 }
 
 // Bring the episode up to SUBS_PER_EPISODE downloads, waiting at most

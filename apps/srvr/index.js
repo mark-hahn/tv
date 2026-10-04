@@ -2844,7 +2844,17 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
   const playStills = web
     ? null
     : stills.playStills(file, posMs > 0 ? posMs : trimPosMs);
-  await subs.subsBeforePlay(rec, season, episode, file);
+  const lateSubs = await subs.subsBeforePlay(rec, season, episode, file);
+  // Downloads the play could not wait for: once they land, a player that
+  // opened this episode with no .srt takes them up.
+  lateSubs?.then(() =>
+    notifyClients("subsLate", {
+      showName,
+      season,
+      episode,
+      ...subsForFile(String(rec.id), file, season, episode),
+    }),
+  );
   return {
     url: `${TV_URL}/${rel.split("/").map(encodeURIComponent).join("/")}`,
     showName,

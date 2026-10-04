@@ -364,7 +364,17 @@ class VideoPlayer extends FrameLayout {
             return stillsHold && stills.shownMs() >= 0 ? stills.shownMs() : super.getContentPosition();
           }
         });
-    MediaItem.Builder item = new MediaItem.Builder().setUri(url);
+    long resumeMs = p.optLong("posMs");
+    exo.setMediaItem(mediaItem(p), resumeMs > 0 ? resumeMs : p.optLong("trimPosMs"));
+    exo.prepare();
+    exo.play();
+    setVisibility(VISIBLE);
+  }
+
+  // getPlayUrl's video with its .srt files sideloaded, each with the id SUBS_ID
+  // and its index in subs.
+  private static MediaItem mediaItem(JSONObject p) {
+    MediaItem.Builder item = new MediaItem.Builder().setUri(p.optString("url"));
     JSONArray subs = p.optJSONArray("subs");
     List<MediaItem.SubtitleConfiguration> subConfigs = new ArrayList<>();
     for (int i = 0; subs != null && i < subs.length(); i++) {
@@ -376,12 +386,33 @@ class VideoPlayer extends FrameLayout {
               .setLabel(sub.optString("label"))
               .build());
     }
-    item.setSubtitleConfigurations(subConfigs);
-    long resumeMs = p.optLong("posMs");
-    exo.setMediaItem(item.build(), resumeMs > 0 ? resumeMs : p.optLong("trimPosMs"));
-    exo.prepare();
-    exo.play();
-    setVisibility(VISIBLE);
+    return item.setSubtitleConfigurations(subConfigs).build();
+  }
+
+  /**
+   * tv-srvr's subsLate: the downloads the play could not wait for have landed.
+   * A video of that episode that opened with no .srt opens again where it is
+   * with them, starting on the one tv-srvr picks, as reload does. One that
+   * opened with some keeps them; the rest are there next time.
+   */
+  void addSubs(JSONObject late) {
+    if (exo == null) return;
+    JSONArray subs = late.optJSONArray("subs");
+    JSONArray had = playing.optJSONArray("subs");
+    if (subs == null || subs.length() == 0 || had != null && had.length() > 0) return;
+    if (!late.optString("showName").equals(playing.optString("showName"))
+        || late.optInt("season") != playing.optInt("season")
+        || late.optInt("episode") != playing.optInt("episode")) return;
+    try {
+      playing.put("subs", subs);
+      playing.put("subPick", late.optInt("subPick", -1));
+    } catch (JSONException e) {
+      Log.e(TAG, "late subtitles failed: " + e);
+      return;
+    }
+    subsPicked = false;
+    view.setKeepContentOnPlayerReset(true);
+    exo.setMediaItem(mediaItem(playing), exo.getCurrentPosition());
   }
 
   /**
@@ -702,7 +733,8 @@ class VideoPlayer extends FrameLayout {
   /** The panel's + and -: subOfs moves by sec; nothing is shifted until Apply. */
   void subOffset(double sec) {
     if (exo == null) return;
-    subOfs += sec;
+    // To the ms, so tenths that net to nothing come back to exactly 0.
+    subOfs = Math.round((subOfs + sec) * 1000) / 1000.0;
     capText = capNow();
     events.onSubtitles(subtitleList());
   }

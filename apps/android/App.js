@@ -1946,7 +1946,7 @@ function Remote({ setSubError }) {
         <View style={subCtrlStyles.ofsRow}>
           <View style={subCtrlStyles.ofsBtn}>
             <Text style={subCtrlStyles.ofsBtnText}>
-              {(subList?.subOfs ?? 0).toFixed(2)}
+              {(subList?.subOfs ?? 0).toFixed(1)}
             </Text>
           </View>
           <TouchableOpacity
@@ -1965,8 +1965,8 @@ function Remote({ setSubError }) {
           </TouchableOpacity>
         </View>
         {[
-          ["+", 1, 0.25],
-          ["-", -1, -0.25],
+          ["+", 0.5, 0.1],
+          ["-", -0.5, -0.1],
         ].map(([label, ...steps]) => (
           <View key={label} style={subCtrlStyles.ofsRow}>
             {steps.map((sec) => (

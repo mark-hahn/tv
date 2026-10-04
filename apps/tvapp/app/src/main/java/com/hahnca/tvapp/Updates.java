@@ -30,6 +30,7 @@ class Updates {
   private static final String TAG = "tvapp";
   private static final String UPDATES_URL = "wss://hahnca.com/tv-srvr";
   private static final String TVDB_UPDATED = "tvdbUpdated";
+  private static final String SUBS_LATE = "subsLate";
   // Long enough that a run of records lands as one reload, short enough that a
   // change made on the web client shows up here while the user is still looking
   // at what they changed.
@@ -42,14 +43,21 @@ class Updates {
     void onShowsChanged();
   }
 
+  interface SubsListener {
+    /** On the ui thread: an episode's .srt files, once downloads its play did not wait for land. */
+    void onSubsLate(JSONObject data);
+  }
+
   private final Handler ui = new Handler(Looper.getMainLooper());
   private final Listener listener;
+  private final SubsListener subsListener;
   private final Runnable notifyChanged;
   private WebSocketClient client;
   private boolean running;
 
-  Updates(Listener listener) {
+  Updates(Listener listener, SubsListener subsListener) {
     this.listener = listener;
+    this.subsListener = subsListener;
     this.notifyChanged = () -> this.listener.onShowsChanged();
   }
 
@@ -79,7 +87,14 @@ class Updates {
 
             @Override
             public void onMessage(String message) {
-              if (!isTvdbUpdate(message)) return;
+              JSONObject msg = read(message);
+              if (msg == null) return;
+              if (SUBS_LATE.equals(msg.optString("notification"))) {
+                JSONObject data = msg.optJSONObject("data");
+                if (data != null) ui.post(() -> subsListener.onSubsLate(data));
+                return;
+              }
+              if (!TVDB_UPDATED.equals(msg.optString("notification"))) return;
               // Restarted on every record, so a burst settles into one reload.
               ui.removeCallbacks(notifyChanged);
               ui.postDelayed(notifyChanged, SETTLE_MS);
@@ -113,12 +128,12 @@ class Updates {
         RETRY_MS);
   }
 
-  private static boolean isTvdbUpdate(String message) {
+  private static JSONObject read(String message) {
     try {
-      return TVDB_UPDATED.equals(new JSONObject(message).optString("notification"));
+      return new JSONObject(message);
     } catch (Exception e) {
       Log.e(TAG, "updates socket message unreadable: " + e);
-      return false;
+      return null;
     }
   }
 }

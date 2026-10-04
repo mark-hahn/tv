@@ -1,6 +1,6 @@
 // Video filename facts shared by every app: what counts as a video, what
-// counts as a scene sample, and how a video is stepped aside to `.old`
-// together with the sidecars that belong to it.
+// counts as a scene sample, and how a replaced video is deleted together with
+// the sidecars that belong to it.
 //
 // srvr's own videoFiles.js re-exports the list and the name test so its
 // existing call sites keep working; down imports them from here directly.
@@ -27,17 +27,9 @@ export const videoFileExtensions = [
 
 const VIDEO_EXT_SET = new Set(videoFileExtensions);
 
-export function vidHasAlt(name) {
-  return name.toLowerCase().endsWith(".alt");
-}
-
-export function vidStripAlt(name) {
-  return vidHasAlt(name) ? name.slice(0, -4) : name;
-}
-
-// True when name (after stripping a trailing .alt) is a real video file.
+// True when name is a real video file.
 export function vidIsVideoName(name) {
-  const ext = vidStripAlt(String(name || ""))
+  const ext = String(name || "")
     .split(".")
     .pop()
     .toLowerCase();
@@ -54,46 +46,37 @@ export function vidIsSampleName(name) {
 }
 
 /**
- * Step a video aside to `.old`, taking its sidecars with it.
+ * Delete a replaced or losing video together with its sidecars.
  *
- * A replaced episode used to leave its `.en.srt` / `.asr.srt` / `.nfo` /
- * `-thumb.jpg` behind under the old basename, where they belong to nothing:
- * the replacement carries a different release name, so it starts with no
- * subtitles at all while the stale ones sit next to it looking current.
+ * Its `.srt` / `.nfo` / `-thumb.jpg` files name the deleted release, so left
+ * behind they would belong to nothing while looking current.
  *
- * Only the named video moves; any other video sharing the prefix is left
- * alone, so a "<name>.PROPER.mkv" next door is never dragged along. `.old` is
- * appended until the name is free, so nothing is overwritten.
+ * Only the named video goes; any other video sharing the prefix is left
+ * alone, so a "<name>.PROPER.mkv" next door is never dragged along.
  *
- * Returns the video's new path, or null if it could not be renamed.
+ * Returns the names deleted, the video first. Throws if the video itself
+ * could not be deleted.
  */
-export function vidDemoteToOld(videoPath) {
+export function vidDeleteWithSidecars(videoPath) {
   const dir = path.dirname(videoPath);
   const videoName = path.basename(videoPath);
   const base = videoName.replace(/\.[^.]+$/, "");
 
-  let names;
-  try {
-    names = fs.readdirSync(dir);
-  } catch {
-    names = [videoName];
-  }
-
-  let videoDst = null;
+  fs.unlinkSync(videoPath);
+  const deleted = [videoName];
+  const names = fs.readdirSync(dir);
+  const owns = (stem, name) =>
+    name.startsWith(stem + ".") || name.startsWith(stem + "-");
+  // A video that merely shares the prefix keeps its own sidecars.
+  const others = names
+    .filter((n) => vidIsVideoName(n))
+    .map((n) => n.replace(/\.[^.]+$/, ""))
+    .filter((s) => s.length > base.length && owns(base, s));
   for (const name of names) {
-    if (!name.startsWith(base)) continue;
-    if (name.endsWith(".old")) continue;
-    // Another video that merely shares the prefix is a different file.
-    if (name !== videoName && vidIsVideoName(name)) continue;
-    const src = path.join(dir, name);
-    let dst = src + ".old";
-    while (fs.existsSync(dst)) dst += ".old";
-    try {
-      fs.renameSync(src, dst);
-    } catch {
-      continue;
-    }
-    if (name === videoName) videoDst = dst;
+    if (!owns(base, name) || vidIsVideoName(name)) continue;
+    if (others.some((s) => name === s || owns(s, name))) continue;
+    fs.unlinkSync(path.join(dir, name));
+    deleted.push(name);
   }
-  return videoDst;
+  return deleted;
 }

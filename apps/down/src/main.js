@@ -26,7 +26,6 @@ import {
   setUnilogSink,
   logHere,
   resolveShowFolderName,
-  vidDemoteToOld,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
@@ -2562,10 +2561,11 @@ async function main() {
     cycleSeMap = {};
 
     // Build an index of in-flight downloads keyed by season dir + SxxExx → best res.
-    // Active downloads (waiting/downloading) occupy an episode even though no live
-    // file is on disk yet (old file renamed to .old, new file still in .rsync-tmp-<procId>),
-    // so this lets the fromFlex check skip a stale same/worse-quality candidate for
-    // the same episode instead of racing it (see down-coll-plan.md).
+    // Active downloads (waiting/downloading) occupy an episode even though the
+    // new file is not on disk yet (it is still in .rsync-tmp-<procId>, and the
+    // file it replaces is still live), so this lets the fromFlex check skip a
+    // stale same/worse-quality candidate for the same episode instead of racing
+    // it (see down-coll-plan.md).
     inProgressSeIndex = {};
     try {
       var _activeDownloads = tvJson.getDownloads ? tvJson.getDownloads() : [];
@@ -3362,8 +3362,8 @@ async function main() {
     // written — nothing was downloaded, so the down history must not say it
     // was. The file is re-examined every cycle while it stays on usb, so the
     // skip is logged once per file.
-    // Skip this check for forced downloads — the worker renames the existing
-    // file to .old and re-fetches.
+    // Skip this check for forced downloads — the worker re-fetches over the
+    // existing file, which rsync replaces only once the new copy is whole.
     if (
       !processingForced &&
       (fs.existsSync(`${tvSeasonPath}/${destTitle || fname}`) ||
@@ -3489,10 +3489,10 @@ async function main() {
 
       // Skip if a same-or-better-quality download for this exact episode is already
       // in flight under a different filename. During a higher-quality replacement the
-      // old file is renamed to .old and the new file lives in .rsync-tmp-<procId>, so the disk
-      // check below sees no live file — without this guard a stale same/worse-quality
-      // USB candidate gets queued and races the in-flight download, leaving a duplicate
-      // live file on disk (see down-coll-plan.md).
+      // new file lives in .rsync-tmp-<procId> and the disk check below only sees the
+      // file it replaces — without this guard a stale same/worse-quality USB candidate
+      // that beats that file gets queued and races the in-flight download, leaving a
+      // duplicate live file on disk (see down-coll-plan.md).
       if (inProgressSeIndex) {
         var _ipKey =
           String(tvSeasonPath).replace(/\/+$/, "") + "\x00" + flexSeStr;
@@ -3588,29 +3588,8 @@ async function main() {
             );
             return process.nextTick(checkFile);
           }
-          // USB is better than disk — rename disk file to .old before
-          // downloading. Its sidecars go with it: they name the old release,
-          // so left behind they belong to nothing while the incoming file
-          // starts with no subtitles at all.
-          try {
-            var _oldPath = path.join(tvSeasonPath, _diskFile);
-            var _oldDst = vidDemoteToOld(_oldPath);
-            if (!_oldDst) throw new Error("rename produced no file");
-            unilog(
-              334,
-              "renamed worse disk file to .old:",
-              _diskFile,
-              "→",
-              path.basename(_oldDst),
-            );
-          } catch (renameErr3) {
-            unilog(
-              335,
-              "rename worse disk file to .old failed:",
-              _diskFile,
-              renameErr3.message,
-            );
-          }
+          // USB is better than disk. The disk file stays until the better
+          // one has landed; the worker then deletes it with its sidecars.
         }
         // Allow through — download the better USB file.
       } else if (!flexHistKeyExists) {
@@ -3661,27 +3640,8 @@ async function main() {
               unilog(2189, `${downloadCount}/${chkCount} SKIP (disk file same/better quality): ${fname} ${flexSeStr} disk=${diskRes}p usb=${usbRes}p`);
             return process.nextTick(checkFile);
           }
-          // USB is better — rename the worse disk file to .old before
-          // downloading, sidecars included (see the note on the other branch).
-          try {
-            var oldPath = path.join(tvSeasonPath, diskFile);
-            var oldDst = vidDemoteToOld(oldPath);
-            if (!oldDst) throw new Error("rename produced no file");
-            unilog(
-              337,
-              "renamed worse disk file to .old:",
-              diskFile,
-              "→",
-              path.basename(oldDst),
-            );
-          } catch (renameErr2) {
-            unilog(
-              338,
-              "rename worse disk file to .old failed:",
-              diskFile,
-              renameErr2.message,
-            );
-          }
+          // USB is better. The disk file stays until the better one has
+          // landed; the worker then deletes it with its sidecars.
         }
       }
 

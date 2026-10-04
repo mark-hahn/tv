@@ -22,7 +22,6 @@ import {
   parseFileSeasonEpisode,
   cleanSrt,
   vidIsVideoName,
-  vidIsSampleName,
 } from "@tv/share";
 import * as epd from "@tv/share";
 import cron from "node-cron";
@@ -31,7 +30,6 @@ import { showNameFromFilePath } from "./showPaths.js";
 import { BATCH_SCHED, subExtractQueue } from "./batchQueue.js";
 import * as tvdb from "./tvdb.js";
 import * as subs from "./subs.js";
-import { sidecarType } from "./subOrigin.js";
 
 // ---- hard-wired constants (no env vars per repo convention) ----
 const moviesDir = "/mnt/media/movies";
@@ -276,15 +274,14 @@ function loadQueues() {
 function setSubStage(stage) {
   if (subsState.subQueueBusy) subsState.subStage = stage;
 }
-// Whether the sweep should take the video: unwatched, with no subtitle file at
-// all, and not yet through the add-to-disk steps.
+// Whether the sweep should take the video: unwatched and not yet through the
+// add-to-disk steps, whatever subtitle files it already has.
 function sweepWantsVideo(videoFilePath, showName) {
   if (subsState.subQueue.some((e) => e.videoFilePath === videoFilePath))
     return false;
   if (subsState.asrQueue.some((e) => e.videoPath === videoFilePath))
     return false;
   if (subs.isProcessed(videoFilePath)) return false;
-  if (subs.listSidecars(videoFilePath).length > 0) return false;
   const rec = tvdb.getAllTvdbSync?.()?.[showName];
   const parsed = parseFileSeasonEpisode(videoFilePath);
   return !(
@@ -444,48 +441,6 @@ async function renameSFiles(videoFilePath, season, episode) {
     await fs.promises.unlink(src);
   }
 }
-// A video that replaced an older one of its episode takes over the old one's
-// subtitle files, sanitized; nothing already there is overwritten. The old
-// video is the one stepped aside to .old, with or without its sidecars. Files
-// this code named keep their suffix, and the rest become S files. The old
-// video's copies of its own text tracks come only when this video has none.
-async function copyReplacedSubs(videoFilePath, season, episode, hasEmbText) {
-  const dir = path.dirname(videoFilePath);
-  const stem = subs.videoStem(videoFilePath);
-  const names = await fs.promises.readdir(dir);
-  const oldStems = new Set();
-  for (const name of names) {
-    if (!name.endsWith(".old")) continue;
-    const was = name.replace(/(\.old)+$/, "");
-    if (!vidIsVideoName(was) || vidIsSampleName(was)) continue;
-    const se = parseFileSeasonEpisode(was, path.basename(dir));
-    if (se?.season !== season || se?.episode !== episode) continue;
-    if (subs.videoStem(was) !== stem) oldStems.add(subs.videoStem(was));
-  }
-  for (const oldStem of oldStems) {
-    for (const name of names) {
-      if (!name.startsWith(oldStem)) continue;
-      if (name === `${stem}.srt` || name.startsWith(`${stem}.`)) continue;
-      const m = /^(?:\.(.+))?\.srt(?:\.old)*$/.exec(name.slice(oldStem.length));
-      if (!m) continue;
-      const suffix = m[1] ?? "";
-      const type = sidecarType(suffix);
-      if (hasEmbText && "TH".includes(type)) continue;
-      const text = cleanSrt(
-        await fs.promises.readFile(path.join(dir, name), "utf8"),
-      );
-      let dstName = `${stem}.${suffix}.srt`;
-      if (type === "S") {
-        dstName = await addSFile(videoFilePath, text);
-        if (!dstName) continue;
-      } else {
-        if (fs.existsSync(path.join(dir, dstName))) continue;
-        await fs.promises.writeFile(path.join(dir, dstName), text, "utf8");
-      }
-      unilog(2686, `${showNameFromFilePath(videoFilePath)}: copied ${name} to ${dstName}`);
-    }
-  }
-}
 async function generateSrtWithAsr(videoFilePath, fromUI) {
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   const srtPath = base + ".asr.srt";
@@ -630,10 +585,10 @@ function doSubQueueNow() {
 }
 // What a video gets when it lands on disk, or when the sweep or the local
 // pane's Subs button names it: its text tracks copied out, new subtitle files
-// named, a replaced video's subtitles taken over, an opensubtitles search
-// (nothing is downloaded until the video plays), and ASR when that leaves it
-// with nothing: no embedded text track, no usable search result and no
-// subtitle file at all.
+// named, and ASR when that leaves it with nothing: no embedded text track, no
+// subtitle file at all and no usable opensubtitles search result. Only such a
+// video is searched, since only then can the result change anything; nothing
+// is downloaded until the video plays.
 async function processSubQueueEntry() {
   // Only one entry at a time. startSubQueueLoop serializes itself by awaiting,
   // but doSubQueueNow can fire between ticks, and the entry now stays at the
@@ -655,7 +610,7 @@ async function processSubQueueEntry() {
   subsState.subStage = "starting";
   try {
     // The file can vanish between enqueue and now — most often a duplicate
-    // lower-resolution download demoted to `.old`.
+    // lower-resolution download that was deleted.
     if (!fs.existsSync(videoFilePath)) {
       unilog(
         1401,
@@ -674,13 +629,16 @@ async function processSubQueueEntry() {
     const episode = parsed?.episode;
     const isEpisode = Number.isInteger(season) && Number.isInteger(episode);
     const hasEmbText = await extractEmbSrts(videoFilePath, entry.fromUI);
-    if (isEpisode) {
+    if (isEpisode && entry.renameS) {
       setSubStage("naming subtitle files");
-      if (entry.renameS) await renameSFiles(videoFilePath, season, episode);
-      await copyReplacedSubs(videoFilePath, season, episode, hasEmbText);
+      await renameSFiles(videoFilePath, season, episode);
     }
+    // Any subtitle file beside it, of any type, keeps it out of ASR, and so
+    // does an embedded text track; then there is nothing to search for.
+    const needsSubs =
+      !hasEmbText && subs.listSidecars(videoFilePath).length === 0;
     let usable = false;
-    if (isEpisode && rec?.imdbId) {
+    if (needsSubs && isEpisode && rec?.imdbId) {
       setSubStage("searching opensubtitles");
       try {
         await subs.searchEpisode(rec, season, episode, videoFilePath);
@@ -691,16 +649,11 @@ async function processSubQueueEntry() {
         return;
       }
       usable = subs.hasUsableSub(String(rec.id), season, episode);
-    } else {
+    } else if (needsSubs) {
       unilog(2683, `${showName}: no opensubtitles search for ${path.basename(videoFilePath)}, ${isEpisode ? "the show has no imdb id" : "it has no season and episode"}`);
     }
     setSubStage("choosing next queue");
-    // Any subtitle file beside it, of any type, keeps it out of ASR.
-    if (
-      !hasEmbText &&
-      !usable &&
-      subs.listSidecars(videoFilePath).length === 0
-    ) {
+    if (needsSubs && !usable) {
       addToAsrQueue([
         {
           videoPath: videoFilePath,

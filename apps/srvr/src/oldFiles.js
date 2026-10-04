@@ -1,5 +1,5 @@
 // Weekly cleanup of files that can never be needed again. Under the tv show
-// folders: Emby trickplay indexes (`.bif` / `.bifx`, plus any `.old` copies),
+// folders: Emby trickplay indexes (`.bif` / `.bifx`),
 // and orphaned sidecars -- subtitle, metadata, artwork and marker files whose
 // video file is no longer on disk. Outside them, two trees that only ever grow:
 // the mpfour mp4 mirrors and the originals recode.js moves aside, both expired
@@ -61,8 +61,7 @@ const SIDECAR_SUFFIXES = new Set([
 ]);
 
 // Emby trickplay indexes. Emby rebuilds them on demand, so they are dropped
-// whether or not their video is still there -- including any `.bif.old` copies
-// left behind by an earlier rename.
+// whether or not their video is still there.
 const TRICKPLAY_SUFFIXES = new Set(["bif", "bifx"]);
 
 const RULE_ORPHAN = "orphan-sidecar";
@@ -125,17 +124,6 @@ const extOf = (name) => {
   return dot <= 0 ? "" : name.slice(dot + 1).toLowerCase();
 };
 
-// Drop the trailing run of `.old` / `.alt` markers so a superseded copy still
-// counts as the video its sidecars belong to.
-const stripChain = (name) => {
-  let rest = name;
-  for (;;) {
-    const m = /\.(old|alt)$/i.exec(rest);
-    if (!m) return rest;
-    rest = rest.slice(0, -m[0].length);
-  }
-};
-
 const isEmbyMeta = (name) => {
   const lower = name.toLowerCase();
   if (EMBY_META_NAMES.has(lower)) return true;
@@ -178,18 +166,17 @@ function collectDirs(root) {
 // Deletable files in one directory: every trickplay index, plus sidecars whose
 // video file is gone.
 function planDir(dir, files) {
-  // Video base names in this directory, lowercased, chain markers stripped.
+  // Video base names in this directory, lowercased.
   const stems = [];
   for (const f of files) {
-    const bare = stripChain(f.name);
-    const ext = extOf(bare);
+    const ext = extOf(f.name);
     if (!VIDEO_EXTS.has(ext)) continue;
-    stems.push(bare.slice(0, -(ext.length + 1)).toLowerCase());
+    stems.push(f.name.slice(0, -(ext.length + 1)).toLowerCase());
   }
 
   const deletes = [];
   for (const f of files) {
-    const ext = extOf(stripChain(f.name));
+    const ext = extOf(f.name);
     if (TRICKPLAY_SUFFIXES.has(ext)) {
       deletes.push({ ...f, dir, rule: RULE_BIF });
       continue;
@@ -467,7 +454,7 @@ function report(result, verbose) {
 
   const bySuffix = new Map();
   for (const e of result.deleted) {
-    const ext = extOf(stripChain(e.name)) || "<none>";
+    const ext = extOf(e.name) || "<none>";
     const r = bySuffix.get(ext) || { n: 0, bytes: 0 };
     r.n++;
     r.bytes += e.size;

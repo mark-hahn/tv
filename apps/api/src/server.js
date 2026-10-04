@@ -35,7 +35,7 @@ import {
   usbCpToken,
   readUsbTextFile,
 } from "./usb.js";
-import { getLocalFiles, renameLocalFile, swapLocalOld } from "./local.js";
+import { getLocalFiles, renameLocalFile } from "./local.js";
 import { isTextBuffer } from "./textProbe.js";
 import { enrichQbtStats } from "./qbt-stats.js";
 import { checkSeedingNeeded, dismissSeeding } from "./seedCheck.js";
@@ -1276,25 +1276,6 @@ app.post("/api/local/rename", async (req, res) => {
   }
 });
 
-app.post("/api/local/swap", async (req, res) => {
-  const { relPath, movieMode } = req.body || {};
-  try {
-    if (!relPath) return res.status(400).json({ error: "Missing relPath" });
-    const result = await swapLocalOld(relPath, !!movieMode);
-    res.json(result);
-  } catch (err) {
-    const name =
-      String(relPath || "")
-        .split("/")
-        .pop() || String(relPath);
-    unilog(
-      2052,
-      `local swap error for ${name}: ${err?.message || String(err)}`,
-    );
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.get("/api/local/files", async (req, res) => {
   try {
     const tree = await getLocalFiles();
@@ -1365,7 +1346,6 @@ app.post("/api/local/mediainfo", async (req, res) => {
       const dir = path.dirname(fullPath);
       const baseName = fileName.replace(/\.[^.]+$/, "").toLowerCase();
       const entries = await readdir(dir);
-      // (chosen markers are `<base>.mb.chosen` — they never end in .srt)
       srtsCount = entries.filter((e) => {
         const el = e.toLowerCase();
         return el.startsWith(baseName) && el.endsWith(".srt");

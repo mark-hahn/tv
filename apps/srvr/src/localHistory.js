@@ -487,10 +487,6 @@ function addSidecarEvents(add, ctx) {
       file: `${base}.asr.srt`,
       text: `ASR subtitle generated: ${path.basename(base)}.asr.srt`,
     },
-    {
-      file: `${base}.mb.chosen`,
-      text: `subtitle choice marker written: ${path.basename(base)}.mb.chosen`,
-    },
   ];
 
   try {

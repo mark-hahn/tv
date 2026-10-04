@@ -244,12 +244,16 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
     or `comments` equal and not empty.
 - When a video or an S file lands on disk the watcher queues the video
   (`apps/srvr/src/subsQueue.js`): T and H copied out, an arriving `.srt`
-  named `S<n>`, a replaced (`.old`) video's subtitles taken over, a search
-  with no download, and ASR when the video has no embedded T or H, no usable
-  search result and no subtitle file of any type beside it. Manual ASR from
-  the ASR pane is not limited by this.
-- The 6-hourly sweep queues unwatched library videos that have no sidecar at
-  all and have not been through those steps.
+  named `S<n>`, and ASR when the video has no embedded T or H, no subtitle
+  file of any type beside it and no usable search result. Only such a video
+  is searched (no download). Manual ASR from the ASR pane is not limited by
+  this.
+- The 6-hourly sweep queues unwatched library videos that have not been
+  through those steps, whatever subtitle files they already have.
+- A replaced or losing video is deleted with its sidecars, never kept as
+  `.old` or `.alt`, and a replacement does not inherit its subtitles.
+  tv-down deletes the video a download replaces only after the new file has
+  landed (`del-old.md`).
 - tv-down takes a `.srt` from usb when its episode's video is on disk or on
   its way. Its scan does not exclude `.srt`. A `.srt` whose name and top
   folder give no season and episode (the `Subs/<episode>/2_eng,English.srt`

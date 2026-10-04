@@ -10,7 +10,14 @@ import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import fs from "node:fs";
-import { logHere, setUnilogSink, unilog } from "@tv/share";
+import {
+  logHere,
+  setUnilogSink,
+  unilog,
+  vidDeleteWithSidecars,
+  vidIsSampleName,
+  vidIsVideoName,
+} from "@tv/share";
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
 const PARTIAL_DIR_PREFIX = ".rsync-tmp-";
@@ -310,49 +317,6 @@ const main = () => {
   entry.dateEnded = null;
   postUpdate("update");
 
-  // Rename any existing same-SxxExx video file to .old right before rsync writes.
-  // This is the only place the rename happens — done iff a higher-quality file
-  // is actually about to replace it (we already passed the quality gate in main.js).
-  {
-    const { dst } = makeSrcDst();
-    const localDir = path.dirname(dst);
-    const seMatch = (entry.destTitle || title).match(/S(\d{2})E(\d{2})/i);
-    const videoExts = new Set([
-      "mkv",
-      "mp4",
-      "avi",
-      "mov",
-      "m4v",
-      "wmv",
-      "ts",
-      "m2ts",
-    ]);
-    // Only a video replaces a video: a subtitle file landing beside one must
-    // leave it where it is.
-    const incomingExt = (entry.destTitle || title).split(".").pop().toLowerCase();
-    if (seMatch && videoExts.has(incomingExt)) {
-      const seRe = new RegExp(`S${seMatch[1]}E${seMatch[2]}`, "i");
-      try {
-        const existing = fs.readdirSync(localDir);
-        for (const f of existing) {
-          if (!seRe.test(f)) continue;
-          const ext = f.split(".").pop().toLowerCase();
-          if (!videoExts.has(ext)) continue;
-          const fPath = path.join(localDir, f);
-          let oldDst = fPath + ".old";
-          while (fs.existsSync(oldDst)) oldDst = oldDst + ".old";
-          try {
-            fs.renameSync(fPath, oldDst);
-          } catch (e) {
-            // ignore rename failure — rsync will still proceed
-          }
-        }
-      } catch (e) {
-        // localDir doesn't exist yet — nothing to rename
-      }
-    }
-  }
-
   // Terminal failure: no retry will resume this entry, so drop its partial dir.
   const failFinish = (statusText) => {
     removePartialDir();
@@ -436,7 +400,29 @@ const main = () => {
       removePartialDir();
     }
     await fixMkvSeekIndex(dst);
+    deleteReplaced(dst);
     return true;
+  };
+
+  // The episode's other videos are the ones this download replaces (for a usb
+  // candidate main.js has checked that it beats them). They are deleted,
+  // sidecars included, only now that the new file is whole, so a download that
+  // fails or never starts never costs the episode its video.
+  const deleteReplaced = (dst) => {
+    const name = path.basename(dst);
+    const se = name.match(/S(\d{2})E(\d{2})/i);
+    if (!se || !vidIsVideoName(name) || vidIsSampleName(name)) return;
+    const seRe = new RegExp(`S${se[1]}E${se[2]}`, "i");
+    const dir = path.dirname(dst);
+    for (const f of fs.readdirSync(dir)) {
+      if (f === name || !seRe.test(f) || !vidIsVideoName(f)) continue;
+      try {
+        const gone = vidDeleteWithSidecars(path.join(dir, f));
+        unilog(2715, `deleted replaced video ${f} and ${gone.length - 1} sidecar(s), kept ${name}`);
+      } catch (e) {
+        unilog(2716, `could not delete replaced video ${f}: ${e.message}`);
+      }
+    }
   };
 
   const startRsync = async (attempt) => {

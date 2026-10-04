@@ -10,7 +10,7 @@ import fs from "fs";
 import * as path from "node:path";
 import Database from "better-sqlite3";
 import fetch from "node-fetch";
-import { logHere, cleanSrt, vidStripAlt, unilog} from "@tv/share"
+import { logHere, cleanSrt, unilog} from "@tv/share"
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import { notifyClients } from "./messaging.js";
 import {
@@ -111,7 +111,7 @@ const fmtCode = (season, episode) =>
 // ---- sidecar files ----
 
 export function videoStem(videoPath) {
-  return vidStripAlt(path.basename(videoPath)).replace(/\.[^.]+$/, "");
+  return path.basename(videoPath).replace(/\.[^.]+$/, "");
 }
 
 // The 5-char tag an OpenSubtitles file_id has in a ".opn<TAG>.srt" name.
@@ -169,7 +169,7 @@ export function listSidecars(videoPath) {
 // the disk is what counts. With no video, nothing is downloaded.
 export function syncDownloaded(showId, season, episode, dir) {
   const ids = resFindEpisodeVideos(dir, season, episode)
-    .filter((v) => !v.alt && !resIsSampleName(v.name))
+    .filter((v) => !resIsSampleName(v.name))
     .flatMap((v) => listSidecars(path.join(dir, v.name)))
     .filter((s) => s.type === "V")
     .map((s) => tagFileId(s.suffix));

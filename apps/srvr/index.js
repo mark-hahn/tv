@@ -47,9 +47,8 @@ import {
 } from "./src/config.js";
 import {
   videoFileExtensions,
-  resStripAlt,
   resFindEpisodeVideos,
-  vidDemoteToOld,
+  vidDeleteWithSidecars,
 } from "./src/videoFiles.js";
 import {
   syncBadGroupsFromDisk,
@@ -1217,10 +1216,7 @@ async function mergeDuplicateShowFolders(caller, onlyShow = null) {
           ok: true,
           ...r,
         });
-        unilog(
-          2147,
-          `${group.showName}: merged "${plan.loserFolder}" into "${plan.winnerFolder}" — ${r.moved} video(s) moved, ${r.demoted.length} demoted to .old, folder ${r.removed ? "removed" : `kept (${r.leftBehind.length} video(s) left)`}`,
-        );
+        unilog(2710, `${group.showName}: merged "${plan.loserFolder}" into "${plan.winnerFolder}" — ${r.moved} video(s) moved, ${r.deleted.length} losing duplicate(s) deleted, folder ${r.removed ? "removed" : `kept (${r.leftBehind.length} video(s) left)`}`);
       } catch (e) {
         results.push({
           showName: group.showName,
@@ -1533,8 +1529,8 @@ app.post(
           ok: p.ok,
           reason: p.reason,
           seasons: p.moves.map((m) => m.seasonDir),
-          arriveAsOld: p.moves.flatMap((m) => m.arriveAsOld),
-          demotions: p.demotions.map((d) => path.basename(d)),
+          losers: p.moves.flatMap((m) => m.losers),
+          deletions: p.deletions.map((d) => path.basename(d)),
         })),
       })),
     };
@@ -3756,9 +3752,7 @@ function subFileAdded(filePath) {
     path.basename(dir),
   );
   if (se?.season == null || se?.episode == null) return;
-  const video = resFindEpisodeVideos(dir, se.season, se.episode).find(
-    (v) => !v.alt,
-  );
+  const video = resFindEpisodeVideos(dir, se.season, se.episode)[0];
   if (!video) return;
   enqueueSubQueue(
     {
@@ -3834,21 +3828,21 @@ watcher
         if (tvdbRec && tvdbRec.inLibrary) {
           let queued = false;
           for (const fp of videoFiles) {
-            // Enforce one active video per episode before its subs: a replacement
-            // download that raced the old file can leave two active files. Demote
+            // Enforce one video per episode before its subs: two downloads of
+            // the same episode landing together can leave two files. Delete
             // the lower-res one; if fp itself was the loser, skip enqueuing it.
             const fpSeasonDir = path.dirname(fp);
             const fpSe = parseFileSeasonEpisode(
-              resStripAlt(path.basename(fp)),
+              path.basename(fp),
               path.basename(fpSeasonDir),
             );
             if (fpSe?.season != null && fpSe?.episode != null) {
-              const demoted = reconcileDuplicateEpisodeVideos(
+              const deleted = reconcileDuplicateEpisodeVideos(
                 fpSeasonDir,
                 fpSe.season,
                 fpSe.episode,
               );
-              if (demoted.has(fp)) continue;
+              if (deleted.has(fp)) continue;
             }
             // A file the tv's player stalls on is replaced before anything else
             // looks at it: the subs belong to the recoded
@@ -3930,11 +3924,11 @@ unilog(91, `Watching ${tvDir} for file changes...`);
 // does not depend on any lookup being right.
 //
 // So this walks the library and enqueues any unwatched video of a library show
-// with no subtitle sidecar at all. That is also how the videos already on disk
-// get their embedded text tracks copied out. sweepWantsVideo does the real
-// work: it skips files that are queued, have been through the queue, or have
-// an .srt next to them, so a settled library adds nothing and the sweep is
-// just a directory walk.
+// that has not been through the sub queue, whatever subtitle files it already
+// has. That is also how the videos already on disk get their embedded text
+// tracks copied out. sweepWantsVideo does the real work: it skips files that
+// are queued or have been through the queue, so a settled library adds nothing
+// and the sweep is just a directory walk.
 //
 // The walk also sets every episode's downloaded marks in subs.db from the opn
 // files on disk, for changes the watcher never saw (made while tv-srvr was
@@ -4014,44 +4008,34 @@ setTimeout(() => {
   setInterval(runSubBackstopSweep, SUB_BACKSTOP_INTERVAL_MS);
 }, SUB_BACKSTOP_START_DELAY_MS);
 
-// Enforce one active (non-.old) video file per episode. A replacement download
-// that races the file it replaces can leave two active videos: worker.js
-// renames the pre-existing SxxExx file to .old only once, at rsync start, so a
-// same-episode file that lands mid-download is never demoted. When that happens the
-// lower-resolution active file is demoted to .old, sidecars included. Returns
-// the Set of absolute paths that were demoted. See down-coll-plan.md.
+// Enforce one video file per episode. tv-down deletes the file a download
+// replaces once the new one has landed, but two downloads of the same episode
+// landing together can still leave two videos. Then the lower-resolution one
+// is deleted, sidecars included. Returns the Set of absolute paths that were
+// deleted. See down-coll-plan.md.
 function reconcileDuplicateEpisodeVideos(seasonDir, season, episode) {
-  const demoted = new Set();
-  const actives = resFindEpisodeVideos(seasonDir, season, episode).filter(
-    (v) => !v.alt,
-  );
-  if (actives.length < 2) return demoted;
+  const deleted = new Set();
+  const videos = resFindEpisodeVideos(seasonDir, season, episode);
+  if (videos.length < 2) return deleted;
   // Only act when there is a strictly-higher known resolution to keep; never guess
-  // on same-resolution ties or when any active file's resolution is unknown.
-  if (actives.some((v) => v.res <= 0)) return demoted;
-  const bestRes = Math.max(...actives.map((v) => v.res));
-  const losers = actives.filter((v) => v.res < bestRes);
-  if (losers.length === 0) return demoted;
+  // on same-resolution ties or when any file's resolution is unknown.
+  if (videos.some((v) => v.res <= 0)) return deleted;
+  const bestRes = Math.max(...videos.map((v) => v.res));
+  const losers = videos.filter((v) => v.res < bestRes);
   for (const loser of losers) {
     const src = path.join(seasonDir, loser.name);
     try {
       // Takes the loser's sidecars with it, so the surviving file is not left
       // beside another release's subtitles.
-      if (!vidDemoteToOld(src)) throw new Error("rename produced no file");
+      vidDeleteWithSidecars(src);
     } catch (e) {
-      unilog(
-        1537,
-        `demote duplicate episode video failed for ${loser.name}: ${e.message}`,
-      );
+      unilog(2711, `delete duplicate episode video failed for ${loser.name}: ${e.message}`);
       continue;
     }
-    demoted.add(src);
-    unilog(
-      1538,
-      `demoted duplicate ${loser.res}p episode video to .old (keeping ${bestRes}p): ${loser.name}`,
-    );
+    deleted.add(src);
+    unilog(2712, `deleted duplicate ${loser.res}p episode video (keeping ${bestRes}p): ${loser.name}`);
   }
-  return demoted;
+  return deleted;
 }
 
 // Watchdog heartbeat: a periodic status beat (queue depths + running flags) so

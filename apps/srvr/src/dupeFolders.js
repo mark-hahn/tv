@@ -21,13 +21,13 @@
 // An episode sitting in both folders is not a refusal: the two files are put
 // through `flexgetIsBetterSameRun`, the same comparator flexget uses to choose
 // between two candidates for one episode arriving in a single batch
-// (resolution -> bit depth -> hevc -> seeds -> bad group). The loser is demoted
-// to `.old` exactly as down does when a better release replaces a file already
-// on disk, so one active video per episode survives and neither is lost.
+// (resolution -> bit depth -> hevc -> seeds -> bad group). The loser is
+// deleted with its sidecars, exactly as down does when a better release
+// replaces a file already on disk, so one video per episode survives.
 //
-// Nothing is ever overwritten and no video file is ever deleted: files are
-// renamed across, and the losing folder is removed only once it is proven to
-// hold no video at all.
+// Nothing is ever overwritten and no other video file is ever deleted: files
+// are renamed across, and the losing folder is removed only once it is proven
+// to hold no video at all.
 
 import fs from "fs";
 import * as path from "node:path";
@@ -35,10 +35,9 @@ import * as epd from "@tv/share";
 import { parseFileSeasonEpisode } from "@tv/share";
 import {
   resIsVideoName,
-  resStripAlt,
   resFindEpisodeVideos,
   resIsSampleName,
-  vidDemoteToOld,
+  vidDeleteWithSidecars,
 } from "./videoFiles.js";
 import { flexgetIsBetterSameRun } from "./flexgetScore.js";
 
@@ -119,7 +118,7 @@ export function auditShowFolder(folder, ed) {
 
   for (const seasonDir of subDirs(showDir)) {
     for (const name of videosIn(path.join(showDir, seasonDir))) {
-      const parsed = parseFileSeasonEpisode(resStripAlt(name), seasonDir);
+      const parsed = parseFileSeasonEpisode(name, seasonDir);
       const season = parsed?.season;
       const episode = parsed?.episode;
       if (season == null || episode == null) {
@@ -145,10 +144,10 @@ export function auditShowFolder(folder, ed) {
  * Decide whether `loserFolder` can be folded into `winnerFolder`. Both audits
  * come from `auditShowFolder` and must already be clean.
  *
- * Returns { ok, reason, moves, demotions } -- `moves` is per season directory
+ * Returns { ok, reason, moves, deletions } -- `moves` is per season directory
  * (empty when the losing folder holds nothing but artwork, which is still a
- * merge: the folder goes away), and `demotions` lists the files that lost the
- * same-episode comparison and will be renamed to `.old`.
+ * merge: the folder goes away), and `deletions` lists the winner's files that
+ * lost the same-episode comparison and will be deleted.
  */
 export function planFolderMerge(showName, winnerAudit, loserAudit) {
   const winnerFolder = winnerAudit.folder;
@@ -160,7 +159,7 @@ export function planFolderMerge(showName, winnerAudit, loserAudit) {
     ok: false,
     reason,
     moves: [],
-    demotions: [],
+    deletions: [],
   });
 
   if (!winnerFolder || !loserFolder || winnerFolder === loserFolder) {
@@ -177,7 +176,7 @@ export function planFolderMerge(showName, winnerAudit, loserAudit) {
   }
 
   const moves = [];
-  const demotions = [];
+  const deletions = [];
   const bySeason = new Map();
   for (const ep of loserAudit.episodes) {
     if (!bySeason.has(ep.seasonDir)) bySeason.set(ep.seasonDir, []);
@@ -187,14 +186,13 @@ export function planFolderMerge(showName, winnerAudit, loserAudit) {
   for (const [seasonDir, eps] of bySeason) {
     const srcSeason = path.join(loserAudit.showDir, seasonDir);
     const dstSeason = path.join(winnerAudit.showDir, seasonDir);
-    const arriveAsOld = new Set();
+    const losers = new Set();
     for (const { name, season, episode } of eps) {
       // Same episode in both folders: settle it the way flexget settles two
       // candidates in one batch instead of refusing the whole merge. Whichever
-      // file loses becomes `.old`, so exactly one stays active and neither is
-      // thrown away.
+      // file loses is deleted, so exactly one stays.
       const rivals = resFindEpisodeVideos(dstSeason, season, episode).filter(
-        (v) => !v.alt && !resIsSampleName(v.name),
+        (v) => !resIsSampleName(v.name),
       );
       if (rivals.length) {
         let best = rivals[0];
@@ -209,9 +207,9 @@ export function planFolderMerge(showName, winnerAudit, loserAudit) {
         }
         if (flexgetIsBetterSameRun(asCandidate(name), asCandidate(best.name))) {
           for (const cur of rivals)
-            demotions.push(path.join(dstSeason, cur.name));
+            deletions.push(path.join(dstSeason, cur.name));
         } else {
-          arriveAsOld.add(name);
+          losers.add(name);
         }
       }
       try {
@@ -227,7 +225,7 @@ export function planFolderMerge(showName, winnerAudit, loserAudit) {
       seasonDir,
       srcSeason,
       dstSeason,
-      arriveAsOld: [...arriveAsOld],
+      losers: [...losers],
     });
   }
 
@@ -238,50 +236,45 @@ export function planFolderMerge(showName, winnerAudit, loserAudit) {
     ok: true,
     reason: "",
     moves,
-    demotions,
+    deletions,
   };
 }
 
-// Demoting takes the video's sidecars with it, so the file that stays active
-// is not left sitting next to another release's subtitles.
-const renameToOld = (filePath) => vidDemoteToOld(filePath) || filePath;
-
 /**
  * Carry out a plan that came back ok.
- * Returns { moved, demoted, removed, leftBehind }. A file whose name is already
+ * Returns { moved, deleted, removed, leftBehind }. A file whose name is already
  * taken at the destination is left where it is rather than overwritten, which
  * in turn keeps the losing folder alive.
  */
 export function executeFolderMerge(plan) {
   const loserDir = path.join(TV_DIR, plan.loserFolder);
   let moved = 0;
-  const demoted = [];
+  const deleted = [];
 
-  // Losers of a same-episode comparison step aside first, so the file moving in
-  // is the only active video for that episode the moment it lands.
-  for (const filePath of plan.demotions) {
-    demoted.push(path.basename(renameToOld(filePath)));
+  // Losers of a same-episode comparison go first, sidecars included, so the
+  // file moving in is the only video for that episode the moment it lands and
+  // is not left beside another release's subtitles.
+  for (const filePath of plan.deletions) {
+    vidDeleteWithSidecars(filePath);
+    deleted.push(path.basename(filePath));
   }
 
   for (const m of plan.moves) {
     // A season the winner does not have yet moves whole, in one rename. There
-    // is nothing there to collide with, so nothing arrives as `.old`.
+    // is nothing there to collide with, so nothing loses.
     if (!isDir(m.dstSeason)) {
       fs.renameSync(m.srcSeason, m.dstSeason);
       moved += videosIn(m.dstSeason).length;
       continue;
     }
-    const asOld = new Set(m.arriveAsOld);
+    for (const name of m.losers) {
+      vidDeleteWithSidecars(path.join(m.srcSeason, name));
+      deleted.push(name);
+    }
     for (const name of fs.readdirSync(m.srcSeason)) {
       const src = path.join(m.srcSeason, name);
-      let dst = path.join(m.dstSeason, name);
-      if (asOld.has(name)) {
-        dst += ".old";
-        while (fs.existsSync(dst)) dst += ".old";
-        demoted.push(path.basename(dst));
-      } else if (fs.existsSync(dst)) {
-        continue;
-      }
+      const dst = path.join(m.dstSeason, name);
+      if (fs.existsSync(dst)) continue;
       fs.renameSync(src, dst);
       if (resIsVideoName(name)) moved++;
     }
@@ -290,9 +283,9 @@ export function executeFolderMerge(plan) {
   // Whatever is left is show-level artwork and metadata Emby regenerates --
   // but only once no video is left behind anywhere under it.
   const leftBehind = videosUnder(loserDir);
-  if (leftBehind.length) return { moved, demoted, removed: false, leftBehind };
+  if (leftBehind.length) return { moved, deleted, removed: false, leftBehind };
   fs.rmSync(loserDir, { recursive: true, force: true });
-  return { moved, demoted, removed: true, leftBehind: [] };
+  return { moved, deleted, removed: true, leftBehind: [] };
 }
 
 /**
@@ -334,7 +327,7 @@ export function planDuplicateFolders(showFolders, resolve) {
         ok: false,
         reason: "record has no episodeData to check against",
         moves: [],
-        demotions: [],
+        deletions: [],
       }));
       out.push(group);
       continue;
@@ -357,7 +350,7 @@ export function planDuplicateFolders(showFolders, resolve) {
         ok: false,
         reason: problems.join("; "),
         moves: [],
-        demotions: [],
+        deletions: [],
       }));
       out.push(group);
       continue;

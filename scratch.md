@@ -1,4 +1,9 @@
 
+when a column in the table in the map pane is selected the watched button should:
+  - if there are some watched and some unwatched then toggle whichever ones are in the minority
+    - this sets all to the same
+  - if all are watched then mark all unwatched
+  - if none are watched then mark all watched
 
 
 map col watched should set all

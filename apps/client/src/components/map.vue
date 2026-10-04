@@ -2384,6 +2384,31 @@ export default {
     handleSelectedWatch() {
       const targets = this.getSelectedMapTargets();
       if (targets.length === 0) return;
+      // Column selection: set every aired episode to one value -- the
+      // majority's when mixed, else the opposite of what they all are.
+      if (this.selectedCells.size === 0) {
+        const aired = targets.filter(
+          ({ season, episode }) =>
+            !this.seriesMap?.[season]?.[episode]?.unaired,
+        );
+        const isPlayed = ({ season, episode }) =>
+          !!this.seriesMap?.[season]?.[episode]?.played;
+        const w = aired.filter(isPlayed).length;
+        const watched =
+          w === aired.length ? false : w === 0 || w * 2 >= aired.length;
+        for (const target of aired) {
+          if (isPlayed(target) === watched) continue;
+          this.$emit(
+            "episode-click",
+            this.buildSelectedEpisodeActionEvent({ shiftKey: true }),
+            this.mapShow,
+            target.season,
+            target.episode,
+            watched,
+          );
+        }
+        return;
+      }
       for (const target of targets) {
         this.performEpisodeWatch(
           this.buildSelectedEpisodeActionEvent({ shiftKey: true }),

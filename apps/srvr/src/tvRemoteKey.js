@@ -141,6 +141,8 @@ export async function keySendWithChk({
   }
 
   lastPress = { key, senderId, who, at: now, fromSubCtrl, repeating };
+  // Presses only: a held key repeats every 100 ms or so.
+  if (!repeating) unilog(2708, `${key} from ${who}`);
 
   if (!path) return { blocked: false };
   const result = await forward(base, method, path, body);

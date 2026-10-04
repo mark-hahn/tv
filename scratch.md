@@ -5,9 +5,10 @@ i'm 172
 
 ????????????????????????
 .opnXXXXX naming
-clnup info in tvapp
 back up pause based on pause length
 =================
+
+clnup info in tvapp
 
 in tvapp info in the top row next to the show name i want to change the info to match the info in the tvapp video time bar.  it should have the same order of what to drop when the text is too long
 

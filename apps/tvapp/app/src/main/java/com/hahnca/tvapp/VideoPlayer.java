@@ -810,7 +810,7 @@ class VideoPlayer extends FrameLayout {
                   if (!m.lookingAt()) continue;
                   StringBuilder text = new StringBuilder();
                   while (i + 1 < lines.length && !lines[i + 1].trim().isEmpty())
-                    text.append(text.length() > 0 ? " " : "").append(lines[++i].trim());
+                    text.append(text.length() > 0 ? "\n" : "").append(lines[++i].trim());
                   texts.add(text.toString().replaceAll("<[^>]*>|\\{[^}]*\\}", ""));
                   starts.add(cueMs(m, 1));
                   ends.add(cueMs(m, 5));
@@ -846,15 +846,15 @@ class VideoPlayer extends FrameLayout {
     ui.postDelayed(capStep, CAP_STEP_MS);
   }
 
-  // The captions the offset not yet applied puts at the video's position,
-  // joined, "" for none. At offset 0 they are the ones on screen.
+  // The captions the offset not yet applied puts at the video's position, one
+  // line each as on screen, "" for none. At offset 0 they are the ones on screen.
   private String capNow() {
     if (exo == null) return "";
     long pos = exo.getCurrentPosition() - Math.round(subOfs * 1000);
     StringBuilder text = new StringBuilder();
     for (int i = 0; i < cueStarts.size(); i++)
       if (cueStarts.get(i) <= pos && pos < cueEnds.get(i))
-        text.append(text.length() > 0 ? " " : "").append(cueTexts.get(i));
+        text.append(text.length() > 0 ? "\n" : "").append(cueTexts.get(i));
     return text.toString();
   }
 

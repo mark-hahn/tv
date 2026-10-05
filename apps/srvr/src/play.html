@@ -270,9 +270,9 @@
           if (played && !vid.ended) report("stopped");
         });
 
-        if (!p.subs.length && !(p.skipDurMs > 0)) return;
-        // The buttons over the video: Subs, which toggles the subtitle timing
-        // bar at the top middle, and Skip for the intro, at the top right.
+        // The buttons over the video, at the top right after the show name
+        // and episode: Subs, which toggles the subtitle timing bar at the top
+        // middle, and Skip for the intro.
         // They are in popovers so they can be put above a fullscreen video in
         // the top layer. btns pairs each one with what a click on it does.
         const btns = [];
@@ -294,6 +294,7 @@
           return el;
         };
         const corner = pop("corner");
+        button(corner, document.title, () => {}).style.cursor = "default";
 
         if (p.subs.length) {
           // The timing bar, like the remotes' subtitle panel. ofs is how far

@@ -1,5 +1,4 @@
 
-in web playing show show name and s01e01 to left of subs button
 
 i'm 172
 
@@ -7,6 +6,8 @@ i'm 172
 .opnXXXXX naming
 back up pause based on pause length
 =================
+
+in web player display show name and s01e01 to the left of the subs button
 
 when a column in the table in the map pane is selected the watched button should:
   - if there are some watched and some unwatched then toggle whichever ones are in the minority

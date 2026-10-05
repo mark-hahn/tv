@@ -1932,16 +1932,9 @@ function Remote({ setSubError }) {
               ))
           )}
         </ScrollView>
-        {/* What tvapp shows, moved by the offset. A space keeps the line's
-            height between captions. */}
+        {/* What tvapp shows, moved by the offset, laid out as over the video. */}
         <View style={subCtrlStyles.capLine}>
-          <Text
-            numberOfLines={1}
-            ellipsizeMode="clip"
-            style={subCtrlStyles.capText}
-          >
-            {subList?.cap || " "}
-          </Text>
+          <Text style={subCtrlStyles.capText}>{subList?.cap ?? ""}</Text>
         </View>
         <View style={subCtrlStyles.ofsRow}>
           <View style={subCtrlStyles.ofsBtn}>
@@ -1964,18 +1957,17 @@ function Remote({ setSubError }) {
             </Text>
           </TouchableOpacity>
         </View>
-        {[
-          ["+", 0.5, 0.1],
-          ["-", -0.5, -0.1],
-        ].map(([label, ...steps]) => (
-          <View key={label} style={subCtrlStyles.ofsRow}>
-            {steps.map((sec) => (
+        {[0.5, 0.1].map((step) => (
+          <View key={step} style={subCtrlStyles.ofsRow}>
+            {[-step, step].map((sec) => (
               <TouchableOpacity
                 key={sec}
                 onPress={() => sendTvapprc(`${CMD_SUB_OFFSET},${sec}`)}
                 style={subCtrlStyles.ofsBtn}
               >
-                <Text style={subCtrlStyles.ofsBtnText}>{label}</Text>
+                <Text style={subCtrlStyles.ofsBtnText}>
+                  {sec < 0 ? "-" : "+"}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -3605,8 +3597,10 @@ const subCtrlStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#fff",
   },
+  // Four lines tall, black on white, centered and from the top.
   capLine: {
-    paddingVertical: 14,
+    height: fs(29) * 4 + 2 * 8 + 2,
+    paddingVertical: 8,
     paddingHorizontal: 16,
     flexShrink: 0,
     backgroundColor: "#fff",
@@ -3614,11 +3608,12 @@ const subCtrlStyles = StyleSheet.create({
     borderTopColor: "#333",
     overflow: "hidden",
   },
-  // Wider than the line, so a caption is cut at the edge, mid-word.
   capText: {
-    width: 1000,
     fontSize: fs(22),
+    lineHeight: fs(29),
+    fontWeight: "bold",
     color: "#000",
+    textAlign: "center",
   },
   closeBtn: {
     backgroundColor: "white",
@@ -3636,7 +3631,8 @@ const subCtrlStyles = StyleSheet.create({
     fontWeight: "bold",
     color: "#000",
   },
-  // The timing rows above Close: the offset and Apply, then + and -.
+  // The timing rows above Close: the offset and Apply, then - and + by 0.5
+  // and by 0.1.
   ofsRow: {
     flexDirection: "row",
     height: 64,

@@ -272,19 +272,26 @@
           </div>
         </div>
       </div>
-      <!-- What tvapp shows, moved by the offset, cut at the edge. A space
-           keeps the line's height between captions. -->
+      <!-- What tvapp shows, moved by the offset, laid out as over the video:
+           four lines tall, black on white, centered and from the top -->
       <div
         style="
           flex-shrink: 0;
+          height: calc(4 * 1.3em + 17px);
           padding: 7.5px 14px;
+          box-sizing: border-box;
           border-top: 2px solid #333;
-          white-space: pre;
+          background: #fff;
+          color: #000;
+          text-align: center;
+          white-space: pre-line;
           overflow: hidden;
           font-size: 17px;
+          font-weight: bold;
+          line-height: 1.3;
         "
-      >{{ subList?.cap || " " }}</div>
-      <!-- Timing rows: the offset and Apply, then + and - -->
+      >{{ subList?.cap ?? "" }}</div>
+      <!-- Timing rows: the offset and Apply, then - and + by 0.5 and by 0.1 -->
       <div style="display: flex; height: 10%; flex-shrink: 0">
         <div :style="{ ...subOfsBtn, cursor: 'default' }">
           {{ (subList?.subOfs ?? 0).toFixed(1) }}
@@ -298,21 +305,18 @@
         </div>
       </div>
       <div
-        v-for="row in [
-          ['+', 0.5, 0.1],
-          ['-', -0.5, -0.1],
-        ]"
-        :key="row[0]"
+        v-for="step in [0.5, 0.1]"
+        :key="step"
         style="display: flex; height: 10%; flex-shrink: 0"
       >
         <div
-          v-for="sec in row.slice(1)"
+          v-for="sec in [-step, step]"
           :key="sec"
           @mousedown.prevent="subOffset(sec)"
           @touchstart.prevent="subOffset(sec)"
           :style="subOfsBtn"
         >
-          {{ row[0] }}
+          {{ sec < 0 ? "-" : "+" }}
         </div>
       </div>
       <div

@@ -4035,10 +4035,10 @@ unilog(91, `Watching ${tvDir} for file changes...`);
 // one gate on the only path to the sub queue -- is worth a second route that
 // does not depend on any lookup being right.
 //
-// So this walks the library and enqueues any unwatched video of a library show
-// that has not been through the sub queue, whatever subtitle files it already
-// has. That is also how the videos already on disk get their embedded text
-// tracks copied out. sweepWantsVideo does the real work: it skips files that
+// So this walks the library and enqueues any video of a library show, watched
+// or not, that has not been through the sub queue, whatever subtitle files it
+// already has. That is also how the videos already on disk get their embedded
+// text tracks copied out. sweepWantsVideo does the real work: it skips files that
 // are queued or have been through the queue, so a settled library adds nothing
 // and the sweep is just a directory walk.
 //
@@ -4090,7 +4090,7 @@ async function runSubBackstopSweep() {
           const showName = showNameFromFilePath(fp);
           const rec = tvdb.getAllTvdbSync?.()?.[showName];
           if (!rec?.inLibrary) continue;
-          if (!sweepWantsVideo(fp, showName)) continue;
+          if (!sweepWantsVideo(fp)) continue;
           enqueueSubQueue(
             { videoFilePath: fp, fromUI: false, lowPriority: true },
             false,

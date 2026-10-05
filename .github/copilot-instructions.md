@@ -248,8 +248,10 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   file of any type beside it and no usable search result. Only such a video
   is searched (no download). Manual ASR from the ASR pane is not limited by
   this.
-- The 6-hourly sweep queues unwatched library videos that have not been
-  through those steps, whatever subtitle files they already have.
+- The 6-hourly sweep queues library videos, watched or not, that have not
+  been through those steps, whatever subtitle files they already have. Its
+  entries come after all other batch work: none starts while a stills build,
+  a recode or ASR is running or queued.
 - A replaced or losing video is deleted with its sidecars, never kept as
   `.old` or `.alt`, and a replacement does not inherit its subtitles.
   tv-down deletes the video a download replaces only after the new file has
@@ -575,7 +577,8 @@ because the TV is unreachable from any wireless host here.
   stills come out magenta.
 - The stills ffmpegs run in the idle I/O class, so a build gives way to
   nginx's reads of the playing video (see Media disk). A build shares the
-  disk with the subtitle and ASR jobs, which are idle class too.
+  disk with the subtitle and ASR jobs, which are idle class too, but the
+  subtitle sweep's entries wait until no stills build is left.
 - A remote's `kh,<left|right>` starts a hold; so does the first repeat from
   the TV's own remote. The hold steps one still at a time on tvapp's own
   clock, as fast as its speed allows: right every 20 ms (50 stills, about 2

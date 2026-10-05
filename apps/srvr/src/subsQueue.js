@@ -23,13 +23,14 @@ import {
   cleanSrt,
   vidIsVideoName,
 } from "@tv/share";
-import * as epd from "@tv/share";
 import cron from "node-cron";
 import { notifyClients } from "./messaging.js";
 import { showNameFromFilePath } from "./showPaths.js";
 import { BATCH_SCHED, subExtractQueue } from "./batchQueue.js";
 import * as tvdb from "./tvdb.js";
 import * as subs from "./subs.js";
+import { stillsBusy } from "./stills.js";
+import { getRecodePending } from "./recode.js";
 
 // ---- hard-wired constants (no env vars per repo convention) ----
 const moviesDir = "/mnt/media/movies";
@@ -274,21 +275,14 @@ function loadQueues() {
 function setSubStage(stage) {
   if (subsState.subQueueBusy) subsState.subStage = stage;
 }
-// Whether the sweep should take the video: unwatched and not yet through the
-// add-to-disk steps, whatever subtitle files it already has.
-function sweepWantsVideo(videoFilePath, showName) {
+// Whether the sweep should take the video: not yet through the add-to-disk
+// steps, watched or not, whatever subtitle files it already has.
+function sweepWantsVideo(videoFilePath) {
   if (subsState.subQueue.some((e) => e.videoFilePath === videoFilePath))
     return false;
   if (subsState.asrQueue.some((e) => e.videoPath === videoFilePath))
     return false;
-  if (subs.isProcessed(videoFilePath)) return false;
-  const rec = tvdb.getAllTvdbSync?.()?.[showName];
-  const parsed = parseFileSeasonEpisode(videoFilePath);
-  return !(
-    rec &&
-    parsed &&
-    epd.isWatched(rec.episodeData, parsed.season, parsed.episode)
-  );
+  return !subs.isProcessed(videoFilePath);
 }
 // Copy the video's English (or untagged) text tracks out to sanitized
 // sidecars: <base>.T<n>.srt, or .H<n>.srt for one flagged as describing music
@@ -602,7 +596,18 @@ async function processSubQueueEntry() {
   // process leaves it behind, and then subQueue.json still has it and it is
   // retried on restart instead of vanishing between queues. Re-running is
   // safe: every step skips what is already there.
-  const entry = subsState.subQueue[0];
+  // The sweep's entries come after all other batch work: while stills, a
+  // recode or ASR is running or queued, only the others are taken. One already
+  // running carries on to its end.
+  const othersBusy =
+    stillsBusy() ||
+    getRecodePending().length > 0 ||
+    subsState.genSrtRunning ||
+    subsState.asrQueue.length > 0;
+  const entry = othersBusy
+    ? subsState.subQueue.find((e) => !e.lowPriority)
+    : subsState.subQueue[0];
+  if (!entry) return;
   const videoFilePath = entry.videoFilePath;
   subsState.subQueueBusy = true;
   subsState.currentlyProcessingSubPath = videoFilePath;

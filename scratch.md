@@ -1,5 +1,5 @@
 
-
+in web playing show show name and s01e01 to left of subs button
 
 i'm 172
 

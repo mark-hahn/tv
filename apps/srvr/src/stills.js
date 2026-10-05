@@ -476,6 +476,11 @@ export async function startStills(
 const playBuilds = new Map();
 let newestPlay = null;
 
+// Whether any stills build, intro strip or play set, is running or queued.
+export function stillsBusy() {
+  return !!running || pending.length > 0 || playBuilds.size > 0;
+}
+
 // tvapp's scrub stills for an episode it is about to play, which it shows
 // while left/right is held. Starts the set building unless it is already on
 // disk or on its way, stopping any other set's build, and returns at once with

@@ -58,7 +58,7 @@ tv-down brings `.srt` files over from the usb seedbox. It takes one only when it
 
 ## The backstop sweep
 
-The watcher is the only normal path into the sub queue, and it once silently lost every download for shows whose folder name differs from their TVDB name. So a second path walks the whole library: 10 minutes after tv-srvr starts and then every 6 hours. It queues, at low priority, every video of a library show that is not already in the sub or ASR queue, has not been processed, and is not marked watched, whatever subtitle files it already has. This is also how videos that were on disk before the queue existed get their embedded tracks copied out, including the ones that already had downloaded or ASR files. A settled library adds nothing, so the sweep is just a directory walk.
+The watcher is the only normal path into the sub queue, and it once silently lost every download for shows whose folder name differs from their TVDB name. So a second path walks the whole library: 10 minutes after tv-srvr starts and then every 6 hours. It queues, at low priority, every video of a library show that is not already in the sub or ASR queue, and has not been processed, watched or not, whatever subtitle files it already has. Its entries come after all other batch work: while a stills build (an intro strip or a play set), a recode or ASR is running or queued, the sub queue takes only entries from the watcher or the local pane. An entry already running when such work starts carries on to its end. This is also how videos that were on disk before the queue existed get their embedded tracks copied out, including the ones that already had downloaded or ASR files. A settled library adds nothing, so the sweep is just a directory walk.
 
 ## ASR
 

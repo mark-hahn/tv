@@ -624,6 +624,8 @@ export default {
       showReloadingShows: false,
       isWideLandscape: false,
       actorFilter: null,
+      jevNouls: null, // Map of show name to noul from the jev pane's Shows query
+      jevUndo: [], // Filter and sort from before each jev query, for its Clear
       actorSearchParams: null, // Store search params for word-based actor search
       actorsListMode: false, // Whether we are in actors list mode
       actorsList: [], // List of all actors (for actors list mode)
@@ -644,6 +646,7 @@ export default {
         "Length",
         "Creator",
         "Quality",
+        "Jev",
       ],
       fltrChoices: [
         "All",
@@ -1270,6 +1273,9 @@ export default {
       // The sort key is shared with tv-srvr; what each row *displays* is this
       // client's own business, so only that is still worked out here.
       if (forSort) return getSortKey(show, this.sortChoice, allTvdb);
+      // Sorted by Jev, the row shows the show's jev confidence.
+      if (this.sortChoice === "Jev")
+        return this.jevNouls?.get(show.name)?.toFixed(2) ?? "";
       let lastDownloaded, lastViewed, ratings;
       switch (this.sortChoice) {
         case "Alpha":
@@ -1784,9 +1790,18 @@ export default {
     },
 
     async allClick() {
+      this.resetFilters();
+      await this.select();
+      this.sortPopped = false;
+      this.fltrPopped = false;
+    },
+
+    // Every filter back to how the All button leaves it.
+    resetFilters() {
       evtBus.emit("clearFilterButtons");
       evtBus.emit("clearDescrSearch");
       this.actorFilter = null;
+      this.dropJev();
       this.actorSearchParams = null;
       evtBus.emit("actorSearchCleared");
       window.localStorage.setItem("fltrChoice", "All");
@@ -1804,9 +1819,6 @@ export default {
         const selectedInLibrary = !selectedShow || selectedShow.inLibrary !== false;
         haslibraryCond.filter = selectedInLibrary ? 1 : 0;
       }
-      await this.select();
-      this.sortPopped = false;
-      this.fltrPopped = false;
     },
     async handleTvClick() {
       const show = this.highlightShow;
@@ -2230,7 +2242,19 @@ export default {
       this.sortShows();
     },
 
+    // Turns the jev filter off; a Jev sort goes back to the sort from before
+    // the query.
+    dropJev() {
+      this.jevNouls = null;
+      if (this.sortChoice === "Jev")
+        this.sortChoice =
+          this.jevUndo.findLast((s) => s.sortChoice !== "Jev")?.sortChoice ??
+          "Viewed";
+    },
+
     sortAction(sortChoice) {
+      // Jev sorts by the last jev query's confidence; with none it does nothing.
+      if (sortChoice === "Jev" && !this.jevNouls) return;
       this.sortChoice = sortChoice;
       this.reversed = false;
       this.sortShows();
@@ -2241,6 +2265,7 @@ export default {
 
     async fltrAction(fltrChoice) {
       this.actorFilter = null; // Clear actor filter when changing filter
+      this.dropJev();
       this.actorSearchParams = null;
       evtBus.emit("actorSearchCleared");
       if (fltrChoice === "All") evtBus.emit("clearDescrSearch");
@@ -2739,6 +2764,7 @@ export default {
 
     async condFltrClick(cond, event) {
       this.actorFilter = null; // Clear actor filter when clicking conditional filters
+      this.dropJev();
       this.actorSearchParams = null;
       evtBus.emit("actorSearchCleared");
       this.fltrChoice = "- - - - -";
@@ -2759,6 +2785,15 @@ export default {
     },
 
     sortShows() {
+      // Jev: by the jev query's confidence, highest first.
+      if (this.sortChoice === "Jev" && this.jevNouls) {
+        const dir = this.reversed ? -1 : 1;
+        this.shows = [...this.shows].sort(
+          (a, b) =>
+            dir * (this.jevNouls.get(b.name) - this.jevNouls.get(a.name)),
+        );
+        return;
+      }
       this.shows = sortShowList(
         this.shows,
         this.sortChoice,
@@ -2845,6 +2880,13 @@ export default {
           await this.filterShowsByActor(this.actorFilter);
           return;
         }
+      }
+
+      if (this.jevNouls) {
+        this.shows = allShows.filter((show) => this.jevNouls.has(show.name));
+        this.sortShows();
+        if (scroll) this.scrollToSavedShow();
+        return;
       }
 
       // Lightweight version of select(): avoids a full TVDB refresh unless
@@ -3123,6 +3165,7 @@ export default {
       // Update the shows list and UI
       this.shows = filteredShows;
       this.actorFilter = actorName;
+      this.dropJev();
       this.fltrChoice = "- - - - -";
 
       this.scrollToSavedShow();
@@ -3183,6 +3226,7 @@ export default {
       // Step 3: Update the shows list and UI
       this.shows = filteredShows;
       this.actorFilter = searchText;
+      this.dropJev();
       this.actorSearchParams = { searchWords, matchesSearchTerm }; // Store for refiltering
       this.fltrChoice = "- - - - -";
 
@@ -3252,6 +3296,7 @@ export default {
       // Keep the current selection (highlightName) so refilter() can preserve it
       this.filterStr = "";
       this.actorFilter = null; // Clear actor filter
+      this.dropJev();
       this.actorSearchParams = null;
       evtBus.emit("actorSearchCleared");
       if (!dontClrFilters) {
@@ -3708,6 +3753,44 @@ export default {
       const matchesSearchTerm = (n) => normName(n) === targetNorm;
       this.actorSearchParams = { searchWords: [], matchesSearchTerm };
       evtBus.emit("actorSearchActive", { searchWords: [], matchesSearchTerm });
+    });
+
+    // Filter shows to the [{name, noul}] a jev pane Shows query matched
+    on("filterByJev", async (matched) => {
+      await this.loadAllShowsWithDialog();
+      this.jevUndo.push({
+        jevNouls: this.jevNouls,
+        actorFilter: this.actorFilter,
+        actorSearchParams: this.actorSearchParams,
+        fltrChoice: this.fltrChoice,
+        filterStr: this.filterStr,
+        condFilters: this.conds.map((c) => c.filter),
+        sortChoice: this.sortChoice,
+        reversed: this.reversed,
+      });
+      this.resetFilters();
+      this.jevNouls = new Map(matched.map((s) => [s.name, s.noul]));
+      this.fltrChoice = "- - - - -";
+      this.sortChoice = "Jev";
+      this.reversed = false;
+      await this.refilter();
+      if (
+        this.shows.length > 0 &&
+        !this.shows.some((s) => s.name === this.highlightName)
+      )
+        this.saveVisShow(this.shows[0], true);
+    });
+
+    // The jev pane's Clear: back to the filter and sort from before the last query
+    on("clearJevFilter", async () => {
+      const prev = this.jevUndo.pop();
+      if (!prev) return;
+      const { condFilters, ...rest } = prev;
+      Object.assign(this, rest);
+      this.conds.forEach((c, i) => (c.filter = condFilters[i]));
+      if (prev.actorSearchParams)
+        evtBus.emit("actorSearchActive", prev.actorSearchParams);
+      await this.refilter();
     });
 
     // Clear actorsListMode and actor shows filter when an actor is selected in the actors pane

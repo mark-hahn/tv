@@ -15,6 +15,7 @@ import * as tvdb from "./src/tvdb.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
+import { jevQuery } from "./src/jev.js";
 import { handleFix, readFixState, tailFixLog } from "./src/fix.js";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import {
@@ -1679,6 +1680,7 @@ app.post(
 );
 app.post("/api/searchActorsOutsideLibrary", apiWrapper(tvdb.searchActorsOutsideLibrary));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));
+app.post("/api/jevQuery", apiWrapper(jevQuery));
 app.post("/api/getPersonImages", apiWrapper(tmdb.getPersonImages));
 app.post("/api/getStreamProviders", apiWrapper(tmdb.getStreamProviders));
 // A GET, unlike the other tmdb calls: the tv app asks for one card's image at

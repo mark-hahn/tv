@@ -233,6 +233,7 @@ export default {
         Premiered: "75px",
         Length: "25px",
         Creator: "0",
+        Jev: "45px",
       };
       return widths[this.sortChoice] || "75px";
     },

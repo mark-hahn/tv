@@ -1,4 +1,7 @@
 
+show input query to api in results subpane with output results below that -- separate them with a solid line
+
+
 
 i'm 172
 
@@ -6,6 +9,21 @@ i'm 172
 .opnXXXXX naming
 back up pause based on pause length
 =================
+
+add a sort selection `Jev` to the sort selector in hdrbot. it should be automatically set to match sort state so jev will be selected when sorted by jev -- when jev is selected and there is no jev query it should do nothing.  when query is executed the filter selector should show the dashes in that selector
+
+the filter results were correct. add to results pane: input token count, cost, and time delay for response  -- the cost should assume $0.042/MTok input -- do this for queries with checkbox checked or not checked.
+i changed my mind: don't close jev pane with checkbox checked or not checked until another pane is selected which already works. -- when show list is filtered by jev then show the confidence of each show in the info part of the show line on the left.
+
+add a button `Jev`between Local and log buttons in tab button row.  when clicked open a pane called jev. the pane should have two subpanes, the query at the top with a text editor and the result at the bottom. at the top add button `Query`, checkbox `Shows`, and button `Close`. query button should send the text in the text editor to typesafe as a query. when the Shows checkbox is checked the show list should be treated as context like you did earlier in this conversation. the list of shows with confidence greater then .25 should be used to filter the shows list in list pane and then the jev pane should close. The text in the editor should be persistant. when shows is not checked send the text as a single reuest and put the complete answer in the bottom half of the jev pane as pretty json.
+
+# jeva typesafe text question
+- i want you to use typesafe api to answer a question. 
+- the typesafe quick-start documentation is at https://docs.typesafe.ai/introduction/quickstart.
+- the api key is in /root/dev/apps/tv/jev-key.txt
+- the question is `which of these tv shows are set in the australian outback`
+  - the list of shows in this app should be included in context
+- put answer in ./outback.json
 
 in web player display show name and s01e01 to the left of the subs button
 

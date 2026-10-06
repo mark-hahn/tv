@@ -951,6 +951,11 @@ export function getTmdb(params) {
   return httpCall("/api/getTmdb", params, "POST");
 }
 
+// An All Shows query asks about every show, about 5 s.
+export function jevQuery(params) {
+  return httpCall("/api/jevQuery", params, "POST", 120000);
+}
+
 // Photos of people in one show, chosen by tv-srvr (images.js).
 export function getPersonImages(params) {
   return httpCall("/api/getPersonImages", params, "POST");

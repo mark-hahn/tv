@@ -277,6 +277,11 @@
             :movieMode="movieMode"
             @select-show="handleLocalSelectShow"
           ></Local>
+          <Jev
+            v-show="!simpleMode && currentPane === 'jev'"
+            style="width: 100%; height: 100%"
+            :show="currentShow"
+          ></Jev>
           <Log
             v-show="!simpleMode && currentPane === 'log'"
             style="width: 100%; height: 100%"
@@ -588,6 +593,7 @@ import Qbt from "./qbt.vue";
 import Down from "./down.vue";
 import Usb from "./usb.vue";
 import Local from "./local.vue";
+import Jev from "./jev.vue";
 import Log from "./log.vue";
 import Plot from "./plot.vue";
 import Queues from "./queues.vue";
@@ -625,6 +631,7 @@ export default {
     Usb,
     Down,
     Local,
+    Jev,
     Log,
     Plot,
     Queues,
@@ -971,6 +978,7 @@ export default {
         { label: "Down", key: "down" },
         { label: "Queues", key: "queues" },
         { label: "Local", key: "local" },
+        { label: "Jev", key: "jev" },
         { label: "Log", key: "log" },
         { label: "Plot", key: "plot" },
       ];

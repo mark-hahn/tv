@@ -34,10 +34,10 @@
       "
     >
       <div style="font-size: 18px; font-weight: bold">Refreshing Show</div>
-      <div style="margin-top: 8px; font-size: 16px">
+      <div style="margin-top: 8px; font-size: 18px">
         {{ refreshDialogShowName }}
       </div>
-      <div style="margin-top: 8px; font-size: 14px">
+      <div style="margin-top: 8px; font-size: 18px">
         {{ refreshDialogStatus }}
       </div>
     </div>
@@ -69,7 +69,7 @@
         style="
           width: 100%;
           min-height: 150px;
-          font-size: 14px;
+          font-size: 18px;
           padding: 10px;
           box-sizing: border-box;
           border: 1px solid #ccc;
@@ -89,7 +89,7 @@
         <button
           @click="removeComment"
           style="
-            font-size: 14px;
+            font-size: 18px;
             cursor: pointer;
             padding: 8px 20px;
             border-radius: 7px;
@@ -103,7 +103,7 @@
         <button
           @click="saveComment"
           style="
-            font-size: 14px;
+            font-size: 18px;
             cursor: pointer;
             padding: 8px 20px;
             border-radius: 7px;
@@ -117,7 +117,7 @@
         <button
           @click="closeCommentDialog"
           style="
-            font-size: 14px;
+            font-size: 18px;
             cursor: pointer;
             padding: 8px 20px;
             border-radius: 7px;

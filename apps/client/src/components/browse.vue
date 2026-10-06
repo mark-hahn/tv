@@ -627,7 +627,7 @@
         borderRadius: '5px',
         zIndex: 10000,
         pointerEvents: 'none',
-        fontSize: '16px',
+        fontSize: '18px',
       }"
     >
       {{ toastMessage }}

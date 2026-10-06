@@ -33,7 +33,7 @@
       <div style="font-size: 20px; color: #0066cc; margin-bottom: 15px">
         {{ searchingShowName }}
       </div>
-      <div style="font-size: 16px; color: #666; margin-bottom: 6px">
+      <div style="font-size: 18px; color: #666; margin-bottom: 6px">
         {{ searchingStatus || "Please wait ..." }}
       </div>
     </div>

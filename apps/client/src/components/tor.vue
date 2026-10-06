@@ -865,6 +865,7 @@
       @click.stop="showModal = false"
       style="
         position: fixed;
+        font-size: 18px;
         top: 0;
         left: 0;
         width: 100%;
@@ -887,7 +888,7 @@
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         "
       >
-        <div style="font-size: 16px; margin-bottom: 20px; line-height: 1.5">
+        <div style="font-size: 18px; margin-bottom: 20px; line-height: 1.5">
           Is it OK to download file
           <span style="font-weight: bold">{{
             [...selectedItems][0]?.raw?.title || "Unknown"
@@ -899,7 +900,7 @@
             @click.stop="cancelDownload"
             style="
               padding: 8px 20px;
-              font-size: 14px;
+              font-size: 18px;
               cursor: pointer;
               border-radius: 5px;
               border: 1px solid #ccc;
@@ -912,7 +913,7 @@
             @click.stop="continueDownload"
             style="
               padding: 8px 20px;
-              font-size: 14px;
+              font-size: 18px;
               cursor: pointer;
               border-radius: 5px;
               border: 1px solid #ccc;
@@ -930,6 +931,7 @@
       @click.stop="closeErrorModal"
       style="
         position: fixed;
+        font-size: 18px;
         top: 0;
         left: 0;
         width: 100%;
@@ -954,7 +956,7 @@
       >
         <div
           style="
-            font-size: 16px;
+            font-size: 18px;
             margin-bottom: 20px;
             line-height: 1.5;
             white-space: pre-line;
@@ -967,7 +969,7 @@
             @click.stop="closeErrorModal"
             style="
               padding: 8px 20px;
-              font-size: 14px;
+              font-size: 18px;
               cursor: pointer;
               border-radius: 5px;
               border: 1px solid #ccc;
@@ -985,6 +987,7 @@
       @click.stop="cancelExistingDelete"
       style="
         position: fixed;
+        font-size: 18px;
         top: 0;
         left: 0;
         width: 100%;
@@ -1009,7 +1012,7 @@
       >
         <div
           style="
-            font-size: 16px;
+            font-size: 18px;
             margin-bottom: 20px;
             line-height: 1.5;
             white-space: pre-line;
@@ -1022,7 +1025,7 @@
             @click.stop="cancelExistingDelete"
             style="
               padding: 8px 20px;
-              font-size: 14px;
+              font-size: 18px;
               cursor: pointer;
               border-radius: 5px;
               border: 1px solid #ccc;
@@ -1035,7 +1038,7 @@
             @click.stop="confirmExistingDelete"
             style="
               padding: 8px 20px;
-              font-size: 14px;
+              font-size: 18px;
               cursor: pointer;
               border-radius: 5px;
               border: 1px solid #ccc;
@@ -1054,6 +1057,7 @@
       @click.stop="closeInfoModal"
       style="
         position: fixed;
+        font-size: 18px;
         top: 0;
         left: 0;
         width: 100%;
@@ -1078,7 +1082,7 @@
       >
         <div
           style="
-            font-size: 16px;
+            font-size: 18px;
             margin-bottom: 20px;
             line-height: 1.5;
             white-space: pre-line;
@@ -1091,7 +1095,7 @@
             @click.stop="closeInfoModal"
             style="
               padding: 8px 20px;
-              font-size: 14px;
+              font-size: 18px;
               cursor: pointer;
               border-radius: 5px;
               border: 1px solid #ccc;
@@ -1110,6 +1114,7 @@
       @click.stop="closeTorrentInfoModal"
       style="
         position: fixed;
+        font-size: 18px;
         top: 0;
         left: 0;
         width: 100%;
@@ -1236,7 +1241,7 @@
             @click.stop="closeTorrentInfoModal"
             style="
               padding: 8px 20px;
-              font-size: 14px;
+              font-size: 18px;
               cursor: pointer;
               border-radius: 5px;
               border: 1px solid #ccc;
@@ -1255,6 +1260,7 @@
       @click.stop
       style="
         position: fixed;
+        font-size: 18px;
         top: 0;
         left: 0;
         width: 100%;
@@ -1277,10 +1283,10 @@
           text-align: center;
         "
       >
-        <div style="font-size: 16px; font-weight: bold; margin-bottom: 12px">
+        <div style="font-size: 18px; font-weight: bold; margin-bottom: 12px">
           Loading show into the library
         </div>
-        <div style="font-size: 14px; color: #555">
+        <div style="font-size: 18px; color: #555">
           {{ libraryLoadingStatus }}
         </div>
       </div>

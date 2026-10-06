@@ -1172,7 +1172,7 @@
         color: '#fff',
         padding: '12px 24px',
         borderRadius: '8px',
-        fontSize: '15px',
+        fontSize: '18px',
         fontWeight: 'bold',
         zIndex: 10000,
         boxShadow: '0 4px 12px rgba(0,0,0,0.3)',

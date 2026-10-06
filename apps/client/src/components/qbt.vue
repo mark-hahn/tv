@@ -365,6 +365,7 @@
       @click.stop="closeQbtInfoModal"
       style="
         position: fixed;
+        font-size: 18px;
         top: 0;
         left: 0;
         width: 100%;
@@ -411,7 +412,7 @@
             grid-template-columns: 150px 1fr;
             gap: 8px 14px;
             align-content: start;
-            font-size: 17px;
+            font-size: 18px;
           "
         >
           <div style="font-weight: 600">Name</div>
@@ -462,7 +463,7 @@
             @click.stop="closeQbtInfoModal"
             :style="{
               padding: '8px 20px',
-              fontSize: '17px',
+              fontSize: '18px',
               cursor: 'pointer',
               borderRadius: '5px',
               border: '1px solid #ccc',

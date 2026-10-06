@@ -360,6 +360,7 @@
       @pointerdown.stop
       style="
         position: fixed;
+        font-size: 18px;
         inset: 0;
         background-color: rgba(0, 0, 0, 0.35);
         z-index: 2000;
@@ -385,7 +386,7 @@
           style="
             margin: 0;
             font-family: Arial, sans-serif;
-            font-size: 15px;
+            font-size: 18px;
             font-weight: 400;
             white-space: pre-wrap;
             word-break: break-word;
@@ -401,6 +402,7 @@
       @pointerdown.stop
       style="
         position: fixed;
+        font-size: 18px;
         inset: 0;
         background-color: rgba(0, 0, 0, 0.5);
         z-index: 3000;
@@ -419,7 +421,7 @@
           padding: 24px 28px;
           max-width: 480px;
           width: calc(100% - 40px);
-          font-size: 16px;
+          font-size: 18px;
           font-weight: bold;
         "
       >
@@ -446,7 +448,7 @@
           @click.stop.prevent="missingEpWarning = null"
           @pointerdown.stop.prevent
           style="
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
             cursor: pointer;
             border-radius: 7px;
@@ -466,6 +468,7 @@
       @pointerdown.stop
       style="
         position: fixed;
+        font-size: 18px;
         inset: 0;
         background-color: rgba(0, 0, 0, 0.5);
         z-index: 3000;
@@ -484,7 +487,7 @@
           padding: 24px 28px;
           max-width: 480px;
           width: calc(100% - 40px);
-          font-size: 16px;
+          font-size: 18px;
           font-weight: bold;
         "
       >
@@ -493,7 +496,7 @@
           @click.stop.prevent="subError = null"
           @pointerdown.stop.prevent
           style="
-            font-size: 16px;
+            font-size: 18px;
             font-weight: bold;
             cursor: pointer;
             border-radius: 7px;
@@ -514,6 +517,7 @@
       @pointerdown.stop
       style="
         position: fixed;
+        font-size: 18px;
         inset: 0;
         background-color: rgba(0, 0, 0, 0.35);
         z-index: 2000;
@@ -537,13 +541,13 @@
           overflow: auto;
         "
       >
-        <div style="font-size: 16px; font-weight: bold; margin-bottom: 10px">
+        <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px">
           {{ tvdbMismatchTitle }}
         </div>
         <pre
           style="
             margin: 0;
-            font-size: 12px;
+            font-size: 18px;
             white-space: pre-wrap;
             word-break: break-word;
           "
@@ -553,7 +557,7 @@
             @click.stop.prevent="closeTvdbMismatch"
             @pointerdown.stop.prevent
             style="
-              font-size: 13px;
+              font-size: 18px;
               cursor: pointer;
               border-radius: 7px;
               padding: 4px 12px;

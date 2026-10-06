@@ -287,6 +287,7 @@
       @click.stop="dialogRow = null"
       style="
         position: fixed;
+        font-size: 18px;
         inset: 0;
         background: rgba(0, 0, 0, 0.5);
         z-index: 1000;
@@ -305,7 +306,7 @@
           width: 90%;
           max-height: 80vh;
           overflow-y: auto;
-          font-size: 13px;
+          font-size: 18px;
           font-family: monospace;
         "
       >
@@ -331,7 +332,7 @@
           <pre
             style="
               margin: 0;
-              font-size: 12px;
+              font-size: 18px;
               white-space: pre-wrap;
               word-break: break-all;
             "
@@ -342,7 +343,7 @@
           <button
             @click.stop="dialogRow = null"
             style="
-              font-size: 13px;
+              font-size: 18px;
               cursor: pointer;
               border-radius: 7px;
               padding: 4px 14px;

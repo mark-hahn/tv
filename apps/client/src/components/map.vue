@@ -39,7 +39,7 @@
       <div style="font-size: 20px; color: #0066cc; margin-bottom: 15px">
         {{ mapWorkingShowName }}
       </div>
-      <div style="font-size: 16px; color: #666; margin-bottom: 6px">
+      <div style="font-size: 18px; color: #666; margin-bottom: 6px">
         {{ mapWorkingStatus || "Please wait ..." }}
       </div>
     </div>
@@ -1016,13 +1016,13 @@
           box-shadow: 0 6px 28px rgba(0, 0, 0, 0.4);
         "
       >
-        <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px">
+        <div style="font-weight: bold; font-size: 18px; margin-bottom: 8px">
           Gapchk — {{ gapchkConfirmShow }}
         </div>
         <div
           v-for="(a, i) in gapchkActions"
           :key="i"
-          style="margin-bottom: 10px; font-size: 13px"
+          style="margin-bottom: 10px; font-size: 18px"
         >
           <div
             :style="{
@@ -1046,7 +1046,7 @@
           <div
             v-for="(it, j) in a.items"
             :key="j"
-            style="margin-left: 20px; font-family: monospace; font-size: 12px"
+            style="margin-left: 20px; font-family: monospace; font-size: 18px"
           >
             {{ it }}
           </div>
@@ -1055,7 +1055,7 @@
           <button
             @click="gapchkConfirmShow = null"
             style="
-              font-size: 13.5px;
+              font-size: 18px;
               margin-right: 8px;
               border-radius: 7px;
               padding: 3px 12px;
@@ -1071,7 +1071,7 @@
               cursor: gapchkStrays.length ? 'pointer' : 'default',
             }"
             style="
-              font-size: 13.5px;
+              font-size: 18px;
               margin-right: 8px;
               border-radius: 7px;
               padding: 3px 12px;
@@ -1081,7 +1081,7 @@
           </button>
           <button
             @click="runGapchkActions"
-            style="font-size: 13.5px; border-radius: 7px; padding: 3px 12px"
+            style="font-size: 18px; border-radius: 7px; padding: 3px 12px"
           >
             Do it
           </button>
@@ -1095,14 +1095,15 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: white;
+        background-color: white;
         color: black;
-        padding: 7px 12px;
-        border: 1px solid #ccc;
-        border-radius: 7px;
+        padding: 30px 40px;
+        border: 2px solid black;
+        border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        font-size: 13px;
+        font-size: 18px;
         z-index: 9999;
+        text-align: center;
       "
     >
       {{ gapchkResult }}
@@ -1365,13 +1366,14 @@ export default {
       }
       return set;
     },
-    // Ignoring is only offered when at least one selected episode is not
-    // already in the show's ignoreGaps list -- re-ignoring an ignored
-    // episode does nothing.
     canIgnoreGaps() {
-      if (this.selectedCells.size === 0) return false;
+      return this.selectedCells.size > 0;
+    },
+    // The button toggles: if any selected episode is ignored, it un-ignores
+    // them all; only when none are does it ignore them.
+    ignoreGapsRemoves() {
       for (const key of this.selectedCells) {
-        if (!this.ignoredGapSet.has(key)) return true;
+        if (this.ignoredGapSet.has(key)) return true;
       }
       return false;
     },
@@ -1543,10 +1545,14 @@ export default {
       setTimeout(() => {
         this.ignoreGapsFlash = false;
       }, 750);
-      const r = await srvr.ignoreGaps(show.name, episodes);
-      this.gapchkResult = r?.success
-        ? `ignoring ${r.added} more episode(s) for gap checks`
-        : `ignore failed: ${r?.error || "unknown error"}`;
+      const remove = this.ignoreGapsRemoves;
+      const r = await srvr.ignoreGaps(show.name, episodes, remove);
+      if (r?.success) show.ignoreGaps = r.ignoreGaps;
+      this.gapchkResult = !r?.success
+        ? `ignore failed: ${r?.error || "unknown error"}`
+        : remove
+          ? `no longer ignoring ${r.removed} episode(s) for gap checks`
+          : `ignoring ${r.added} more episode(s) for gap checks`;
       setTimeout(() => {
         this.gapchkResult = "";
       }, 8000);

@@ -65,6 +65,7 @@
       <textarea
         v-model="text"
         @keydown.stop
+        @keydown.ctrl.enter.prevent="!busy && text.trim() && query()"
         spellcheck="false"
         style="
           flex: 1 1 0;

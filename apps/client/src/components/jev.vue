@@ -24,7 +24,15 @@
         padding: 5px 10px;
       "
     >
-      <div style="flex: 1; display: flex; align-items: center; gap: 10px">
+      <div
+        style="
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          white-space: nowrap;
+        "
+      >
         <span>Jev</span>
         <button
           @click="query"
@@ -39,19 +47,39 @@
         >
           <option v-for="m in modes" :key="m" :value="m">{{ m }}</option>
         </select>
+        <label
+          title="In Lib and All Shows keep the shows above this confidence"
+          style="font-family: sans-serif; font-size: 14px; font-weight: normal"
+        >
+          <input
+            type="number"
+            min="10"
+            max="99"
+            step="5"
+            :value="minPct"
+            @change="pctChange"
+            @keydown.stop="pctKey"
+            style="width: 60px; font-size: 14px"
+          />%
+        </label>
       </div>
       <span
         style="
+          flex: 1;
+          min-width: 0;
+          text-align: center;
           font-family: sans-serif;
           font-size: 14px;
           font-weight: normal;
           white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         "
         >{{ stats }}</span
       >
       <div
         style="
-          flex: 1;
+          flex: 0 0 auto;
           display: flex;
           justify-content: flex-end;
           gap: 10px;
@@ -109,8 +137,10 @@ const MODE_KEY = "jev.mode";
 const MODES = ["Plain", "Show", "In Lib", "All Shows"];
 // The modes that ask about many shows and filter the list by the answers.
 const MULTI_MODES = ["In Lib", "All Shows"];
-// A many-show query filters the list to the shows above this.
-const JEV_MIN_NOUL = 0.25;
+const MIN_PCT_KEY = "jev.minPct";
+// A many-show query filters the list to the shows above this confidence, in
+// percent; the box allows whole numbers from 10 to 99.
+const MIN_PCT_DEFAULT = 25;
 
 export default {
   name: "Jev",
@@ -121,6 +151,9 @@ export default {
     return {
       text: window.localStorage.getItem(TEXT_KEY) ?? "",
       mode: window.localStorage.getItem(MODE_KEY) ?? "Plain",
+      minPct: Number(
+        window.localStorage.getItem(MIN_PCT_KEY) ?? MIN_PCT_DEFAULT,
+      ),
       modes: MODES,
       busy: false,
       stats: "",
@@ -137,6 +170,29 @@ export default {
     },
   },
   methods: {
+    // Del in the box puts the default back.
+    pctKey(e) {
+      if (e.key !== "Delete") return;
+      e.preventDefault();
+      this.setPct(e.target, MIN_PCT_DEFAULT);
+    },
+    // A typed value is held to a whole number from 10 to 99; an empty box
+    // goes back to the default.
+    pctChange(e) {
+      const v = e.target.value;
+      const pct =
+        v === ""
+          ? MIN_PCT_DEFAULT
+          : Math.min(99, Math.max(10, Math.round(Number(v))));
+      this.setPct(e.target, pct);
+    },
+    // The box is set directly too: the value may not have changed, so a
+    // re-render would leave what was typed showing.
+    setPct(el, pct) {
+      this.minPct = pct;
+      el.value = pct;
+      window.localStorage.setItem(MIN_PCT_KEY, String(pct));
+    },
     btnStyle(disabled) {
       return {
         padding: "2px 10px",
@@ -177,7 +233,9 @@ export default {
           this.result = JSON.stringify(res.result, null, 2);
           return;
         }
-        const matched = res.result.shows.filter((s) => s.noul > JEV_MIN_NOUL);
+        const matched = res.result.shows.filter(
+          (s) => s.noul > this.minPct / 100,
+        );
         this.result = JSON.stringify(
           { ...res.result, shows: matched },
           null,

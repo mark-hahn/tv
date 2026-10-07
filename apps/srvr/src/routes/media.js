@@ -236,7 +236,9 @@ export function registerMediaRoutes(app) {
       });
       req.on("close", killFfmpeg);
       res.on("close", killFfmpeg);
-      ffmpeg.on("exit", (code) => {
+      // close, not exit: exit can come while stdout still holds data, and
+      // the pipe writing it after this end() crashed tv-srvr.
+      ffmpeg.on("close", (code) => {
         if (code !== 0 && code !== null) unilog(46, `ffmpeg exit code ${code}`);
         if (!res.writableEnded) res.end();
       });

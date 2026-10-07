@@ -845,6 +845,10 @@ export function getAsrQueue() {
   return httpCall("/api/asr/queue");
 }
 
+export function getAsrCost(month) {
+  return httpCall("/api/asr/cost", { month });
+}
+
 export function addToAsrQueue(videoPaths) {
   return httpCall("/api/asr/queue/add", { videoPaths }, "POST");
 }

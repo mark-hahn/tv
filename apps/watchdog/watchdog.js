@@ -26,6 +26,7 @@ const { MailtrapClient } = require("mailtrap");
 const UNILOG_DB_PATH = "/root/dev/apps/tv/unilog/unilog.sqlite";
 const ALERT_LOG_PATH = "/root/dev/apps/tv/unilog/watchdog-alerts.log";
 const PM2_TARGET = "tv-srvr";
+const EMBY_UNIT = "emby-server"; // systemd unit; emailed once each time it goes down
 
 const CHECK_INTERVAL_MS = 60 * 1000; // run all checks every 60s
 const HEARTBEAT_MAX_AGE_MS = 6 * 60 * 1000; // no "hb" event in 6m => stuck/dead
@@ -534,6 +535,23 @@ async function checkErrors() {
   }
 }
 
+// Emby runs under systemd, not pm2. One email per outage: the active "emby"
+// alert suppresses repeats until the unit is active again.
+async function checkEmby() {
+  const state = await new Promise((resolve) =>
+    cp.execFile("systemctl", ["is-active", EMBY_UNIT], (err, out) =>
+      resolve(out.trim() || err.message),
+    ),
+  );
+  if (state === "active") return clear("emby");
+  if (activeAlerts.has("emby")) return;
+  raise("emby", "critical", `${EMBY_UNIT} is ${state}`);
+  await sendMail(
+    `tv-watchdog: ${EMBY_UNIT} is ${state}`,
+    `journalctl -u ${EMBY_UNIT} -n 50 --no-pager`,
+  );
+}
+
 // ---- checks ----
 let lastRestarts = null;
 async function runChecks() {
@@ -561,6 +579,8 @@ async function runChecks() {
     }
     lastRestarts = p.restarts;
   }
+
+  await checkEmby();
 
   // 3. heartbeat liveness (tier 1). Skip while the server is too young to have
   // emitted its first beat yet (avoids a false alarm right after a restart).

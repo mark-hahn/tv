@@ -708,6 +708,19 @@
             Queue
           </button>
           <button
+            @click="asrCostMode = !asrCostMode"
+            :style="{
+              cursor: 'pointer',
+              borderRadius: '4px',
+              padding: '2px 8px',
+              border: '1px solid #bbb',
+              '--btn-bg': asrCostMode ? 'lightgray' : 'whitesmoke',
+              marginRight: '5px',
+            }"
+          >
+            Cost
+          </button>
+          <button
             @click="startAsr"
             :style="{
               cursor: 'pointer',
@@ -767,7 +780,38 @@
         </div>
       </div>
       <div
-        v-if="!asrQueueMode"
+        v-if="asrCostMode"
+        style="
+          flex: 1 1 auto;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+          background-color: #fff;
+          border: 1px solid #eee;
+          padding: 4px;
+        "
+      >
+        <div
+          style="flex: 0 0 auto; display: flex; align-items: center; gap: 10px"
+        >
+          <button
+            @click="stepCostMonth(-1)"
+            style="cursor: pointer; border-radius: 4px; padding: 2px 8px; border: 1px solid #bbb"
+          >
+            &lt;
+          </button>
+          <span>{{ asrCostMonth }}: {{ asrCostTotal }}</span>
+          <button
+            @click="stepCostMonth(1)"
+            style="cursor: pointer; border-radius: 4px; padding: 2px 8px; border: 1px solid #bbb"
+          >
+            &gt;
+          </button>
+        </div>
+        <div ref="asrCostChart" style="flex: 1 1 auto; min-height: 0"></div>
+      </div>
+      <div
+        v-else-if="!asrQueueMode"
         ref="asrScroll"
         style="
           flex: 1 1 auto;
@@ -1196,6 +1240,7 @@ import {
   generateEmb,
   getAsrLog,
   getAsrQueue,
+  getAsrCost,
   getLocalHistory,
   addToAsrQueue,
   abortAsr,
@@ -1208,6 +1253,15 @@ import evtBus from "../evtBus.js";
 import * as util from "../util.js";
 import parseTorrentTitle from "parse-torrent-title";
 import { unilog, logHere } from "../log.js";
+import * as echarts from "echarts/core";
+import { BarChart } from "echarts/charts";
+import { GridComponent, TooltipComponent } from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
+
+echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
+
+// Speechmatics price, dollars per hour of audio, for the ASR pane's Cost chart.
+const ASR_COST_PER_HR = 0.38;
 
 const TEXT_VIEW_MAX_BYTES = 2 * 1024 * 1024;
 // info pane shows only the head of a text file
@@ -1247,6 +1301,11 @@ export default {
       ignoreLogs: false,
       asrQueueMode: false,
       asrQueueEntries: [],
+      asrCostMode: false,
+      asrCostMonth: new Date()
+        .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
+        .slice(0, 7),
+      asrCostTotal: "",
       asrQueueLen: 0,
       asrLogChannel: null,
       asrQueueChannel: null,
@@ -1307,6 +1366,25 @@ export default {
   },
   watch: {
     show(val) {},
+    // The chart element only exists in cost mode, so the chart lives with it.
+    asrCostMode(on) {
+      if (!on) {
+        this._asrCostResize?.disconnect();
+        this._asrCostChart?.dispose();
+        this._asrCostChart = null;
+        return;
+      }
+      this.asrQueueMode = false;
+      this.$nextTick(() => {
+        const el = this.$refs.asrCostChart;
+        this._asrCostChart = echarts.init(el);
+        this._asrCostResize = new ResizeObserver(() =>
+          this._asrCostChart?.resize(),
+        );
+        this._asrCostResize.observe(el);
+        this.loadAsrCost();
+      });
+    },
     movieMode() {
       this.hasLoaded = false;
       this.tree = [];
@@ -1410,6 +1488,8 @@ export default {
     this.stopEmbLogChannel();
     this.stopSubsProgressChannel();
     if (this._onLocalDelKey) evtBus.off("localDelKey", this._onLocalDelKey);
+    this._asrCostResize?.disconnect();
+    this._asrCostChart?.dispose();
   },
   computed: {
     // Rendered ASR output.
@@ -2125,6 +2205,7 @@ export default {
     async clearAsrLog() {
       this.asrLineObjs = [];
       this.asrQueueMode = false;
+      this.asrCostMode = false;
     },
     async startAsr() {
       const mediaRoot = this.movieMode ? "/mnt/media/movies" : "/mnt/media/tv";
@@ -2136,6 +2217,7 @@ export default {
         return;
       }
       this.asrQueueMode = false;
+      this.asrCostMode = false;
       try {
         await addToAsrQueue(videoPaths);
         this.pushAsrLine(`Queued ${videoPaths.length} file(s) for ASR.`);
@@ -2235,8 +2317,61 @@ export default {
     },
     async clickQueue() {
       this.asrQueueMode = !this.asrQueueMode;
+      this.asrCostMode = false;
       if (this.asrQueueMode) {
         await this.fetchAsrQueue();
+      }
+    },
+    stepCostMonth(n) {
+      const [y, m] = this.asrCostMonth.split("-").map(Number);
+      const d = new Date(y, m - 1 + n, 1);
+      this.asrCostMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      this.loadAsrCost();
+    },
+    async loadAsrCost() {
+      const month = this.asrCostMonth;
+      this.asrCostTotal = "loading…";
+      try {
+        const { hrs } = await getAsrCost(month);
+        // a later month click or leaving cost mode wins
+        if (month !== this.asrCostMonth || !this._asrCostChart) return;
+        const cost = hrs.map((h) => +(h * ASR_COST_PER_HR).toFixed(2));
+        const total = hrs.reduce((n, h) => n + h, 0) * ASR_COST_PER_HR;
+        this.asrCostTotal = `$${total.toFixed(2)}`;
+        this._asrCostChart.setOption(
+          {
+            grid: { left: 45, right: 20, top: 20, bottom: 30 },
+            tooltip: {
+              trigger: "axis",
+              axisPointer: { type: "shadow" },
+              valueFormatter: (v) => `$${v.toFixed(2)}`,
+            },
+            xAxis: {
+              type: "category",
+              data: cost.map((_, i) => i + 1),
+              axisTick: { alignWithLabel: true },
+              axisLine: { lineStyle: { color: "#bbb" } },
+              axisLabel: { color: "#666", fontSize: 11 },
+            },
+            yAxis: {
+              type: "value",
+              axisLabel: { color: "#666", fontSize: 11, formatter: "${value}" },
+              splitLine: { lineStyle: { color: "#e8e8e8" } },
+            },
+            series: [
+              {
+                type: "bar",
+                data: cost,
+                barMaxWidth: 28,
+                itemStyle: { color: "#2a78d6", borderRadius: [4, 4, 0, 0] },
+              },
+            ],
+          },
+          true,
+        );
+      } catch (e) {
+        if (month === this.asrCostMonth)
+          this.asrCostTotal = `error: ${e.error ?? e.message}`;
       }
     },
     async fetchAsrLog() {

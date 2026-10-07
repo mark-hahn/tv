@@ -978,7 +978,7 @@ export default {
         { label: "Down", key: "down" },
         { label: "Queues", key: "queues" },
         { label: "Local", key: "local" },
-        { label: "Jev", key: "jev" },
+        { label: "AI", key: "jev" },
         { label: "Log", key: "log" },
         { label: "Plot", key: "plot" },
       ];
@@ -2253,8 +2253,16 @@ export default {
       this.torEpisodeRequest = { show, episodes, seq: this._torEpisodeSeq };
     });
 
+    // A selection the list made itself, for an AI query's filter, rather
+    // than a click: keepPaneOnce comes just before its setUpSeries.
+    evtBus.on("keepPaneOnce", () => {
+      this._keepPaneOnce = true;
+    });
+
     // show-selected: fired when the user picks a new show from the list.
     evtBus.on("setUpSeries", (show) => {
+      const keepPane = this._keepPaneOnce;
+      this._keepPaneOnce = false;
       // --- State update (always) ---
       this.currentShow = show;
       this.currentTvdbData = null; // stale until series pane publishes new data
@@ -2271,6 +2279,7 @@ export default {
       }
 
       // --- Guard layer (keep current pane, no switch) ---
+      if (keepPane) return;
       // Priority 1: map — list.vue handles map content update separately.
       if (prevPane === "map") return;
 

@@ -957,6 +957,41 @@ export function jevQuery(params) {
   return httpCall("/api/jevQuery", params, "POST", 600000);
 }
 
+// Claude's answer as it arrives: onEvent gets each line the server streams
+// ({input}, {text}, {tool, args}), and the promise resolves to the final
+// result. A question can take minutes; the same 10 minute limit applies.
+export async function jevQueryStream(params, onEvent) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 600000);
+  try {
+    const res = await fetch(`${HTTP_URL}/api/jevQueryStream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`jevQueryStream: HTTP ${res.status}`);
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += value;
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const msg = JSON.parse(buf.slice(0, nl));
+        buf = buf.slice(nl + 1);
+        if (msg.error) throw new Error(msg.error);
+        if (msg.done) return msg.done;
+        onEvent(msg);
+      }
+    }
+    throw new Error("jevQueryStream: ended without a result");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Photos of people in one show, chosen by tv-srvr (images.js).
 export function getPersonImages(params) {
   return httpCall("/api/getPersonImages", params, "POST");

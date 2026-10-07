@@ -2,7 +2,11 @@
 // Claude, from the client's jev pane.
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import {
+  query,
+  listSessions,
+  deleteSession,
+} from "@anthropic-ai/claude-agent-sdk";
 import { logHere, unilog} from "@tv/share"
 import { getAllTvdbSync } from "./tvdb.js";
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
@@ -37,11 +41,18 @@ const addCost = async (inputTokens) => {
   });
   jevCost[today] = (jevCost[today] ?? 0) + cost;
   await writeFile(JEV_COST_FILE, JSON.stringify(jevCost, null, 2) + "\n");
-  const month = today.slice(0, 7);
-  let monthCost = 0;
+  return { cost, monthCost: monthCost() };
+};
+
+// Jev's spending so far this LA month.
+const monthCost = () => {
+  const month = new Date()
+    .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
+    .slice(0, 7);
+  let total = 0;
   for (const [date, c] of Object.entries(jevCost))
-    if (date.startsWith(month)) monthCost += c;
-  return { cost, monthCost };
+    if (date.startsWith(month)) total += c;
+  return total;
 };
 
 // The request for one yes/no question about one state.
@@ -157,8 +168,19 @@ const LLM_SYSTEM =
   "the sql tool over a table of them instead: look up only what the " +
   "question needs, and do sorting, counting and totals in SQL rather than " +
   "over rows you fetch. To judge what shows are about, read their overview. " +
+  "When the user asks you to select, filter or pick out shows, also call the " +
+  "select tool with them, which filters the user's show list to them. " +
   "Answer from the data, and from what you know of the shows where the data " +
-  "says nothing. Be brief, and answer in plain text without markdown.";
+  "says nothing. Be brief. Markdown is rendered.";
+// Added for Auto, which gives Claude the jev tool too.
+const LLM_SYSTEM_JEV =
+  " For a question about what shows are about (their story, themes, " +
+  "setting or tone), call the jev tool first instead of searching overviews " +
+  "with SQL: it reads every show's full record. Its scores above about 0.8 " +
+  "are reliable; check the ones below that with SQL and what you know, drop " +
+  "the loose fits, and add shows you know belong that it missed.";
+// The lowest Jev score the jev tool hands Claude.
+const JEV_TOOL_MIN = 0.3;
 
 // A stray ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN would quietly move the
 // session to API billing.
@@ -185,13 +207,35 @@ const noteLimits = (info) => {
 
 // One question to Claude. Show puts the one show's record in the prompt; In
 // Lib and All Shows give Claude the shows_sql tool over a table of the shows,
-// which keeps the prompt small however many there are.
-const llmQuery = async (text, mode, shows) => {
-  const states = [...shows]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((s) => showState(s).tv_show);
-  const showsTool =
-    mode === "In Lib" || mode === "All Shows" ? makeShowsTool(states) : null;
+// which keeps the prompt small however many there are. on() gets the request
+// as {input}, then Claude's text as {text} pieces and each tool call as
+// {tool, args}, while the question runs.
+// A new conversation ends every older one: Resume only ever continues the
+// latest, so their saved sessions are deleted. They are all tv-srvr's, kept
+// for its working directory.
+const dropOldSessions = async (keep) => {
+  const dir = process.cwd();
+  for (const s of await listSessions({ dir }))
+    if (s.sessionId !== keep) await deleteSession(s.sessionId, { dir });
+};
+
+// resume is the session id of an earlier answer, for the pane's Resume: the
+// question then continues that conversation.
+const llmQuery = async (text, mode, shows, on, auto, resume) => {
+  const sorted = [...shows].sort((a, b) => a.name.localeCompare(b.name));
+  const states = sorted.map((s) => showState(s).tv_show);
+  const many = mode === "In Lib" || mode === "All Shows";
+  // What Auto's jev tool spent, in real money, recorded like any Jev query.
+  let jevCost = 0;
+  const jevScore = async (question) => {
+    const { inputTokens, results } = await scoreShows(sorted, question);
+    jevCost += (await addCost(inputTokens)).cost;
+    return results.filter((r) => r.noul >= JEV_TOOL_MIN);
+  };
+  const showsTool = many
+    ? makeShowsTool(states, auto ? { jevScore, jevMin: JEV_TOOL_MIN } : {})
+    : null;
+  const system = LLM_SYSTEM + (showsTool && auto ? LLM_SYSTEM_JEV : "");
   let prompt = text;
   if (mode === "Show")
     prompt = `<shows>\n${JSON.stringify(states)}\n</shows>\n\n${text}`;
@@ -202,11 +246,14 @@ const llmQuery = async (text, mode, shows) => {
       `\n\n${text}`;
   const options = {
     model: LLM_MODEL,
-    systemPrompt: LLM_SYSTEM,
+    systemPrompt: system,
     // No built-in tools, settings or CLAUDE.md: they would add ~25K tokens.
     tools: [],
     settingSources: [],
-    persistSession: false,
+    // Kept, so a later question can resume it. Claude Code saves it under
+    // ~/.claude/projects for tv-srvr's working directory.
+    persistSession: true,
+    ...(resume && { resume }),
     maxTurns: 1,
     effort: LLM_EFFORT,
     env: llmEnv(),
@@ -217,6 +264,19 @@ const llmQuery = async (text, mode, shows) => {
     options.allowedTools = showsTool.allowedTools;
     options.maxTurns = LLM_MAX_TURNS;
   }
+  const input = {
+    model: LLM_MODEL,
+    effort: LLM_EFFORT,
+    maxTurns: options.maxTurns,
+    systemPrompt: system,
+    ...(resume && { resume }),
+    prompt: showsTool ? prompt : text,
+    ...(mode === "Show" && { show: states[0] }),
+    ...(showsTool && { sqlTable: showsTool.schema }),
+  };
+  on({ input });
+  // Text as it is written, for the pane to show live.
+  options.includePartialMessages = true;
   const session = query({ prompt, options });
   let result = null;
   let error = null;
@@ -228,8 +288,17 @@ const llmQuery = async (text, mode, shows) => {
         // Login and billing failures arrive here rather than as a thrown error.
         if (msg.error) error = msg.error;
         for (const b of msg.message?.content ?? [])
-          if (b.type === "tool_use") queries.push(b.input?.query);
-      } else if (msg.type === "rate_limit_event")
+          if (b.type === "tool_use") {
+            if (b.input?.query) queries.push(b.input.query);
+            on({ tool: b.name.replace(/^mcp__\w+__/, ""), args: b.input });
+          }
+      } else if (
+        msg.type === "stream_event" &&
+        msg.event.type === "content_block_delta" &&
+        msg.event.delta.type === "text_delta"
+      )
+        on({ text: msg.event.delta.text });
+      else if (msg.type === "rate_limit_event")
         noteLimits(msg.rate_limit_info);
       else if (msg.type === "result") result = msg;
     }
@@ -249,6 +318,10 @@ const llmQuery = async (text, mode, shows) => {
     showsTool?.close();
   }
   setGlobalMessage({ id: "LlmOldCli", action: "hide" });
+  if (!resume)
+    await dropOldSessions(result.session_id).catch((e) =>
+      unilog(2759, `old claude sessions not deleted: ${e.message}`),
+    );
   const u = result.usage ?? {};
   const inputTokens =
     (u.input_tokens ?? 0) +
@@ -261,17 +334,16 @@ const llmQuery = async (text, mode, shows) => {
     // What the call would cost at API prices; the subscription charged
     // nothing for it while within its limits.
     apiCost: result.total_cost_usd ?? 0,
-    input: {
-      model: LLM_MODEL,
-      effort: LLM_EFFORT,
-      maxTurns: options.maxTurns,
-      systemPrompt: LLM_SYSTEM,
-      prompt: showsTool ? prompt : text,
-      ...(mode === "Show" && { show: states[0] }),
-      ...(showsTool && { sqlTable: showsTool.schema }),
-    },
+    // What Resume continues next time.
+    sessionId: result.session_id,
+    // Real money, for Auto's jev tool calls, and Jev's month so far.
+    jevCost,
+    monthCost: monthCost(),
+    input,
     result: {
       answer: result.result,
+      // Show names for the client's list filter, when Claude picked some.
+      selected: showsTool?.selected() ?? null,
       queries,
       turns: result.num_turns,
       stopReason: result.stop_reason,
@@ -294,7 +366,12 @@ const showQuestion = (text) =>
 // record as the state; the result gives the probability (noul) that each one
 // is a show the text asks for, most likely first. input is the request sent,
 // the first show's for those two.
-export const jevQuery = async ({ text, mode, showName, llm }) => {
+// on() is only for Claude, through the streaming route; see llmQuery. auto
+// is the pane's Auto: Claude, with Jev as a tool.
+export const jevQuery = async (
+  { text, mode, showName, llm, auto, resume },
+  on = () => {},
+) => {
   const all = getAllTvdbSync();
   if (llm) {
     if (mode === "Show" && !all[showName])
@@ -307,7 +384,7 @@ export const jevQuery = async ({ text, mode, showName, llm }) => {
           : Object.values(all).filter(
               (s) => mode === "All Shows" || s.inLibrary !== false,
             );
-    return llmQuery(text, mode, shows);
+    return llmQuery(text, mode, shows, on, auto, resume);
   }
   if (mode === "Plain" || mode === "Show") {
     let input = request("", text);
@@ -327,6 +404,19 @@ export const jevQuery = async ({ text, mode, showName, llm }) => {
   const recs = Object.values(all).filter(
     (s) => mode === "All Shows" || s.inLibrary !== false,
   );
+  const { model, inputTokens, results } = await scoreShows(recs, text);
+  return {
+    inputTokens,
+    ...(await addCost(inputTokens)),
+    input: request(showState(recs[0]), showQuestion(text)),
+    result: { model, shows: results },
+  };
+};
+
+// The text asked of each show separately, its record as the state: the
+// probability (noul) that each is a show the text asks for, most likely
+// first. The caller records the cost.
+const scoreShows = async (recs, text) => {
   const instructions = showQuestion(text);
   const results = [];
   let model = null;
@@ -345,10 +435,5 @@ export const jevQuery = async ({ text, mode, showName, llm }) => {
   );
   results.sort((a, b) => b.noul - a.noul);
   unilog(2736, `asked ${results.length} shows, ${inputTokens} tokens: ${text}`);
-  return {
-    inputTokens,
-    ...(await addCost(inputTokens)),
-    input: request(showState(recs[0]), instructions),
-    result: { model, shows: results },
-  };
+  return { model, inputTokens, results };
 };

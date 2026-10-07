@@ -215,7 +215,9 @@ export default {
       e.target.value = this.selectedSort;
     },
     displaySortChoice(sortChoice) {
-      return sortChoice === "Viewed" ? "Watched" : String(sortChoice || "");
+      if (sortChoice === "Viewed") return "Watched";
+      if (sortChoice === "Jev") return "AI";
+      return String(sortChoice || "");
     },
     condFltrColor(cond) {
       switch (cond.filter) {

@@ -634,6 +634,7 @@ let cachedDiskShows = null;
 // Remote button display order; unlisted buttons sort just before "Official Website".
 const GENRES_MAX_LINE_LEN = 30;
 const REMOTE_BUTTON_ORDER = ["IMDB", "Rotten", "Google", "Wikipedia"];
+const POSTER_HEIGHT = 308; // px, the info pane poster is always this tall
 const remoteSortKey = (name) => {
   if (name === "Official Website") return REMOTE_BUTTON_ORDER.length + 1;
   const idx = REMOTE_BUTTON_ORDER.findIndex((prefix) =>
@@ -1001,7 +1002,7 @@ export default {
 
       const img = new Image();
       img.style.width = "auto";
-      img.style.height = "auto";
+      img.style.height = POSTER_HEIGHT + "px";
       img.style.objectFit = "contain";
       img.style.display = "block";
       img.style.visibility = "hidden";
@@ -1043,7 +1044,7 @@ export default {
             926,
             `setPoster auto-show: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
           );
-          img.style.maxHeight = infoBoxEl.clientHeight + "px";
+          img.style.maxHeight = POSTER_HEIGHT + "px";
           img.style.visibility = "visible";
         }
       }
@@ -1693,7 +1694,7 @@ export default {
                   942,
                   `preview nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
                 );
-                posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+                posterImg.style.maxHeight = POSTER_HEIGHT + "px";
                 posterImg.style.visibility = "visible";
               }
             });
@@ -1710,7 +1711,7 @@ export default {
                 943,
                 `seriesReady nextTick: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
               );
-              posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+              posterImg.style.maxHeight = POSTER_HEIGHT + "px";
               posterImg.style.visibility = "visible";
             }
           }
@@ -1891,7 +1892,7 @@ export default {
           appliedMaxHeight = existingMaxHeight;
         } else if (infoBoxEl && newHeight > 0) {
           unilog(946, `tvdbUpdated: ${newHeight}px for ${this.show?.name}`);
-          appliedMaxHeight = newHeight;
+          appliedMaxHeight = POSTER_HEIGHT;
         }
         if (appliedMaxHeight > 0) {
           posterImg.style.maxHeight = appliedMaxHeight + "px";
@@ -1938,7 +1939,7 @@ export default {
             947,
             `paneChanged: ${infoBoxEl.clientHeight}px for ${this.show?.name}`,
           );
-          posterImg.style.maxHeight = infoBoxEl.clientHeight + "px";
+          posterImg.style.maxHeight = POSTER_HEIGHT + "px";
           posterImg.style.visibility = "visible";
         }
       });

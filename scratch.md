@@ -1,12 +1,28 @@
 
 
 
+
 i'm 172
 
 ????????????????????????
 .opnXXXXX naming
 back up pause based on pause length
 =================
+
+when there is no data in field to the left of the show name the field should not be shown.
+
+remove the clear button and clear code from header.
+
+when doing an llm query show total results like now live as they are received and then when finished show just the text received like:
+`I selected 9 shows set in the Australian outback:
+
+Darby and Joan, Population: 11, The Tourist, Thou Shalt Not Steal, Top End Bub, True Colours (2022), Upright, Mystery Road and Mystery Road: Origin.
+
+The descriptions only say "outback" for some of these. I added Mystery Road, Mystery Road: Origin, True Colours and Upright based on what I know of where they're set.
+
+I left out Les Norton, because its main character is from the outback but the show takes place in Sydney. I also left out Wanted (2016), a chase across Australia that's only partly in the outback.`
+
+when llm mode results are showing then that text and only that text should fill the results subpane. it should be shown as markdown. ctrl-clicking in the results pane should toggle showing markdown of text and complete raw result text.
 
 show input query to api in results subpane with output results below that -- separate them with a solid line
 

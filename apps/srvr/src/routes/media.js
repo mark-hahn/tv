@@ -9,6 +9,7 @@ import * as path from "node:path";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { unilog, logHere } from "@tv/share";
 import { listSidecars } from "../subs.js";
+import { showFolderFor } from "../showPaths.js";
 import { HDR_TRANSFERS, TONEMAP } from "../stills.js";
 
 const tvDir = "/mnt/media/tv";
@@ -350,7 +351,11 @@ export function registerMediaRoutes(app) {
       res.status(400).json({ error: "invalid show name" });
       return;
     }
-    const seasonDir = path.join(tvDir, showName, `Season ${season}`);
+    const seasonDir = path.join(
+      tvDir,
+      showFolderFor(showName),
+      `Season ${season}`,
+    );
     let entries;
     try {
       entries = fs.readdirSync(seasonDir);

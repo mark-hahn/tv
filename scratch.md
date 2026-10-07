@@ -1,6 +1,4 @@
 
-show input query to api in results subpane with output results below that -- separate them with a solid line
-
 
 
 i'm 172
@@ -9,6 +7,8 @@ i'm 172
 .opnXXXXX naming
 back up pause based on pause length
 =================
+
+show input query to api in results subpane with output results below that -- separate them with a solid line
 
 add a sort selection `Jev` to the sort selector in hdrbot. it should be automatically set to match sort state so jev will be selected when sorted by jev -- when jev is selected and there is no jev query it should do nothing.  when query is executed the filter selector should show the dashes in that selector
 

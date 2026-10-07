@@ -62,6 +62,18 @@
             style="width: 60px; font-size: 14px"
           />%
         </label>
+        <label
+          title="Ask Claude, on the Max plan, instead of jev"
+          style="
+            font-family: sans-serif;
+            font-size: 14px;
+            font-weight: normal;
+            cursor: pointer;
+          "
+        >
+          <input type="checkbox" v-model="llm" />
+          LLM
+        </label>
       </div>
       <span
         style="
@@ -138,6 +150,7 @@ const MODES = ["Plain", "Show", "In Lib", "All Shows"];
 // The modes that ask about many shows and filter the list by the answers.
 const MULTI_MODES = ["In Lib", "All Shows"];
 const MIN_PCT_KEY = "jev.minPct";
+const LLM_KEY = "jev.llm";
 // A many-show query filters the list to the shows above this confidence, in
 // percent; the box allows whole numbers from 10 to 99.
 const MIN_PCT_DEFAULT = 25;
@@ -154,6 +167,7 @@ export default {
       minPct: Number(
         window.localStorage.getItem(MIN_PCT_KEY) ?? MIN_PCT_DEFAULT,
       ),
+      llm: window.localStorage.getItem(LLM_KEY) === "true",
       modes: MODES,
       busy: false,
       stats: "",
@@ -167,6 +181,9 @@ export default {
     },
     mode(val) {
       window.localStorage.setItem(MODE_KEY, val);
+    },
+    llm(val) {
+      window.localStorage.setItem(LLM_KEY, String(val));
     },
   },
   methods: {
@@ -216,11 +233,20 @@ export default {
           text: this.text,
           mode: this.mode,
           showName: this.show?.name,
+          llm: this.llm,
         });
         const secs = (performance.now() - start) / 1000;
         const tokens = res.inputTokens;
         const tokStr =
           tokens >= 10000 ? `${Math.round(tokens / 1000)}K` : `${tokens}`;
+        // Claude: the answer, then the SQL it ran and the usage.
+        if (res.llm) {
+          this.stats = `${tokStr} Tokens | Max plan ($${res.apiCost.toFixed(4)} at API rates) | ${secs.toFixed(1)} Secs`;
+          this.input = JSON.stringify(res.input, null, 2);
+          const { answer, ...rest } = res.result;
+          this.result = `${answer}\n\n${JSON.stringify(rest, null, 2)}`;
+          return;
+        }
         // This query's cost, then the total so far this month.
         const costStr = `$${res.cost.toFixed(4)}/${res.monthCost.toFixed(2)}`;
         this.stats = `${tokStr} Tokens | ${costStr} | ${secs.toFixed(1)} Secs`;

@@ -951,9 +951,10 @@ export function getTmdb(params) {
   return httpCall("/api/getTmdb", params, "POST");
 }
 
-// An All Shows query asks about every show, about 5 s.
+// An All Shows query asks jev about every show, about 5 s; Claude can take
+// minutes over a long show list.
 export function jevQuery(params) {
-  return httpCall("/api/jevQuery", params, "POST", 120000);
+  return httpCall("/api/jevQuery", params, "POST", 600000);
 }
 
 // Photos of people in one show, chosen by tv-srvr (images.js).

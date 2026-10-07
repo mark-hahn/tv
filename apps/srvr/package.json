@@ -22,11 +22,11 @@
   },
   "homepage": "https://github.com/mark-hahn/tv#readme",
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.292",
     "@tv/share": "workspace:*",
     "base64-js": "^1.5.1",
     "better-sqlite3": "^11.10.0",
     "chokidar": "^3.5.3",
-    "node-cron": "^3.0.3",
     "cors": "^2.8.6",
     "date-and-time": "^3.6.0",
     "dotenv": "^17.2.3",
@@ -34,12 +34,14 @@
     "mailtrap": "^4.3.2",
     "moment": "^2.29.4",
     "moviedb-promise": "^4.0.7",
+    "node-cron": "^3.0.3",
     "node-fetch": "^3.3.2",
     "parse-torrent-title": "^2.1.0",
     "playwright": "^1.57.0",
     "public-ip": "^7.0.1",
     "rimraf": "^6.0.1",
-    "ws": "^8.18.0"
+    "ws": "^8.18.0",
+    "zod": "4.6.5"
   },
   "nodemonConfig": {
     "ignore": [

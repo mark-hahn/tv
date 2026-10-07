@@ -35,13 +35,6 @@
       >
         <span>AI</span>
         <button
-          @click="query(false)"
-          :disabled="busy || !text.trim()"
-          :style="btnStyle(busy || !text.trim())"
-        >
-          {{ busy ? "Asking..." : "Query" }}
-        </button>
-        <button
           @click="query(true)"
           :disabled="!canResume"
           :style="btnStyle(!canResume)"
@@ -168,9 +161,11 @@ const MODES = ["Plain", "Show", "In Lib", "All Shows"];
 const MULTI_MODES = ["In Lib", "All Shows"];
 const MIN_PCT_KEY = "jev.minPct";
 // $<this query's Jev cost>/<Jev's month so far>/<Claude's cost at API rates>,
-// each "0" when that one wasn't used.
+// each "0" when that one wasn't used. A figure space (a digit's width, never
+// collapsed) sits each side of a "/".
+const COST_SEP = " / ";
 const costStr = (jev, jevMonth, claude) =>
-  `$${jev ? jev.toFixed(4) : "0"}/${jevMonth.toFixed(2)}/${claude ? claude.toFixed(2) : "0"}`;
+  [jev ? `$${jev.toFixed(4)}` : "$0", jevMonth.toFixed(2), claude ? claude.toFixed(2) : "0"].join(COST_SEP);
 
 const ENGINE_KEY = "jev.engine";
 // Who answers: Claude with Jev as one of its tools, Jev alone, Claude alone.
@@ -261,6 +256,11 @@ export default {
         });
     },
   },
+  // Jev's month so far shows before any query has run.
+  async mounted() {
+    const { monthCost } = await srvr.getJevMonthCost();
+    if (!this.stats) this.stats = costStr(0, monthCost, 0);
+  },
   methods: {
     // Del in the box puts the default back.
     pctKey(e) {
@@ -333,7 +333,7 @@ export default {
         // Claude: the answer as markdown; ctrl-click shows the raw result,
         // the answer then the SQL it ran and the usage.
         if (res.llm) {
-          this.stats = `${tokStr} Tokens | ${costStr(res.jevCost, res.monthCost, res.apiCost)} | ${secs.toFixed(1)} Secs`;
+          this.stats = `${tokStr} | ${costStr(res.jevCost, res.monthCost, res.apiCost)} | ${secs.toFixed(1)} Secs`;
           this.input = JSON.stringify(res.input, null, 2);
           const { answer, ...rest } = res.result;
           this.result = `${answer}\n\n${JSON.stringify(rest, null, 2)}`;
@@ -348,7 +348,7 @@ export default {
             );
           return;
         }
-        this.stats = `${tokStr} Tokens | ${costStr(res.cost, res.monthCost, 0)} | ${secs.toFixed(1)} Secs`;
+        this.stats = `${tokStr} | ${costStr(res.cost, res.monthCost, 0)} | ${secs.toFixed(1)} Secs`;
         // A many-show query sends one request per show; only the first shows.
         this.input =
           JSON.stringify(res.input, null, 2) + (multi ? "\n... <snip> ..." : "");

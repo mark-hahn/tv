@@ -957,6 +957,10 @@ export function getTmdb(params) {
 
 // An All Shows query asks jev about every show, about 5 s; Claude can take
 // minutes over a long show list.
+export function getJevMonthCost() {
+  return httpCall("/api/jevMonthCost");
+}
+
 export function jevQuery(params) {
   return httpCall("/api/jevQuery", params, "POST", 600000);
 }

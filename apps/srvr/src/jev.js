@@ -45,7 +45,7 @@ const addCost = async (inputTokens) => {
 };
 
 // Jev's spending so far this LA month.
-const monthCost = () => {
+export const monthCost = () => {
   const month = new Date()
     .toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
     .slice(0, 7);

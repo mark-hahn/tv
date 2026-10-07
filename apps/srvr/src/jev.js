@@ -280,8 +280,8 @@ const llmQuery = async (text, mode, shows, on, auto, resume) => {
   const session = query({ prompt, options });
   let result = null;
   let error = null;
-  // The SQL Claude ran, for the pane.
-  const queries = [];
+  // Every tool Claude called, with its arguments, for the pane.
+  const toolCalls = [];
   try {
     for await (const msg of session) {
       if (msg.type === "assistant") {
@@ -289,8 +289,9 @@ const llmQuery = async (text, mode, shows, on, auto, resume) => {
         if (msg.error) error = msg.error;
         for (const b of msg.message?.content ?? [])
           if (b.type === "tool_use") {
-            if (b.input?.query) queries.push(b.input.query);
-            on({ tool: b.name.replace(/^mcp__\w+__/, ""), args: b.input });
+            const call = { tool: b.name.replace(/^mcp__\w+__/, ""), args: b.input };
+            toolCalls.push(call);
+            on(call);
           }
       } else if (
         msg.type === "stream_event" &&
@@ -344,7 +345,7 @@ const llmQuery = async (text, mode, shows, on, auto, resume) => {
       answer: result.result,
       // Show names for the client's list filter, when Claude picked some.
       selected: showsTool?.selected() ?? null,
-      queries,
+      toolCalls,
       turns: result.num_turns,
       stopReason: result.stop_reason,
       usage: u,

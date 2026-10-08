@@ -377,6 +377,13 @@ export function judge(cues, set) {
   return { verdict: "wrong cut", clips, needsMiddle: !set.middle };
 }
 
+// The ms fix (see fixedText) moves a cue at ms by.
+function shiftAt(fix, ms) {
+  if (!fix.drift) return fix.offsetMs;
+  const [[a, oa], [b, ob]] = fix.drift;
+  return oa + ((ob - oa) * (ms - a)) / (b - a);
+}
+
 // judge for a sidecar from readSidecars, with why for a wrong cut that only
 // its end shows.
 export function judgeFile(f, set) {
@@ -390,12 +397,7 @@ export function judgeFile(f, set) {
 // moves each cue by the offset on the line through them. Never below 0, and
 // through cleanSrt.
 export function fixedText(srtText, fix) {
-  const move = fix.drift
-    ? (ms) => {
-        const [[a, oa], [b, ob]] = fix.drift;
-        return ms + oa + ((ob - oa) * (ms - a)) / (b - a);
-      }
-    : (ms) => ms + fix.offsetMs;
+  const move = (ms) => ms + shiftAt(fix, ms);
   const at = (t) => msToSrtTime(Math.max(0, Math.round(move(srtTimeToMs(t)))));
   const timeLineRe =
     /^([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(\s*-->\s*)([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(.*)$/;

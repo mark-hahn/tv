@@ -162,7 +162,6 @@ const upsertCheck = db.prepare(`
 `);
 const deleteCheckRow = db.prepare(`DELETE FROM checks WHERE file = ?`);
 const deleteVideoChecks = db.prepare(`DELETE FROM checks WHERE video = ?`);
-const anyVideoCheck = db.prepare(`SELECT 1 FROM checks WHERE video = ? LIMIT 1`);
 const spendRow = db.prepare(`SELECT usd FROM asrSpend WHERE day = ?`);
 const addSpend = db.prepare(`
   INSERT INTO asrSpend (day, usd) VALUES (?, ?)
@@ -310,6 +309,15 @@ export function playList(showId, season, episode, videoPath) {
     before += group.length;
   }
   return { sidecars: groups.flat(), pick };
+}
+
+// The label a play's list gives the video's sidecar file (see playList), or
+// null when there is no such file.
+export function playLabel(videoPath, file) {
+  const s = listSidecars(videoPath).find((x) => x.file === file);
+  if (!s) return null;
+  const verdict = freshCheck(path.join(path.dirname(videoPath), file))?.verdict;
+  return verdict === "good" ? `${s.label} ${VERIFIED_MARK}` : s.label;
 }
 
 // The video stopped with this subtitle file showing: it is the episode's
@@ -638,10 +646,6 @@ export function saveCheck({ file, video, verdict, offsetMs = null, method = null
     detail,
     ts: Date.now(),
   });
-}
-
-export function hasChecks(video) {
-  return !!anyVideoCheck.get(video);
 }
 
 export function forgetCheck(file) {

@@ -351,6 +351,10 @@
             applying = false;
             applyBtn.textContent = res?.ok ? "Apply" : "Failed";
             if (res?.ok && t === ofsTrack) applied = target;
+            // Timed by hand now: tv-srvr's label for it has no check mark.
+            const label = res?.ok ? (await res.json()).label : null;
+            if (label)
+              vid.querySelectorAll("track")[[...vid.textTracks].indexOf(t)].label = label;
             render();
           };
           button(corner, "Subs", () =>

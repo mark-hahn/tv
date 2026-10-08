@@ -69,7 +69,7 @@ const MSG_ACTIVE_SHOW = "a";
 // Whether that show is hidden, which is what the hide key reads Unhide for.
 const MSG_ACTIVE_HIDDEN = "i";
 // The subtitle tracks of the video tvapp is playing, as JSON {title, tracks:
-// [{label, type}], selected, subOfs, syncOfs, canSync, cap}, or null when
+// [{label, type}], selected, subOfs, canSync, cap}, or null when
 // none is up; cap is the caption tvapp shows, moved by subOfs, sent on every
 // change. Asked for with CMD_SUBTITLES; CMD_SUBTITLE,<n> turns track n on, -1
 // turns them off.
@@ -78,16 +78,22 @@ const CMD_SUBTITLES = "l";
 const CMD_SUBTITLE = "t";
 // The subtitle panel's timing offset: CMD_SUB_OFFSET,<sec> moves it (the
 // list's subOfs), CMD_SUB_APPLY shifts the playing .srt by it, reloads, and
-// puts it back to 0.
+// puts it back to 0; the file, timed by hand, keeps its check mark only when
+// it fits.
 const CMD_SUB_OFFSET = "so";
 const CMD_SUB_APPLY = "sa";
-// The panel's Sync: tv-srvr's subtitle fix for the episode tvapp is playing
-// (each file checked against the video's words, fixed or dropped, one
-// downloaded when none fits), and the video reopened with the files as they
-// are now. Only when the list's canSync, which is off once the episode has
-// been fixed. The list's syncOfs is the shift the showing file got, shown as
-// the offset until the next + or -.
+// The panel's Sync: tv-srvr measures how far the showing file is off the
+// video's words, and that becomes the offset (subOfs), so the caption line
+// shows the captions it puts there; nothing is shifted until Apply, and a
+// file that fits as it is gets its check mark. A file from another cut or at
+// another rate gets a toast on the TV instead. Only
+// when the list's canSync: a subtitle on, and the episode's files not all
+// checked yet.
 const CMD_SUB_SYNC = "sy";
+// The panel's offset: in tenths, or in hundredths when it is off them, as one
+// Sync measured is.
+const subOfsText = (ofs = 0) =>
+  ofs.toFixed(Number.isInteger(Math.round(ofs * 1000) / 100) ? 1 : 2);
 const CMD_OPEN_TVAPP = "o";
 const CMD_BACK = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -1948,9 +1954,7 @@ function Remote({ setSubError }) {
         <View style={subCtrlStyles.ofsRow}>
           <View style={subCtrlStyles.ofsBtn}>
             <Text style={subCtrlStyles.ofsBtnText}>
-              {subList?.subOfs || !subList?.syncOfs
-                ? (subList?.subOfs ?? 0).toFixed(1)
-                : subList.syncOfs.toFixed(2)}
+              {subOfsText(subList?.subOfs)}
             </Text>
           </View>
           <TouchableOpacity

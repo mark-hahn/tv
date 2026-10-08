@@ -2296,50 +2296,10 @@ app.post("/api/subsCountEpisodes", apiWrapper(subsCountEpisodes));
 // <base>.asr.srt.
 app.post("/api/syncSubToAsr", apiWrapper(subPrepare.syncSidecar));
 
-// The remotes' Sync: subPrepare.js on the episode tvapp is playing, now. ASR
-// it ends up needing is queued as asked for by hand, outside the daily cap.
-// Returns the episode's subtitles as getPlayUrl gives them now, with fixed:
-// {file: offsetMs}, the shift each file it fixed got.
-app.post(
-  "/api/fixSubs",
-  apiWrapper(async ({ showName, season, episode }) => {
-    const rec = tvdb.getAllTvdbSync()?.[showName];
-    if (!rec) throw new Error(`fixSubs: no show ${showName}`);
-    const file = epd.getFullPath(
-      rec.episodeData,
-      showPaths.showFolderFor(showName, rec),
-      season,
-      episode,
-      tvDir,
-    );
-    if (!file)
-      throw new Error(`fixSubs: no file for ${showName} ${fmtSeasonEpisode(season, episode)}`);
-    const prep = await subPrepare.prepareVideoSubs({
-      videoPath: file,
-      rec,
-      season,
-      episode,
-    });
-    if (prep.needsAsr)
-      addToAsrQueue([
-        {
-          videoPath: file,
-          showName,
-          season,
-          episode,
-          fromUI: true,
-          lowPriority: false,
-          source: "remote Sync",
-          addedAt: Date.now(),
-        },
-      ]);
-    return {
-      ...subsForFile(String(rec.id), file, season, episode),
-      subsChecked: true,
-      fixed: prep.fixed,
-    };
-  }),
-);
+// The remotes' Sync: how far the subtitle file showing is off its video at
+// posMs (subPrepare.measureSidecar). Nothing is shifted; the remote shows the
+// offset, and its Apply shifts the file.
+app.post("/api/measureSub", apiWrapper(subPrepare.measureSidecar));
 
 // subPrepare.js on one video (path under the tv folder), dry unless dryRun is
 // false: what it would do with each subtitle file, and what a play would then
@@ -2437,7 +2397,14 @@ app.post("/api/applySubOffset", async (req, res) => {
     res.status(500).json({ error: "write failed: " + e.message });
     return;
   }
-  res.json({ ok: true });
+  // Timed by hand now: it keeps a check mark only when it fits. label is its
+  // label in a play's list now, and subsChecked getPlayUrl's.
+  await subPrepare.judgeHandTimed(resolvedSrt);
+  res.json({
+    ok: true,
+    label: subs.playLabel(resolvedVideo, path.basename(resolvedSrt)),
+    subsChecked: !subPrepare.needsCheck(resolvedVideo),
+  });
 });
 
 // ASR subtitle queue endpoints
@@ -3087,8 +3054,8 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
     trimPosMs,
     skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),
     ...subsForFile(String(rec.id), file, season, episode),
-    // Whether the episode's subtitle files have been checked and fixed; the
-    // remotes' Sync is for one that has not (fixSubs).
+    // Whether the episode's subtitle files have all been checked and fixed;
+    // the remotes' Sync is for one that has not (measureSub).
     subsChecked: !subPrepare.needsCheck(file),
     ...(web
       ? {
@@ -4108,8 +4075,8 @@ watcher
       handleShowDiskChange(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
   })
-  // A subtitle file rewritten in place, most often by the remote's Apply, is
-  // judged again (subPrepare.js).
+  // A subtitle file rewritten in place, most often by a remote's Apply, is
+  // judged as timed by hand (subPrepare.js).
   .on("change", (filePath) => {
     if (filePath.split(".").pop() !== "srt") return;
     subPrepare.subFileEvent(filePath, "change").catch((e) => {

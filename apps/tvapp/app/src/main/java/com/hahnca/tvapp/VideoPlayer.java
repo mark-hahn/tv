@@ -64,10 +64,10 @@ class VideoPlayer extends FrameLayout {
   private static final String PROGRESS_URL = "https://hahnca.com/tv-srvr/api/playProgress";
   // The .srt timing shift the subtitle panel's Apply uses.
   private static final String SHIFT_SUBS_URL = "https://hahnca.com/tv-srvr/api/applySubOffset";
-  // The subtitle panel's Sync: tv-srvr's subtitle fix for the episode, which
-  // can take minutes when it downloads.
-  private static final String FIX_SUBS_URL = "https://hahnca.com/tv-srvr/api/fixSubs";
-  private static final int FIX_SUBS_TIMEOUT_MS = 180000;
+  // The subtitle panel's Sync: how far the showing .srt is off, which takes
+  // ASR on two clips of a video never checked.
+  private static final String MEASURE_SUB_URL = "https://hahnca.com/tv-srvr/api/measureSub";
+  private static final int MEASURE_SUB_TIMEOUT_MS = 180000;
   private static final String SYNC_FAILED_TOAST = "Subtitle sync failed.";
   // A cue's times in the served vtt: "00:01:02.345 --> 00:01:04.000".
   private static final Pattern CUE_TIMES =
@@ -200,13 +200,10 @@ class VideoPlayer extends FrameLayout {
   // once the reopened video has its tracks.
   private String reloadSubId;
   // The remote subtitle panel's timing offset in seconds, not yet applied to
-  // the playing .srt. It goes back to 0 on Apply, a new video or another
-  // subtitle pick.
+  // the playing .srt: moved by + and -, and set by Sync. It goes back to 0 on
+  // Apply, a new video or another subtitle pick.
   private double subOfs;
-  // The seconds the panel's last Sync moved the showing .srt by, which the
-  // panel shows until the next + or -, Apply, subtitle pick or video.
-  private double syncOfs;
-  // An Apply's or a Sync's shift is on its way to tv-srvr.
+  // An Apply's shift or a Sync's measure is on its way to tv-srvr.
   private boolean shifting;
   // The showing .srt's captions (cueStarts, cueEnds, cueTexts), read from the
   // track cueSubId names. cueSeq goes up on every read and every clear, so a
@@ -289,7 +286,6 @@ class VideoPlayer extends FrameLayout {
         res > 0 ? String.valueOf(res) : "");
     subsPicked = false;
     subOfs = 0;
-    syncOfs = 0;
     clearCues();
     stills.open(p.optJSONObject("stills"));
     String url = p.optString("url");
@@ -650,7 +646,7 @@ class VideoPlayer extends FrameLayout {
     for (Tracks.Group g : textGroups) if (g.isSelected()) reloadSubId = g.getTrackFormat(0).id;
     clearCues();
     view.setKeepContentOnPlayerReset(true);
-    exo.setMediaItem(exo.getCurrentMediaItem(), exo.getCurrentPosition());
+    exo.setMediaItem(mediaItem(playing), exo.getCurrentPosition());
   }
 
   void close() {
@@ -685,9 +681,10 @@ class VideoPlayer extends FrameLayout {
 
   /**
    * For the remote's subtitle panel: {title, tracks: [{label, type}], selected,
-   * subOfs, syncOfs, canSync, cap}, selected -1 when subtitles are off. canSync
-   * until the episode's subtitles have been fixed (subsChecked), and not while
-   * a fix or a shift is on its way. Null when no video is up.
+   * subOfs, canSync, cap}, selected -1 when subtitles are off. canSync with a
+   * subtitle on, until the episode's subtitles have all been checked
+   * (subsChecked), and not while a measure or a shift is on its way. Null when
+   * no video is up.
    */
   JSONObject subtitleList() {
     if (exo == null || playing == null) return null;
@@ -697,9 +694,9 @@ class VideoPlayer extends FrameLayout {
       int selected = -1;
       for (int i = 0; i < textGroups.size(); i++) {
         Tracks.Group g = textGroups.get(i);
-        Format f = g.getTrackFormat(0);
+        // tv-srvr's label as it is now: its check mark follows Apply and Sync.
         JSONObject t = new JSONObject();
-        t.put("label", f.label != null ? f.label : "Track " + (i + 1));
+        t.put("label", playingSub(i).optString("label", "Track " + (i + 1)));
         t.put("type", "srt");
         tracks.put(t);
         if (g.isSelected()) selected = i;
@@ -712,8 +709,7 @@ class VideoPlayer extends FrameLayout {
       out.put("tracks", tracks);
       out.put("selected", selected);
       out.put("subOfs", subOfs);
-      out.put("syncOfs", syncOfs);
-      out.put("canSync", !shifting && !playing.optBoolean("subsChecked"));
+      out.put("canSync", selected >= 0 && !shifting && !playing.optBoolean("subsChecked"));
       out.put("cap", capText);
     } catch (JSONException e) {
       Log.e(TAG, "subtitle list failed: " + e);
@@ -726,7 +722,6 @@ class VideoPlayer extends FrameLayout {
   void selectSubtitle(int index) {
     if (exo == null || index == selectedSub()) return;
     subOfs = 0;
-    syncOfs = 0;
     TrackSelectionParameters.Builder b = exo.getTrackSelectionParameters().buildUpon();
     if (index < 0 || index >= textGroups.size()) {
       b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true);
@@ -749,20 +744,22 @@ class VideoPlayer extends FrameLayout {
     if (exo == null) return;
     // To the ms, so tenths that net to nothing come back to exactly 0.
     subOfs = Math.round((subOfs + sec) * 1000) / 1000.0;
-    syncOfs = 0;
     capText = capNow();
     events.onSubtitles(subtitleList());
   }
 
   /**
    * The panel's Apply: tv-srvr shifts the playing .srt on disk by subOfs, which
-   * goes back to 0, and the video reloads to show it. With no subtitle on there
-   * is no file to shift.
+   * goes back to 0, and the video reloads to show it. The file is timed by hand
+   * now: tv-srvr judges it again, and its label keeps the check mark only when
+   * it fits, as does the episode's subsChecked. With no subtitle on there is no
+   * file to shift.
    */
   void applySubOfs() {
     int sel = selectedSub();
     if (exo == null || shifting || sel < 0 || subOfs == 0) return;
-    Uri sub = Uri.parse(playingSub(sel).optString("url"));
+    JSONObject entry = playingSub(sel);
+    Uri sub = Uri.parse(entry.optString("url"));
     double target = subOfs;
     JSONObject body = new JSONObject();
     try {
@@ -777,21 +774,26 @@ class VideoPlayer extends FrameLayout {
     JSONObject was = playing;
     new Thread(
             () -> {
-              boolean ok = false;
+              JSONObject res = null;
               try {
-                Http.postJson(SHIFT_SUBS_URL, body.toString());
-                ok = true;
+                res = new JSONObject(Http.postJson(SHIFT_SUBS_URL, body.toString()));
               } catch (Exception e) {
                 Log.e(TAG, "subtitle shift failed: " + e);
               }
-              boolean shifted = ok;
+              JSONObject shifted = res;
               ui.post(
                   () -> {
                     shifting = false;
-                    if (!shifted || playing != was) return;
+                    if (shifted == null || playing != was) return;
                     // A + or - pressed while the shift was on its way stays.
                     subOfs -= target;
-                    syncOfs = 0;
+                    try {
+                      if (!shifted.optString("label").isEmpty())
+                        entry.put("label", shifted.optString("label"));
+                      playing.put("subsChecked", shifted.optBoolean("subsChecked"));
+                    } catch (JSONException e) {
+                      Log.e(TAG, "shifted subtitle label failed: " + e);
+                    }
                     reload();
                     events.onSubtitles(subtitleList());
                   });
@@ -801,22 +803,24 @@ class VideoPlayer extends FrameLayout {
   }
 
   /**
-   * The panel's Sync: tv-srvr's subtitle fix for the episode (subPrepare.js),
-   * which checks each of its subtitle files against the words of the video,
-   * shifts or stretches the ones that are off, drops the ones from another
-   * cut, and downloads one when none fits. The video reopens where it is with
-   * the files as they are now (setFixedSubs). Sync is off for an episode once
-   * it has been fixed.
+   * The panel's Sync: tv-srvr measures how far the showing .srt is off the
+   * words of the video (subPrepare.js), and that becomes the offset, as if set
+   * with + and -: the panel's caption line shows the captions it puts here, and
+   * nothing is shifted until Apply; a file that fits as it is gets its check
+   * mark. When no one shift fits (another cut, another rate), or none can be
+   * told, a toast says why and the offset stays.
    */
   void syncSubs() {
-    if (exo == null || shifting || playing.optBoolean("subsChecked")) return;
+    int sel = selectedSub();
+    if (exo == null || shifting || sel < 0 || playing.optBoolean("subsChecked")) return;
+    JSONObject entry = playingSub(sel);
+    Uri sub = Uri.parse(entry.optString("url"));
     JSONObject body = new JSONObject();
     try {
-      body.put("showName", playing.optString("showName"));
-      body.put("season", playing.optInt("season"));
-      body.put("episode", playing.optInt("episode"));
+      body.put("videoPath", sub.getQueryParameter("path"));
+      body.put("srtFile", sub.getQueryParameter("file"));
     } catch (JSONException e) {
-      Log.e(TAG, "subtitle fix body failed: " + e);
+      Log.e(TAG, "subtitle measure body failed: " + e);
       return;
     }
     shifting = true;
@@ -826,59 +830,40 @@ class VideoPlayer extends FrameLayout {
             () -> {
               JSONObject res = null;
               try {
-                res = new JSONObject(Http.postJson(FIX_SUBS_URL, body.toString(), FIX_SUBS_TIMEOUT_MS));
+                res =
+                    new JSONObject(
+                        Http.postJson(MEASURE_SUB_URL, body.toString(), MEASURE_SUB_TIMEOUT_MS));
               } catch (Exception e) {
-                Log.e(TAG, "subtitle fix failed: " + e);
+                Log.e(TAG, "subtitle measure failed: " + e);
               }
-              JSONObject fixedSubs = res;
+              JSONObject measured = res;
               ui.post(
                   () -> {
                     shifting = false;
                     if (playing != was) return;
-                    if (fixedSubs == null) {
-                      events.onVideoError(SYNC_FAILED_TOAST);
-                      events.onSubtitles(subtitleList());
-                      return;
+                    if (measured != null) {
+                      // A file that fits as it is was marked so.
+                      try {
+                        if (!measured.optString("label").isEmpty())
+                          entry.put("label", measured.optString("label"));
+                        playing.put("subsChecked", measured.optBoolean("subsChecked"));
+                      } catch (JSONException e) {
+                        Log.e(TAG, "measured subtitle label failed: " + e);
+                      }
                     }
-                    setFixedSubs(fixedSubs);
+                    if (measured == null) {
+                      events.onVideoError(SYNC_FAILED_TOAST);
+                    } else if (measured.isNull("offsetMs")) {
+                      events.onVideoError("Sync: " + measured.optString("why"));
+                    } else if (selectedSub() == sel) {
+                      subOfs = measured.optLong("offsetMs") / 1000.0;
+                      capText = capNow();
+                    }
+                    events.onSubtitles(subtitleList());
                   });
             },
-            "sub-fix")
+            "sub-measure")
         .start();
-  }
-
-  /**
-   * The episode's subtitles after a fix, as getPlayUrl gives them, with fixed,
-   * the shift each fixed file got: the video reopens where it is with them, on
-   * the file that was showing when it is still there, else on the one tv-srvr
-   * picks, or with subtitles off when they were. The panel shows the shift the
-   * showing file got; any + or - is void.
-   */
-  private void setFixedSubs(JSONObject res) {
-    int sel = selectedSub();
-    String showing = sel < 0 ? null : playingSub(sel).optString("file");
-    JSONArray subs = res.optJSONArray("subs");
-    if (subs == null) subs = new JSONArray();
-    int pick = res.optInt("subPick", -1);
-    for (int i = 0; showing != null && i < subs.length(); i++)
-      if (showing.equals(subs.optJSONObject(i).optString("file"))) pick = i;
-    if (sel < 0) pick = -1;
-    try {
-      playing.put("subs", subs);
-      playing.put("subPick", pick);
-      playing.put("subsChecked", true);
-    } catch (JSONException e) {
-      Log.e(TAG, "fixed subtitles failed: " + e);
-      return;
-    }
-    JSONObject fixed = res.optJSONObject("fixed");
-    syncOfs = showing != null && fixed != null ? fixed.optLong(showing) / 1000.0 : 0;
-    subOfs = 0;
-    subsPicked = false;
-    clearCues();
-    view.setKeepContentOnPlayerReset(true);
-    exo.setMediaItem(mediaItem(playing), exo.getCurrentPosition());
-    events.onSubtitles(subtitleList());
   }
 
   /**

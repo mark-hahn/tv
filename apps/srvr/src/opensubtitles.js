@@ -146,6 +146,7 @@ async function openSubtitlesSubtitles({
   page,
   season,
   episode,
+  moviehash,
 }) {
   const url = new URL("https://api.opensubtitles.com/api/v1/subtitles");
   const params = {
@@ -165,6 +166,9 @@ async function openSubtitlesSubtitles({
       params.episode_number = String(episode);
     }
   }
+  // Flags the results made for the file with this hash (moviehash_match); it
+  // does not narrow the search.
+  if (moviehash) params.moviehash = moviehash;
 
   url.search = new URLSearchParams(params).toString();
 
@@ -276,6 +280,7 @@ export const subsSearch = async (params) => {
   let page = params?.page;
   const season = params?.season;
   const episode = params?.episode;
+  const moviehash = params?.moviehash || null;
 
   if (!imdbDigits && !query) {
     throw new Error("subsSearch: missing imdb_id or query");
@@ -298,6 +303,7 @@ export const subsSearch = async (params) => {
       page,
       season,
       episode,
+      moviehash,
     });
 
     if (resp.ok) {
@@ -318,6 +324,7 @@ export const subsSearch = async (params) => {
         page,
         season,
         episode,
+        moviehash,
       });
 
       if (retry.resp.ok) {

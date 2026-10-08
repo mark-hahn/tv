@@ -1,10 +1,13 @@
 // subs — a video's subtitle files and the OpenSubtitles side of them: every
 // search result ever returned, which of them were downloaded, the download a
 // video waits on before it plays, and which subtitle each episode last showed.
+// It also keeps what subPrepare.js learns: the clip transcripts of a checked
+// video, each sidecar's verdict, and what automatic ASR has cost each day.
 //
 // Every subtitle is a sidecar .srt beside its video; embedded tracks are
-// copied out to sidecars (subsQueue.js) and never shown themselves. Nothing is
-// downloaded from OpenSubtitles except here, just before a video plays.
+// copied out to sidecars (subsQueue.js) and never shown themselves. Downloads
+// from OpenSubtitles happen just before a video plays, and in the background
+// for a video with no subtitle that fits it (downloadUntilFit).
 
 import fs from "fs";
 import * as path from "node:path";
@@ -31,6 +34,12 @@ const PLAY_WAIT_MS = 5000;
 // on when nothing has been chosen yet.
 const TYPE_ORDER = "THVS+";
 const TAG_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+// Background downloads an episode with no fitting subtitle gets in one go.
+const MAX_FIT_DOWNLOADS = 5;
+// What a play's subtitle list marks a file checked against the audio with.
+const VERIFIED_MARK = "✓";
+// The OpenSubtitles hash reads this much from each end of the video.
+const HASH_CHUNK = 65536;
 
 const db = new Database(SUBS_DB_PATH);
 db.pragma("journal_mode = WAL");
@@ -56,6 +65,32 @@ db.exec(`
   );
   CREATE TABLE IF NOT EXISTS processed (path TEXT PRIMARY KEY);
 `);
+// clips: the ASR clip transcripts of a checked video (subPrepare.js), with the
+// audio track they came from; track -1 marks a video with no English audio,
+// checked by audio matching instead. checks: each sidecar's verdict, which
+// holds while the file keeps the size and mtime it had. asrSpend: what
+// automatic complete ASR was charged each day (PST).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS clips (
+    video TEXT PRIMARY KEY, track INTEGER NOT NULL, json TEXT NOT NULL,
+    ts INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS checks (
+    file TEXT PRIMARY KEY, video TEXT NOT NULL, size INTEGER NOT NULL,
+    mtimeMs INTEGER NOT NULL, verdict TEXT NOT NULL, offsetMs INTEGER,
+    method TEXT, detail TEXT, ts INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS checksVideo ON checks (video);
+  CREATE TABLE IF NOT EXISTS asrSpend (day TEXT PRIMARY KEY, usd REAL NOT NULL);
+`);
+// subs.unfitFor: the video this file was found not to fit (another cut or
+// rate); it is never downloaded for that video again. subs.hashFor: the video
+// whose OpenSubtitles hash a search said this file was made for.
+const subsCols = new Set(
+  db.prepare(`PRAGMA table_info(subs)`).all().map((c) => c.name),
+);
+if (!subsCols.has("unfitFor")) db.exec(`ALTER TABLE subs ADD COLUMN unfitFor TEXT`);
+if (!subsCols.has("hashFor")) db.exec(`ALTER TABLE subs ADD COLUMN hashFor TEXT`);
 
 const insertSub = db.prepare(`
   INSERT OR IGNORE INTO subs (showId, season, episode, fileId, hearingImpaired,
@@ -103,6 +138,36 @@ const processedRow = db.prepare(`SELECT 1 FROM processed WHERE path = ?`);
 const insertProcessed = db.prepare(
   `INSERT OR IGNORE INTO processed (path) VALUES (?)`,
 );
+const setUnfitFor = db.prepare(`UPDATE subs SET unfitFor = ? WHERE fileId = ?`);
+const setHashFor = db.prepare(
+  `UPDATE subs SET hashFor = ? WHERE showId = ? AND season = ? AND episode = ? AND fileId = ?`,
+);
+const clipsRow = db.prepare(`SELECT * FROM clips WHERE video = ?`);
+const upsertClips = db.prepare(`
+  INSERT INTO clips (video, track, json, ts) VALUES (?, ?, ?, ?)
+  ON CONFLICT(video) DO UPDATE SET track = excluded.track, json = excluded.json,
+    ts = excluded.ts
+`);
+const deleteClipsRow = db.prepare(`DELETE FROM clips WHERE video = ?`);
+const fileCheck = db.prepare(`SELECT * FROM checks WHERE file = ?`);
+const upsertCheck = db.prepare(`
+  INSERT INTO checks (file, video, size, mtimeMs, verdict, offsetMs, method,
+    detail, ts)
+  VALUES (@file, @video, @size, @mtimeMs, @verdict, @offsetMs, @method,
+    @detail, @ts)
+  ON CONFLICT(file) DO UPDATE SET video = excluded.video, size = excluded.size,
+    mtimeMs = excluded.mtimeMs, verdict = excluded.verdict,
+    offsetMs = excluded.offsetMs, method = excluded.method,
+    detail = excluded.detail, ts = excluded.ts
+`);
+const deleteCheckRow = db.prepare(`DELETE FROM checks WHERE file = ?`);
+const deleteVideoChecks = db.prepare(`DELETE FROM checks WHERE video = ?`);
+const anyVideoCheck = db.prepare(`SELECT 1 FROM checks WHERE video = ? LIMIT 1`);
+const spendRow = db.prepare(`SELECT usd FROM asrSpend WHERE day = ?`);
+const addSpend = db.prepare(`
+  INSERT INTO asrSpend (day, usd) VALUES (?, ?)
+  ON CONFLICT(day) DO UPDATE SET usd = usd + excluded.usd
+`);
 
 const fmtCode = (season, episode) =>
   `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
@@ -124,7 +189,7 @@ function fileIdTag(fileId) {
   return out.padStart(5, "A");
 }
 
-function tagFileId(suffix) {
+export function tagFileId(suffix) {
   let n = 0;
   for (const ch of suffix.slice(3).toUpperCase())
     n = n * 32 + TAG_ALPHABET.indexOf(ch);
@@ -217,6 +282,36 @@ export function pickSidecar(showId, season, episode, sidecars) {
   );
 }
 
+// What a play offers: the video's sidecars and the index of the one to start
+// on, -1 with none. Files checked against the audio (subPrepare.js) come
+// first, marked VERIFIED_MARK, then T and H files that could not be judged,
+// which came out of the video, then everything unchecked; files from another
+// cut and signs tracks are left out. The start is pickSidecar's choice among
+// the first of those groups that has any. With no checks this is just
+// listSidecars and pickSidecar.
+export function playList(showId, season, episode, videoPath) {
+  const dir = path.dirname(videoPath);
+  const groups = [[], [], []];
+  for (const s of listSidecars(videoPath)) {
+    const verdict = freshCheck(path.join(dir, s.file))?.verdict;
+    if (verdict === "wrong cut" || verdict === "unusable") continue;
+    if (verdict === "good")
+      groups[0].push({ ...s, label: `${s.label} ${VERIFIED_MARK}` });
+    else if (verdict && "TH".includes(s.type)) groups[1].push(s);
+    else groups[2].push(s);
+  }
+  let pick = -1;
+  let before = 0;
+  for (const group of groups) {
+    if (group.length > 0) {
+      pick = before + pickSidecar(showId, season, episode, group);
+      break;
+    }
+    before += group.length;
+  }
+  return { sidecars: groups.flat(), pick };
+}
+
 // The video stopped with this subtitle file showing: it is the episode's
 // chosen one now, and none of the episode's others are.
 export function subStopped(showId, season, episode, videoPath, file) {
@@ -244,7 +339,12 @@ export function subStopped(showId, season, episode, videoPath, file) {
 // when its file sits beside the video.
 export async function searchEpisode(rec, season, episode, videoPath) {
   const showId = String(rec.id);
-  const data = await subsSearch({ imdb_id: rec.imdbId, season, episode });
+  const data = await subsSearch({
+    imdb_id: rec.imdbId,
+    season,
+    episode,
+    moviehash: await videoHash(videoPath),
+  });
   for (const item of Array.isArray(data?.data) ? data.data : []) {
     const a = item.attributes;
     const fileId = a?.files?.[0]?.file_id;
@@ -266,31 +366,54 @@ export async function searchEpisode(rec, season, episode, videoPath) {
       a.comments ?? "",
       a.feature_details?.title ?? "",
     );
+    if (a.moviehash_match) setHashFor.run(videoPath, showId, season, episode, fileId);
   }
   syncDownloaded(showId, season, episode, path.dirname(videoPath));
 }
 
-// The next file to download for the episode, or null: the first result from
-// the same origin as a chosen file of the show, else the first that is not
-// foreign-parts-only.
-function nextCandidate(showId, season, episode, failed) {
+// The video's OpenSubtitles hash: its size plus every 8-byte little-endian
+// word of its first and last HASH_CHUNK bytes, mod 2^64, as 16 hex digits.
+async function videoHash(videoPath) {
+  const fh = await fs.promises.open(videoPath, "r");
+  try {
+    const { size } = await fh.stat();
+    let sum = BigInt(size);
+    for (const at of [0, Math.max(0, size - HASH_CHUNK)]) {
+      const buf = Buffer.alloc(HASH_CHUNK);
+      await fh.read(buf, 0, HASH_CHUNK, at);
+      for (let i = 0; i < HASH_CHUNK; i += 8)
+        sum = (sum + buf.readBigUInt64LE(i)) & 0xffffffffffffffffn;
+    }
+    return sum.toString(16).padStart(16, "0");
+  } finally {
+    await fh.close();
+  }
+}
+
+// The release group at the end of a video or release name ("...-NTb"),
+// lowercase, or null.
+function releaseGroup(name) {
+  return /-([a-z0-9]{2,})$/i.exec(name)?.[1].toLowerCase() ?? null;
+}
+
+// The next file to download for the episode's video, or null, leaving out
+// files found not to fit it: one made for the video by its hash, else one
+// from the video's release group, else one from the same origin as a chosen
+// file of the show, else the first that is not foreign-parts-only.
+function nextCandidate(showId, season, episode, failed, videoPath) {
   const rows = episodeSubs
     .all(showId, season, episode)
-    .filter((r) => !r.downloaded && !failed.has(r.fileId));
+    .filter(
+      (r) => !r.downloaded && !failed.has(r.fileId) && r.unfitFor !== videoPath,
+    );
+  const group = releaseGroup(videoStem(videoPath));
   const chosen = chosenSubs.all(showId);
   return (
+    rows.find((r) => r.hashFor === videoPath) ??
+    (group && rows.find((r) => releaseGroup(r.release ?? "") === group)) ??
     rows.find((r) => chosen.some((c) => sameOrigin(r, c))) ??
     rows.find((r) => !r.foreignPartsOnly) ??
     null
-  );
-}
-
-// Whether the episode's search results hold a subtitle to use: one already
-// downloaded or one that would be.
-export function hasUsableSub(showId, season, episode) {
-  return (
-    countDownloaded.get(showId, season, episode).n > 0 ||
-    !!nextCandidate(showId, season, episode, new Set())
   );
 }
 
@@ -344,7 +467,7 @@ async function fetchSubs(rec, season, episode, videoPath) {
       SUBS_PER_EPISODE - countDownloaded.get(showId, season, episode).n;
     const batch = [];
     while (batch.length < need) {
-      const row = nextCandidate(showId, season, episode, tried);
+      const row = nextCandidate(showId, season, episode, tried, videoPath);
       if (!row) break;
       batch.push(row);
       tried.add(row.fileId);
@@ -393,6 +516,34 @@ export function prefetchSubs(rec, season, episode, videoPath) {
     return;
   unilog(2727, `${rec.name} ${fmtCode(season, episode)} subtitles fetched ahead of its play`);
   fetchJob(rec, season, episode, videoPath);
+}
+
+// Background downloads for a video with no subtitle that fits it: search,
+// then download candidates one at a time, best first, each judged by judge
+// (subPrepare.js), which returns "good" for a file that fits, as it is or once
+// fixed. Stops at the first good one, or after MAX_FIT_DOWNLOADS tries.
+// Returns that file's path, or null.
+export async function downloadUntilFit(rec, season, episode, videoPath, judge) {
+  const showId = String(rec.id);
+  const code = fmtCode(season, episode);
+  await searchEpisode(rec, season, episode, videoPath);
+  const tried = new Set();
+  for (let n = 0; n < MAX_FIT_DOWNLOADS; n++) {
+    const row = nextCandidate(showId, season, episode, tried, videoPath);
+    if (!row) return null;
+    tried.add(row.fileId);
+    try {
+      await downloadSub(row, videoPath);
+    } catch (e) {
+      unilog(2794, `${rec.name} ${code} download of opn${fileIdTag(row.fileId)} failed: ${e.message}`);
+      continue;
+    }
+    const file = opnPath(videoPath, row.fileId);
+    const verdict = await judge(file);
+    unilog(2795, `${rec.name} ${code} downloaded opn${fileIdTag(row.fileId)} (${row.release}): ${verdict}`);
+    if (verdict === "good") return file;
+  }
+  return null;
 }
 
 // Before a video plays: its downloads, then whether it has any subtitle at
@@ -446,4 +597,75 @@ export function isProcessed(videoPath) {
 
 export function markProcessed(videoPath) {
   insertProcessed.run(videoPath);
+}
+
+// ---- what subPrepare.js learns ----
+
+export function getClips(video) {
+  const row = clipsRow.get(video);
+  return row ? { track: row.track, ...JSON.parse(row.json) } : null;
+}
+
+export function saveClips(video, track, data) {
+  upsertClips.run(video, track, JSON.stringify(data), Date.now());
+}
+
+// The file's check, or null when it has none or the file has changed since.
+export function freshCheck(file) {
+  const check = fileCheck.get(file);
+  if (!check) return null;
+  let st;
+  try {
+    st = fs.statSync(file);
+  } catch {
+    return null;
+  }
+  return st.size === check.size && Math.round(st.mtimeMs) === check.mtimeMs
+    ? check
+    : null;
+}
+
+export function saveCheck({ file, video, verdict, offsetMs = null, method = null, detail = null }) {
+  const st = fs.statSync(file);
+  upsertCheck.run({
+    file,
+    video,
+    size: st.size,
+    mtimeMs: Math.round(st.mtimeMs),
+    verdict,
+    offsetMs,
+    method,
+    detail,
+    ts: Date.now(),
+  });
+}
+
+export function hasChecks(video) {
+  return !!anyVideoCheck.get(video);
+}
+
+export function forgetCheck(file) {
+  deleteCheckRow.run(file);
+}
+
+// The video is gone: so is what was learned about it.
+export function forgetVideo(video) {
+  deleteVideoChecks.run(video);
+  deleteClipsRow.run(video);
+}
+
+// The opn file with this suffix does not fit this video.
+export function markUnfit(videoPath, suffix) {
+  setUnfitFor.run(videoPath, tagFileId(suffix));
+}
+
+const pstDay = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+
+export function asrSpentToday() {
+  return spendRow.get(pstDay())?.usd ?? 0;
+}
+
+export function addAsrSpend(usd) {
+  addSpend.run(pstDay(), usd);
 }

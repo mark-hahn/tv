@@ -214,25 +214,60 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
     found videos, so a disk outage clears nothing.
   - `picks`: the sidecar each episode showed at its last stop.
   - `processed`: videos the add-to-disk steps have handled.
-- Nothing is downloaded from OpenSubtitles except in `getPlayUrl`
+  - `clips`: the ASR clip transcripts of each checked video, and its audio
+    track (-1: no English audio). `checks`: each sidecar's verdict, valid
+    while the file keeps its size and mtime. `asrSpend`: automatic complete
+    ASR's cost per PST day. `subs.unfitFor` marks a result found not to fit
+    a video, `subs.hashFor` one OpenSubtitles made for it (moviehash).
+- Subtitle checks (`apps/srvr/src/subPrepare.js`, `subSpotCheck.js`,
+  `srt-fix.md`): each sidecar's timing is checked against the words of the
+  video's English audio, heard by ASR (Speechmatics) on two 2-minute clips
+  at the busiest dialogue of the first and last third, about 2.5 cents.
+  - Per clip, cues pair with the clip's words by their first 5 words, and
+    the median of the pairs is the offset (positive: captions early).
+  - good: both clips agree within 250 ms on −250..+500 ms. fixable: they
+    agree on anything else (shifted), or a middle clip shows the file runs
+    at another rate (stretched). wrong cut: they disagree, or a file that
+    can't be told ends over 5 s past the video. can't tell: a clip has too
+    few pairs. unusable: under 3 dialogue cues a minute, or not English.
+  - A fixed file is judged again. A wrong-cut or unusable opn file is
+    deleted and marked unfit; a wrong-cut asr file is deleted. Other
+    misfits stay on disk but are never offered.
+  - With nothing good, OpenSubtitles candidates are downloaded one at a time
+    and judged, up to 5; with none fitting, a complete ASR is queued.
+  - A video with no English audio track: T and H are presumed good, the
+    others are checked by whole-file audio matching (ffsubsync), no ASR.
+  - It runs after the add-to-disk steps, and from the remotes' Sync. The
+    watcher judges a sidecar that arrives or changes later from the stored
+    clips, at no cost; a deleted video's checks go with it.
+  - A video counts as checked (`needsCheck`) by its path: a replacement or
+    rename is checked again.
+- OpenSubtitles downloads happen in the checks above and in `getPlayUrl`
   (`subsBeforePlay`), for tvapp and the browser player alike:
-  - Only when the episode has fewer than 3 downloaded: search, then download
-    all it still needs at once (`fetchSubs`), then replacements for any that
-    failed, until it has 3, 3 have failed, or no candidate is left.
-  - A candidate is the first result from the same origin as a chosen file of
-    the show, else the first that is not foreign-parts-only.
-  - Play waits at most 3 s (`PLAY_WAIT_MS`, about twice a measured search
-    plus 3 parallel downloads). Slow, failed, or with no subtitle file at all
-    after the wait ("no subtitles"), it plays anyway and `subError` puts one
-    pop-up, problems joined by "; ", on the phones and the web client. The
-    pop-up sits over every screen and pane until Close is pressed.
+  - At play, only when the episode has fewer than 3 downloaded: search, then
+    download all it still needs at once (`fetchSubs`), then replacements
+    for any that failed, until it has 3, 3 have failed, or no candidate is
+    left. The watcher checks each one that lands.
+  - A candidate is, in order: one made for the video by its hash, one from
+    the video's release group, one from the same origin as a chosen file of
+    the show, else the first that is not foreign-parts-only. Results unfit
+    for the video are never candidates.
+  - Play waits at most 5 s (`PLAY_WAIT_MS`). Slow, failed, or with no
+    subtitle file at all after the wait ("no subtitles"), it plays anyway
+    and `subError` puts one pop-up, problems joined by "; ", on the phones
+    and the web client. The pop-up sits over every screen and pane until
+    Close is pressed.
   - The API allows 5 requests a second. A search or download answered 429 is
     retried after its `retry-after` (1 s). One play alone sends 4.
   - There is no daily download quota check of our own; OpenSubtitles enforces
     its 1000 a day, and past it downloads fail like any other.
-- The start pick (`pickSidecar`): the file the episode last showed, else the
-  type the show last showed (for V, the one from the same origin as a chosen
-  one), else the first in the order T, H, V, S, +.
+- What a play offers (`playList`): files checked good first, labelled with
+  a ✓, then T and H files that could not be judged, then unchecked files.
+  Files from another cut and unusable ones are left out.
+- The start pick (`pickSidecar`, within the first of those groups that has
+  any): the file the episode last showed, else the type the show last
+  showed (for V, the one from the same origin as a chosen one), else the
+  first in the order T, H, V, S, +.
 - The player sends the showing file as `sub` in `playProgress`. At a stop
   that is not an early stop it becomes the episode's pick and `chosen`.
 - Same origin (`sameOrigin()`): two results for different episodes match when
@@ -244,14 +279,16 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
     or `comments` equal and not empty.
 - When a video or an S file lands on disk the watcher queues the video
   (`apps/srvr/src/subsQueue.js`): T and H copied out, an arriving `.srt`
-  named `S<n>`, and ASR when the video has no embedded T or H, no subtitle
-  file of any type beside it and no usable search result. Only such a video
-  is searched (no download). Manual ASR from the ASR pane is not limited by
+  named `S<n>`, then the subtitle checks above, and ASR when they leave
+  nothing that fits. Automatic ASR stops for the day at $20
+  (`AUTO_ASR_DAILY_USD`); a video put off is not marked processed, so the
+  sweep brings it back. Manual ASR from the ASR pane is not limited by
   this.
 - The 6-hourly sweep queues library videos, watched or not, that have not
   been through those steps, whatever subtitle files they already have. Its
   entries come after all other batch work: none starts while a stills build,
-  a recode or ASR is running or queued.
+  a recode or ASR is running or queued. With `SUB_CHECK_BACKFILL` (off) it
+  also queues videos never checked.
 - A replaced or losing video is deleted with its sidecars, never kept as
   `.old` or `.alt`, and a replacement does not inherit its subtitles.
   tv-down deletes the video a download replaces only after the new file has
@@ -272,7 +309,13 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 - Timing offset: set from the remotes' subtitle panel (`so`/`sa`, see Video
   keys) and from the browser player's Subs bar, and applied only by
   rewriting the `.srt` on disk (`/api/applySubOffset`). No offset is stored
-  anywhere; `/api/subtitle` serves the file as it is.
+  anywhere; `/api/subtitle` serves the file as it is. The rewritten file is
+  judged again, never moved back.
+- Sync: the remotes' panel Sync (`sy`) runs the subtitle checks on the
+  playing episode now (`/api/fixSubs`), and is off once the episode has
+  been checked (`getPlayUrl`'s `subsChecked`). The local pane's Sync shifts
+  one sidecar to fit its video, by the stored clips, else by its
+  `.asr.srt`.
 - `/api/subsCountEpisodes` (the torrent pane's Chk Subs, through tv-api):
   per episode, the distinct OpenSubtitles releases, a hearing-impaired copy
   counting with its release. It searches 3 at a time, finds an IMDb id by
@@ -459,7 +502,7 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-10-02**. tvapp (`apps/tvapp`, native Java, package
+Current as of **2026-10-08**. tvapp (`apps/tvapp`, native Java, package
 `com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
 (`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
@@ -556,6 +599,11 @@ because the TV is unreachable from any wireless host here.
     what moved since the last Apply (through `cleanSrt()`, never below 0),
     and tvapp reloads the video at its position. The shift is permanent.
     A new video or another track resets the offset to 0.
+  - Sync, left of Close under the offset, sends `sy`: tvapp has tv-srvr's
+    `/api/fixSubs` check and fix the episode's subtitle files, then reopens
+    the video at its position with the new list, on the showing file. The
+    offset shows the shift that file got. Sync is off while it runs and
+    once the episode has been checked.
   - Holding the Apps key in tvapprc mode sends `k,reload`, which reloads the
     playing video so an edited subtitle file is fetched again.
 - The camera overlay pauses a playing video. The video resumes when the
@@ -628,13 +676,14 @@ actor filter → filter text → top of list. At the top Back goes to the TV's h
 | `t,<n>` | turn on subtitle track n; `t,-1` turns them off |
 | `so,<sec>` | move the subtitle offset by sec; shifts nothing yet |
 | `sa` | apply the offset: shift the showing `.srt` on disk and reload |
+| `sy` | Sync: check and fix the episode's subtitle files, then reopen |
 | `k,reload` | reload the playing video at its position |
 
 `s` is held until the list has loaded, and `e`/`p` wait behind it.
 
 **Commands back to the remote** — `z`, `c,<count>`, `a,<name>`, `i,<0|1>`,
 `l,<json>` (subtitle tracks `{title, tracks: [{label, type}], selected,
-subOfs, oldSubOfs}`, or `null` with no video up).
+subOfs, syncOfs, canSync, cap}`, or `null` with no video up).
 The bridge adds `u`/`d` (tvapp up/down). Those two, and the bridge socket
 closing, are the only things that set or clear tvapprc mode. The phone sends
 the bridge `o` to open tvapp.
@@ -645,8 +694,9 @@ the bridge `o` to open tvapp.
 - The top-right cell is Hide/Unhide (`h`), in place of Home.
 - Row 3's left cell is Search: the phone-only filter input screen, which
   sends `f,<text>`. Its right cell is Skip (`k,skip`). Back sends `b`.
-- Holding Vol+ opens the subtitle panel. Holding Apps sends `k,reload`; a
-  short press still opens the streaming list.
+- Holding Vol+ opens the subtitle panel, whose bottom row is Sync (`sy`)
+  and Close. Holding Apps sends `k,reload`; a short press still opens the
+  streaming list.
 - No phone key sends `e`.
 - Outside tvapprc mode row 3's left cell is Emby, which launches the Emby
   app (Google TV input only), and its right cell is Input, the set's

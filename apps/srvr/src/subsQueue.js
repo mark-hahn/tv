@@ -2,8 +2,9 @@
 //
 // Owns two persistent queues and their background loops:
 //   subQueue  what a video gets when it lands on disk: its text tracks copied
-//             out to sidecars, new subtitle files named, a replaced video's
-//             subtitles taken over, an opensubtitles search, ASR triage
+//             out to sidecars, new subtitle files named, every sidecar checked
+//             against its audio and a download or ASR when none fits
+//             (subPrepare.js)
 //   asrQueue  whisper ASR transcription queue
 // Every subtitle is a sanitized sidecar .srt; src/subs.js has the rest.
 //
@@ -31,6 +32,7 @@ import * as tvdb from "./tvdb.js";
 import * as subs from "./subs.js";
 import { stillsBusy } from "./stills.js";
 import { getRecodePending } from "./recode.js";
+import { prepareVideoSubs } from "./subPrepare.js";
 
 // ---- hard-wired constants (no env vars per repo convention) ----
 const moviesDir = "/mnt/media/movies";
@@ -41,6 +43,11 @@ const SUBTITLE_LOG_DIR = "/root/dev/apps/tv/apps/asr/data/subtitle-logs/";
 const ASR_JS_PATH = "/root/dev/apps/tv/apps/asr/asr.js";
 const ASR_LOG_BUFFER_MAX = 500;
 const EMB_LOG_BUFFER_MAX = 500;
+// What complete ASR the pipeline starts by itself may cost in a day (PST), at
+// Speechmatics' price. ASR asked for from the ASR pane or the Subs button is
+// not counted.
+const AUTO_ASR_DAILY_USD = 20;
+const ASR_USD_PER_HOUR = 0.38;
 // A sidecar this code names itself, as opposed to one that arrived as it is.
 export const NAMED_SIDECAR_RE = /\.(?:[THS]\d+|mb\d+|opn[A-Z2-7]{5}|asr)\.srt$/i;
 
@@ -579,10 +586,9 @@ function doSubQueueNow() {
 }
 // What a video gets when it lands on disk, or when the sweep or the local
 // pane's Subs button names it: its text tracks copied out, new subtitle files
-// named, and ASR when that leaves it with nothing: no embedded text track, no
-// subtitle file at all and no usable opensubtitles search result. Only such a
-// video is searched, since only then can the result change anything; nothing
-// is downloaded until the video plays.
+// named, then every subtitle file checked against the video's audio and dealt
+// with, an OpenSubtitles download that fits when none does, and ASR when no
+// download fits either (subPrepare.js).
 async function processSubQueueEntry() {
   // Only one entry at a time. startSubQueueLoop serializes itself by awaiting,
   // but doSubQueueNow can fire between ticks, and the entry now stays at the
@@ -633,32 +639,32 @@ async function processSubQueueEntry() {
     const season = parsed?.season;
     const episode = parsed?.episode;
     const isEpisode = Number.isInteger(season) && Number.isInteger(episode);
-    const hasEmbText = await extractEmbSrts(videoFilePath, entry.fromUI);
+    await extractEmbSrts(videoFilePath, entry.fromUI);
     if (isEpisode && entry.renameS) {
       setSubStage("naming subtitle files");
       await renameSFiles(videoFilePath, season, episode);
     }
-    // Any subtitle file beside it, of any type, keeps it out of ASR, and so
-    // does an embedded text track; then there is nothing to search for.
-    const needsSubs =
-      !hasEmbText && subs.listSidecars(videoFilePath).length === 0;
-    let usable = false;
-    if (needsSubs && isEpisode && rec?.imdbId) {
-      setSubStage("searching opensubtitles");
-      try {
-        await subs.searchEpisode(rec, season, episode, videoFilePath);
-      } catch (e) {
-        // Not marked done: ASR costs money, and whether this video needs it is
-        // not known until a search works. The sweep brings it back.
-        unilog(2682, `${showName}: search failed for ${path.basename(videoFilePath)}: ${e.message}`);
-        return;
-      }
-      usable = subs.hasUsableSub(String(rec.id), season, episode);
-    } else if (needsSubs) {
-      unilog(2683, `${showName}: no opensubtitles search for ${path.basename(videoFilePath)}, ${isEpisode ? "the show has no imdb id" : "it has no season and episode"}`);
-    }
+    // A check, search or download that fails throws: then the video is not
+    // marked done, and the sweep brings it back.
+    const prep = await prepareVideoSubs({
+      videoPath: videoFilePath,
+      rec,
+      season,
+      episode,
+      setStage: setSubStage,
+    });
     setSubStage("choosing next queue");
-    if (needsSubs && !usable) {
+    if (prep.needsAsr) {
+      const usd = (prep.durS / 3600) * ASR_USD_PER_HOUR;
+      if (!entry.fromUI) {
+        const spent = subs.asrSpentToday();
+        if (spent + usd > AUTO_ASR_DAILY_USD) {
+          // Not marked done: the sweep brings it back on a later day.
+          unilog(2796, `${showName}: ASR for ${path.basename(videoFilePath)} put off, automatic ASR is at $${spent.toFixed(2)} of $${AUTO_ASR_DAILY_USD} today`);
+          return;
+        }
+        subs.addAsrSpend(usd);
+      }
       addToAsrQueue([
         {
           videoPath: videoFilePath,

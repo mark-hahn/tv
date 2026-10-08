@@ -114,7 +114,7 @@ function shiftedSrt(srtText, offsetMs) {
 }
 
 // The video beside subFile that it is a sidecar of: <stem>.srt or <stem>.*.srt.
-async function sidecarVideo(subFile) {
+export async function sidecarVideo(subFile) {
   const name = path.basename(subFile);
   const video = (await fsp.readdir(path.dirname(subFile))).find((f) => {
     if (!vidIsVideoName(f)) return false;

@@ -81,9 +81,12 @@ const CMD_SUBTITLE = "t";
 // puts it back to 0.
 const CMD_SUB_OFFSET = "so";
 const CMD_SUB_APPLY = "sa";
-// The panel's Sync: the playing .srt shifted on disk to match the episode's
-// .asr.srt and reloaded, only when the list's canSync. The list's syncOfs is
-// the shift, shown as the offset until the next + or -.
+// The panel's Sync: tv-srvr's subtitle fix for the episode tvapp is playing
+// (each file checked against the video's words, fixed or dropped, one
+// downloaded when none fits), and the video reopened with the files as they
+// are now. Only when the list's canSync, which is off once the episode has
+// been fixed. The list's syncOfs is the shift the showing file got, shown as
+// the offset until the next + or -.
 const CMD_SUB_SYNC = "sy";
 const CMD_OPEN_TVAPP = "o";
 const CMD_BACK = "b";

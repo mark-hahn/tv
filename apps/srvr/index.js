@@ -87,7 +87,7 @@ import * as subsQueue from "./src/subsQueue.js";
 import * as subs from "./src/subs.js";
 import * as asrCost from "./src/asrCost.js";
 import { subsCountEpisodes } from "./src/opensubtitles.js";
-import { syncSubToAsr } from "./src/subSync.js";
+import * as subPrepare from "./src/subPrepare.js";
 import * as stills from "./src/stills.js";
 import * as recode from "./src/recode.js";
 
@@ -2291,9 +2291,90 @@ app.post(
 // The torrent pane's Chk Subs, through tv-api: OpenSubtitles release counts.
 app.post("/api/subsCountEpisodes", apiWrapper(subsCountEpisodes));
 
-// Sync in the local pane and the remotes' subtitle panel: a sidecar shifted
-// to match its <base>.asr.srt.
-app.post("/api/syncSubToAsr", apiWrapper(syncSubToAsr));
+// Sync in the local pane and the remotes' subtitle panel: a sidecar moved to
+// fit the words of its video, by its stored clip transcripts, else by its
+// <base>.asr.srt.
+app.post("/api/syncSubToAsr", apiWrapper(subPrepare.syncSidecar));
+
+// The remotes' Sync: subPrepare.js on the episode tvapp is playing, now. ASR
+// it ends up needing is queued as asked for by hand, outside the daily cap.
+// Returns the episode's subtitles as getPlayUrl gives them now, with fixed:
+// {file: offsetMs}, the shift each file it fixed got.
+app.post(
+  "/api/fixSubs",
+  apiWrapper(async ({ showName, season, episode }) => {
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec) throw new Error(`fixSubs: no show ${showName}`);
+    const file = epd.getFullPath(
+      rec.episodeData,
+      showPaths.showFolderFor(showName, rec),
+      season,
+      episode,
+      tvDir,
+    );
+    if (!file)
+      throw new Error(`fixSubs: no file for ${showName} ${fmtSeasonEpisode(season, episode)}`);
+    const prep = await subPrepare.prepareVideoSubs({
+      videoPath: file,
+      rec,
+      season,
+      episode,
+    });
+    if (prep.needsAsr)
+      addToAsrQueue([
+        {
+          videoPath: file,
+          showName,
+          season,
+          episode,
+          fromUI: true,
+          lowPriority: false,
+          source: "remote Sync",
+          addedAt: Date.now(),
+        },
+      ]);
+    return {
+      ...subsForFile(String(rec.id), file, season, episode),
+      subsChecked: true,
+      fixed: prep.fixed,
+    };
+  }),
+);
+
+// subPrepare.js on one video (path under the tv folder), dry unless dryRun is
+// false: what it would do with each subtitle file, and what a play would then
+// offer.
+app.post(
+  "/api/subPrepare",
+  apiWrapper(async ({ path: relPath, dryRun = true }) => {
+    const videoPath = path.resolve(tvDir, String(relPath || ""));
+    if (!videoPath.startsWith(tvDir + "/"))
+      throw new Error(`not under ${tvDir}: ${relPath}`);
+    const showName = showNameFromFilePath(videoPath);
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    const se = parseFileSeasonEpisode(
+      path.basename(videoPath),
+      path.basename(path.dirname(videoPath)),
+    );
+    const prep = await subPrepare.prepareVideoSubs({
+      videoPath,
+      rec,
+      season: se?.season,
+      episode: se?.episode,
+      dryRun: dryRun !== false,
+    });
+    const play = rec
+      ? subs.playList(String(rec.id), se?.season, se?.episode, videoPath)
+      : null;
+    return {
+      ...prep,
+      play: play && {
+        labels: play.sidecars.map((x) => x.label),
+        pick: play.pick,
+      },
+    };
+  }),
+);
 
 app.post("/api/applySubOffset", async (req, res) => {
   const { videoPath, srtFile, offsetMs } = req.body || {};
@@ -2924,9 +3005,10 @@ function prefetchNextSubs(showName, rec, after = null) {
 
 // The file's subtitles: its sidecar .srt files as urls (tv-srvr hands them out
 // as vtt), each with the subtitle panel's label, and subPick, the index of the
-// one to start on, -1 with none. Embedded tracks are never offered.
+// one to start on, -1 with none. Embedded tracks are never offered, nor files
+// checked as not fitting the video (subs.playList).
 function subsForFile(showId, file, season, episode) {
-  const sidecars = subs.listSidecars(file);
+  const { sidecars, pick } = subs.playList(showId, season, episode, file);
   return {
     subs: sidecars.map((s) => ({
       url:
@@ -2935,7 +3017,7 @@ function subsForFile(showId, file, season, episode) {
       label: s.label,
       file: s.file,
     })),
-    subPick: subs.pickSidecar(showId, season, episode, sidecars),
+    subPick: pick,
   };
 }
 
@@ -3005,6 +3087,9 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
     trimPosMs,
     skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),
     ...subsForFile(String(rec.id), file, season, episode),
+    // Whether the episode's subtitle files have been checked and fixed; the
+    // remotes' Sync is for one that has not (fixSubs).
+    subsChecked: !subPrepare.needsCheck(file),
     ...(web
       ? {
           path: file,
@@ -3935,6 +4020,9 @@ watcher
     if (ext === "srt") {
       subFileChanged(filePath);
       subFileAdded(filePath);
+      subPrepare.subFileEvent(filePath, "add").catch((e) => {
+        unilog(2797, `check of added ${path.basename(filePath)} failed: ${e.message}`);
+      });
       return;
     }
     if (!videoFileExtensions.includes(ext)) return;
@@ -4020,13 +4108,23 @@ watcher
       handleShowDiskChange(showName);
     }, DISK_CHANGE_DEBOUNCE_MS);
   })
+  // A subtitle file rewritten in place, most often by the remote's Apply, is
+  // judged again (subPrepare.js).
+  .on("change", (filePath) => {
+    if (filePath.split(".").pop() !== "srt") return;
+    subPrepare.subFileEvent(filePath, "change").catch((e) => {
+      unilog(2798, `check of changed ${path.basename(filePath)} failed: ${e.message}`);
+    });
+  })
   .on("unlink", (filePath) => {
     const ext = filePath.split(".").pop();
     if (ext === "srt") {
       subFileChanged(filePath);
+      subPrepare.subFileEvent(filePath, "unlink");
       return;
     }
     if (!videoFileExtensions.includes(ext)) return;
+    subPrepare.forgetVideo(filePath);
 
     const showName = showNameFromFilePath(filePath);
     if (!showName) return;
@@ -4085,6 +4183,11 @@ unilog(91, `Watching ${tvDir} for file changes...`);
 // every folder and found videos, so a disk outage clears nothing.
 const SUB_BACKSTOP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const SUB_BACKSTOP_START_DELAY_MS = 10 * 60 * 1000;
+// The backfill: with this on, the sweep also queues library videos that have
+// been through the queue before their subtitle files were checked against
+// their audio (subPrepare.js), so they are checked too. Off until it is
+// wanted; each check costs about 2.5 cents of ASR.
+const SUB_CHECK_BACKFILL = false;
 
 async function runSubBackstopSweep() {
   let scanned = 0;
@@ -4127,7 +4230,11 @@ async function runSubBackstopSweep() {
           const showName = showNameFromFilePath(fp);
           const rec = tvdb.getAllTvdbSync?.()?.[showName];
           if (!rec?.inLibrary) continue;
-          if (!sweepWantsVideo(fp)) continue;
+          if (
+            !sweepWantsVideo(fp) &&
+            !(SUB_CHECK_BACKFILL && subPrepare.needsCheck(fp))
+          )
+            continue;
           enqueueSubQueue(
             { videoFilePath: fp, fromUI: false, lowPriority: true },
             false,

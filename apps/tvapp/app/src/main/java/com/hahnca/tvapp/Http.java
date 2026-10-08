@@ -25,7 +25,13 @@ class Http {
   }
 
   static String postJson(String url, String body) throws Exception {
+    return postJson(url, body, READ_TIMEOUT_MS);
+  }
+
+  /** postJson for an answer that takes longer than READ_TIMEOUT_MS. */
+  static String postJson(String url, String body, int readTimeoutMs) throws Exception {
     HttpURLConnection conn = open(url);
+    conn.setReadTimeout(readTimeoutMs);
     conn.setRequestMethod("POST");
     conn.setRequestProperty("Content-Type", "application/json");
     conn.setDoOutput(true);

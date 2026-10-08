@@ -1,5 +1,10 @@
 
-ignore sidecars of replaced releases and delete those files in a one-time operation
+how expensive would a backfill be only on shows that have a watched episode in the last month?
+change the sync button in the remote to run this fix -- if already run disable the sync button.
+will we be able to tell if a fix has been done on an episode before so we don't check an episode twice?
+change  $5/day cap on automatic ASR to $20/day.
+could files whose cues run past the end be shrunk based on rate?
+update docs.
 
 
 i'm 172

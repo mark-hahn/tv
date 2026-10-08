@@ -2408,18 +2408,27 @@ app.post("/api/applySubOffset", async (req, res) => {
 });
 
 // ASR subtitle queue endpoints
+// lowPriority queues them at the back, after all other batch work, as the
+// sweep does (a backfill).
 app.post("/api/asr/subs/enqueue", (req, res) => {
-  const { videoPaths, fromUI } = req.body || {};
+  const { videoPaths, fromUI, lowPriority } = req.body || {};
   if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
     res.status(400).json({ error: "videoPaths required" });
     return;
   }
-  for (const vp of [...videoPaths].reverse()) {
-    enqueueSubQueue(
-      { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false },
-      true,
-    );
-  }
+  if (lowPriority)
+    for (const vp of videoPaths)
+      enqueueSubQueue(
+        { videoFilePath: vp, fromUI: false, lowPriority: true },
+        false,
+      );
+  else
+    for (const vp of [...videoPaths].reverse()) {
+      enqueueSubQueue(
+        { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false },
+        true,
+      );
+    }
   persistSubQueue();
   doSubQueueNow();
   res.json({ ok: true, queued: videoPaths.length });

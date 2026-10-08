@@ -1,10 +1,4 @@
 
-how expensive would a backfill be only on shows that have a watched episode in the last month?
-change the sync button in the remote to run this fix -- if already run disable the sync button.
-will we be able to tell if a fix has been done on an episode before so we don't check an episode twice?
-change  $5/day cap on automatic ASR to $20/day.
-could files whose cues run past the end be shrunk based on rate?
-update docs.
 
 
 i'm 172
@@ -14,7 +8,14 @@ i'm 172
 back up pause based on pause length
 =================
 
-when there is no data in field to the left of the show name the field should not be shown.
+when there is no data in how expensive would a backfill be only on shows that have a watched episode in the last month?
+change the sync button in the remote to run this fix -- if already run disable the sync button.
+will we be able to tell if a fix has been done on an episode before so we don't check an episode twice?
+change  $5/day cap on automatic ASR to $20/day.
+could files whose cues run past the end be shrunk based on rate?
+update docs.
+
+field to the left of the show name the field should not be shown.
 
 remove the clear button and clear code from header.
 

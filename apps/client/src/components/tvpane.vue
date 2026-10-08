@@ -294,7 +294,11 @@
       <!-- Timing rows: the offset and Apply, then - and + by 0.5 and by 0.1 -->
       <div style="display: flex; height: 10%; flex-shrink: 0">
         <div :style="{ ...subOfsBtn, cursor: 'default' }">
-          {{ (subList?.subOfs ?? 0).toFixed(1) }}
+          {{
+            subList?.subOfs || !subList?.syncOfs
+              ? (subList?.subOfs ?? 0).toFixed(1)
+              : subList.syncOfs.toFixed(2)
+          }}
         </div>
         <div
           @mousedown.prevent="subApply"
@@ -319,23 +323,26 @@
           {{ sec < 0 ? "-" : "+" }}
         </div>
       </div>
-      <div
-        @mousedown.prevent="showSubCtrl = false"
-        @touchstart.prevent="showSubCtrl = false"
-        style="
-          background: lightgreen;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 26px;
-          font-weight: bold;
-          cursor: pointer;
-          flex-shrink: 0;
-          height: 20%;
-          user-select: none;
-        "
-      >
-        Close
+      <div style="display: flex; flex-shrink: 0; height: 20%">
+        <div
+          @mousedown.prevent="subSync"
+          @touchstart.prevent="subSync"
+          :style="{
+            ...subCloseRowBtn,
+            borderRight: '2px solid #fff',
+            color: subList?.canSync ? '#000' : '#bbb',
+            cursor: subList?.canSync ? 'pointer' : 'default',
+          }"
+        >
+          Sync
+        </div>
+        <div
+          @mousedown.prevent="showSubCtrl = false"
+          @touchstart.prevent="showSubCtrl = false"
+          :style="subCloseRowBtn"
+        >
+          Close
+        </div>
       </div>
     </div>
     <!-- Picture settings pane -->
@@ -783,9 +790,10 @@ const MSG_ACTIVE_SHOW = "a";
 // Whether that show is hidden, which is what the hide key reads Unhide for.
 const MSG_ACTIVE_HIDDEN = "i";
 // The subtitle tracks of the video tvapp is playing, as JSON {title, tracks:
-// [{label, type}], selected, subOfs, cap}, or null when none is up; cap is
-// the caption tvapp shows, moved by subOfs, sent on every change. Asked for
-// with CMD_SUBTITLES; CMD_SUBTITLE,<n> turns track n on, -1 turns them off.
+// [{label, type}], selected, subOfs, syncOfs, canSync, cap}, or null when
+// none is up; cap is the caption tvapp shows, moved by subOfs, sent on every
+// change. Asked for with CMD_SUBTITLES; CMD_SUBTITLE,<n> turns track n on, -1
+// turns them off.
 const MSG_SUBTITLES = "l";
 const CMD_SUBTITLES = "l";
 const CMD_SUBTITLE = "t";
@@ -794,6 +802,10 @@ const CMD_SUBTITLE = "t";
 // puts it back to 0.
 const CMD_SUB_OFFSET = "so";
 const CMD_SUB_APPLY = "sa";
+// The panel's Sync: the playing .srt shifted on disk to match the episode's
+// .asr.srt and reloaded, only when the list's canSync. The list's syncOfs is
+// the shift, shown as the offset until the next + or -.
+const CMD_SUB_SYNC = "sy";
 const CMD_OPEN_TVAPP = "o";
 const CMD_BACK = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -962,6 +974,20 @@ export default {
         border: "2px solid #000",
         borderRadius: "8px",
         background: "#fff",
+        fontSize: "26px",
+        fontWeight: "bold",
+        cursor: "pointer",
+        userSelect: "none",
+      };
+    },
+    // The bottom row's Sync and Close.
+    subCloseRowBtn() {
+      return {
+        flex: 1,
+        background: "lightgreen",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         fontSize: "26px",
         fontWeight: "bold",
         cursor: "pointer",
@@ -1672,6 +1698,10 @@ export default {
 
     subApply() {
       if (this.subApplyOk) this.sendTvapprc(CMD_SUB_APPLY);
+    },
+
+    subSync() {
+      if (this.subList?.canSync) this.sendTvapprc(CMD_SUB_SYNC);
     },
 
     subSelectTrack(index) {

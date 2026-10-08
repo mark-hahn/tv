@@ -837,6 +837,10 @@ export function playPathInTab(path) {
   window.open(`${HTTP_URL}/api/play?${new URLSearchParams({ path })}`, "_blank");
 }
 
+export function syncSubToAsr(path, asrPath) {
+  return httpCall("/api/syncSubToAsr", { path, asrPath }, "POST");
+}
+
 export function getAsrLog() {
   return httpCall("/api/asr/log");
 }

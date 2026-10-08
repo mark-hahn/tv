@@ -69,9 +69,10 @@ const MSG_ACTIVE_SHOW = "a";
 // Whether that show is hidden, which is what the hide key reads Unhide for.
 const MSG_ACTIVE_HIDDEN = "i";
 // The subtitle tracks of the video tvapp is playing, as JSON {title, tracks:
-// [{label, type}], selected, subOfs, cap}, or null when none is up; cap is
-// the caption tvapp shows, moved by subOfs, sent on every change. Asked for
-// with CMD_SUBTITLES; CMD_SUBTITLE,<n> turns track n on, -1 turns them off.
+// [{label, type}], selected, subOfs, syncOfs, canSync, cap}, or null when
+// none is up; cap is the caption tvapp shows, moved by subOfs, sent on every
+// change. Asked for with CMD_SUBTITLES; CMD_SUBTITLE,<n> turns track n on, -1
+// turns them off.
 const MSG_SUBTITLES = "l";
 const CMD_SUBTITLES = "l";
 const CMD_SUBTITLE = "t";
@@ -80,6 +81,10 @@ const CMD_SUBTITLE = "t";
 // puts it back to 0.
 const CMD_SUB_OFFSET = "so";
 const CMD_SUB_APPLY = "sa";
+// The panel's Sync: the playing .srt shifted on disk to match the episode's
+// .asr.srt and reloaded, only when the list's canSync. The list's syncOfs is
+// the shift, shown as the offset until the next + or -.
+const CMD_SUB_SYNC = "sy";
 const CMD_OPEN_TVAPP = "o";
 const CMD_BACK = "b";
 // Back to a clean tvapp screen: the show list focused and nothing else,
@@ -1883,6 +1888,7 @@ function Remote({ setSubError }) {
     // with an offset.
     const subOn = subList?.tracks[subList.selected]?.type === "srt";
     const subApplyOk = subOn && subList.subOfs !== 0;
+    const subSyncOk = !!subList?.canSync;
     return (
       <View style={styles.container}>
         <StatusBar hidden />
@@ -1939,7 +1945,9 @@ function Remote({ setSubError }) {
         <View style={subCtrlStyles.ofsRow}>
           <View style={subCtrlStyles.ofsBtn}>
             <Text style={subCtrlStyles.ofsBtnText}>
-              {(subList?.subOfs ?? 0).toFixed(1)}
+              {subList?.subOfs || !subList?.syncOfs
+                ? (subList?.subOfs ?? 0).toFixed(1)
+                : subList.syncOfs.toFixed(2)}
             </Text>
           </View>
           <TouchableOpacity
@@ -1972,13 +1980,30 @@ function Remote({ setSubError }) {
             ))}
           </View>
         ))}
-        <TouchableOpacity
-          onPress={() => setShowSubCtrl(false)}
-          style={subCtrlStyles.closeBtn}
-          activeOpacity={0.7}
-        >
-          <Text style={subCtrlStyles.closeBtnText}>Close</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row" }}>
+          <TouchableOpacity
+            disabled={!subSyncOk}
+            onPress={() => sendTvapprc(CMD_SUB_SYNC)}
+            style={[subCtrlStyles.closeBtn, { flex: 1 }]}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                subCtrlStyles.closeBtnText,
+                !subSyncOk && subCtrlStyles.ofsBtnTextOff,
+              ]}
+            >
+              Sync
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowSubCtrl(false)}
+            style={[subCtrlStyles.closeBtn, { flex: 1 }]}
+            activeOpacity={0.7}
+          >
+            <Text style={subCtrlStyles.closeBtnText}>Close</Text>
+          </TouchableOpacity>
+        </View>
         {locked && (
           <View style={lockStyles.overlay}>
             <Text style={lockStyles.title}>Remote Collision</Text>
@@ -3631,8 +3656,8 @@ const subCtrlStyles = StyleSheet.create({
     fontWeight: "bold",
     color: "#000",
   },
-  // The timing rows above Close: the offset and Apply, then - and + by 0.5
-  // and by 0.1.
+  // The timing rows above Sync and Close: the offset and Apply, then - and +
+  // by 0.5 and by 0.1.
   ofsRow: {
     flexDirection: "row",
     height: 64,

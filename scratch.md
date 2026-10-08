@@ -1,5 +1,9 @@
 
+Becker/Season 1/Becker.S01E09.Choose.Me.720p.WEB-DL.AAC2.0.H.264-squalor.mkv
 
+find matching text in these 2 srt files. use simple short phrases of just a few words with no other close captions. give me a histogram of timing offsets:
+`Becker/Season 1/Becker.S01E09.Choose.Me.720p.WEB-DL.AAC2.0.H.264-squalor.T2.srt` and 
+`Becker/Season 1/Becker.S01E09.Choose.Me.720p.WEB-DL.AAC2.0.H.264-squalor.asr.srt`
 
 i'm 172
 

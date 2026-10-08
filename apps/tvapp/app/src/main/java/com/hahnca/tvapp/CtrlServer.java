@@ -82,9 +82,10 @@ class CtrlServer extends WebSocketServer {
   private static final String CMD_UNHIDE = "hu";
   private static final String CMD_SUBTITLES = "l";
   private static final String CMD_SUBTITLE = "t";
-  // The subtitle panel's + and - (so,<sec>) and its Apply (sa).
+  // The subtitle panel's + and - (so,<sec>), its Apply (sa) and its Sync (sy).
   private static final String CMD_SUB_OFFSET = "so";
   private static final String CMD_SUB_APPLY = "sa";
+  private static final String CMD_SUB_SYNC = "sy";
   // A live camera over the whole screen. The argument is a page url, or "off".
   // Everything about the video is that page's business; see CamOverlay.
   private static final String CMD_CAM = "v";
@@ -135,6 +136,8 @@ class CtrlServer extends WebSocketServer {
     void onSubOffset(double sec);
 
     void onApplySubOffset();
+
+    void onSyncSubs();
 
     void onShowCam(String url);
 
@@ -290,6 +293,8 @@ class CtrlServer extends WebSocketServer {
       listener.onSubtitlesWanted();
     } else if (CMD_SUB_APPLY.equals(message)) {
       listener.onApplySubOffset();
+    } else if (CMD_SUB_SYNC.equals(message)) {
+      listener.onSyncSubs();
     } else {
       Log.w(TAG, "unknown ctrl command: " + message);
     }

@@ -87,6 +87,7 @@ import * as subsQueue from "./src/subsQueue.js";
 import * as subs from "./src/subs.js";
 import * as asrCost from "./src/asrCost.js";
 import { subsCountEpisodes } from "./src/opensubtitles.js";
+import { syncSubToAsr } from "./src/subSync.js";
 import * as stills from "./src/stills.js";
 import * as recode from "./src/recode.js";
 
@@ -2289,6 +2290,10 @@ app.post(
 
 // The torrent pane's Chk Subs, through tv-api: OpenSubtitles release counts.
 app.post("/api/subsCountEpisodes", apiWrapper(subsCountEpisodes));
+
+// Sync in the local pane and the remotes' subtitle panel: a sidecar shifted
+// to match its <base>.asr.srt.
+app.post("/api/syncSubToAsr", apiWrapper(syncSubToAsr));
 
 app.post("/api/applySubOffset", async (req, res) => {
   const { videoPath, srtFile, offsetMs } = req.body || {};

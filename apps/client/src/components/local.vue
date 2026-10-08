@@ -110,6 +110,22 @@
             </button>
 
             <button
+              @click="clickSync"
+              :disabled="!syncAsrPath"
+              title="Shift the selected subtitle file to match its asr timing"
+              :style="{
+                cursor: syncAsrPath ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': syncAsrPath ? 'whitesmoke' : '#e8e8e8',
+                color: syncAsrPath ? 'inherit' : '#aaa',
+              }"
+            >
+              Sync
+            </button>
+
+            <button
               @click="clickFix"
               :style="{
                 cursor: 'pointer',
@@ -1246,6 +1262,7 @@ import {
   abortAsr,
   openChannel,
   removeFromAsrQueue,
+  syncSubToAsr,
   toggleBadGroup,
   playPathInTab,
 } from "../srvr.js";
@@ -1522,6 +1539,23 @@ export default {
     historyReady() {
       const relPath = this.singleSelectedFile;
       return !!relPath && VIDEO_EXT_RE.test(relPath);
+    },
+    // relPath of the <base>.asr.srt beside a single selected <base>.*.srt
+    // that is not itself an asr, or null
+    syncAsrPath() {
+      const relPath = this.singleSelectedFile;
+      if (!relPath || !relPath.endsWith(".srt") || relPath.endsWith(".asr.srt"))
+        return null;
+      const parts = relPath.split("/");
+      const name = parts.pop();
+      const parentPath = parts.join("/");
+      const asr = this.getSiblings(parentPath).find(
+        (n) =>
+          n.type === "file" &&
+          n.name.endsWith(".asr.srt") &&
+          name.startsWith(n.name.slice(0, -"asr.srt".length)),
+      );
+      return asr ? this.getPath(parentPath, asr.name) : null;
     },
     infoLines() {
       if (!this.infoText) return [];
@@ -2414,6 +2448,21 @@ export default {
         this.initFixState();
       } else {
         this.stopFixPolling();
+      }
+    },
+    async clickSync() {
+      const asrPath = this.syncAsrPath;
+      if (!asrPath) return;
+      try {
+        const { offsetMs, matches } = await syncSubToAsr(
+          this.singleSelectedFile,
+          asrPath,
+        );
+        this.showToastInfo(
+          `Shifted ${offsetMs > 0 ? "+" : ""}${offsetMs} ms (${matches} phrases)`,
+        );
+      } catch (e) {
+        this.showToastError(e?.error || e?.message || String(e));
       }
     },
     async clearFixLog() {

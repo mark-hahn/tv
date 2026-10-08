@@ -64,6 +64,10 @@ class VideoPlayer extends FrameLayout {
   private static final String PROGRESS_URL = "https://hahnca.com/tv-srvr/api/playProgress";
   // The .srt timing shift the subtitle panel's Apply uses.
   private static final String SHIFT_SUBS_URL = "https://hahnca.com/tv-srvr/api/applySubOffset";
+  // The subtitle panel's Sync: the .srt shifted to match the episode's .asr.srt.
+  private static final String SYNC_SUBS_URL = "https://hahnca.com/tv-srvr/api/syncSubToAsr";
+  private static final String ASR_SUFFIX = ".asr.srt";
+  private static final String SYNC_FAILED_TOAST = "Subtitle sync failed.";
   // A cue's times in the served vtt: "00:01:02.345 --> 00:01:04.000".
   private static final Pattern CUE_TIMES =
       Pattern.compile(
@@ -198,7 +202,10 @@ class VideoPlayer extends FrameLayout {
   // the playing .srt. It goes back to 0 on Apply, a new video or another
   // subtitle pick.
   private double subOfs;
-  // An Apply's shift is on its way to tv-srvr.
+  // The seconds the panel's last Sync moved the showing .srt by, which the
+  // panel shows until the next + or -, Apply, subtitle pick or video.
+  private double syncOfs;
+  // An Apply's or a Sync's shift is on its way to tv-srvr.
   private boolean shifting;
   // The showing .srt's captions (cueStarts, cueEnds, cueTexts), read from the
   // track cueSubId names. cueSeq goes up on every read and every clear, so a
@@ -281,6 +288,7 @@ class VideoPlayer extends FrameLayout {
         res > 0 ? String.valueOf(res) : "");
     subsPicked = false;
     subOfs = 0;
+    syncOfs = 0;
     clearCues();
     stills.open(p.optJSONObject("stills"));
     String url = p.optString("url");
@@ -675,8 +683,10 @@ class VideoPlayer extends FrameLayout {
   }
 
   /**
-   * For the remote's subtitle panel: {title, tracks: [{label, type}], selected},
-   * selected -1 when subtitles are off. Null when no video is up.
+   * For the remote's subtitle panel: {title, tracks: [{label, type}], selected,
+   * subOfs, syncOfs, canSync, cap}, selected -1 when subtitles are off. canSync
+   * when the showing track is not the .asr.srt and there is one. Null when no
+   * video is up.
    */
   JSONObject subtitleList() {
     if (exo == null || playing == null) return null;
@@ -701,6 +711,8 @@ class VideoPlayer extends FrameLayout {
       out.put("tracks", tracks);
       out.put("selected", selected);
       out.put("subOfs", subOfs);
+      out.put("syncOfs", syncOfs);
+      out.put("canSync", selected >= 0 && syncAsrFile(selected) != null);
       out.put("cap", capText);
     } catch (JSONException e) {
       Log.e(TAG, "subtitle list failed: " + e);
@@ -713,6 +725,7 @@ class VideoPlayer extends FrameLayout {
   void selectSubtitle(int index) {
     if (exo == null || index == selectedSub()) return;
     subOfs = 0;
+    syncOfs = 0;
     TrackSelectionParameters.Builder b = exo.getTrackSelectionParameters().buildUpon();
     if (index < 0 || index >= textGroups.size()) {
       b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true);
@@ -735,6 +748,7 @@ class VideoPlayer extends FrameLayout {
     if (exo == null) return;
     // To the ms, so tenths that net to nothing come back to exactly 0.
     subOfs = Math.round((subOfs + sec) * 1000) / 1000.0;
+    syncOfs = 0;
     capText = capNow();
     events.onSubtitles(subtitleList());
   }
@@ -776,11 +790,79 @@ class VideoPlayer extends FrameLayout {
                     if (!shifted || playing != was) return;
                     // A + or - pressed while the shift was on its way stays.
                     subOfs -= target;
+                    syncOfs = 0;
                     reload();
                     events.onSubtitles(subtitleList());
                   });
             },
             "sub-shift")
+        .start();
+  }
+
+  // The episode's .asr.srt in getPlayUrl's subs when the text track at this
+  // index is another file, else null.
+  private String syncAsrFile(int index) {
+    String file = playingSub(index).optString("file");
+    if (file.endsWith(ASR_SUFFIX)) return null;
+    JSONArray subs = playing.optJSONArray("subs");
+    for (int i = 0; i < subs.length(); i++) {
+      String f = subs.optJSONObject(i).optString("file");
+      if (f.endsWith(ASR_SUFFIX)) return f;
+    }
+    return null;
+  }
+
+  /**
+   * The panel's Sync, as the local pane's: tv-srvr shifts the playing .srt on
+   * disk to match the episode's .asr.srt, and the video reloads to show it.
+   * The panel shows the shift; nothing is left to Apply.
+   */
+  void syncSubs() {
+    int sel = selectedSub();
+    if (exo == null || shifting || sel < 0) return;
+    String asr = syncAsrFile(sel);
+    if (asr == null) return;
+    JSONObject sub = playingSub(sel);
+    String videoPath = Uri.parse(sub.optString("url")).getQueryParameter("path");
+    String dir = videoPath.substring(0, videoPath.lastIndexOf('/') + 1);
+    JSONObject body = new JSONObject();
+    try {
+      body.put("path", dir + sub.optString("file"));
+      body.put("asrPath", dir + asr);
+    } catch (JSONException e) {
+      Log.e(TAG, "subtitle sync body failed: " + e);
+      return;
+    }
+    shifting = true;
+    JSONObject was = playing;
+    new Thread(
+            () -> {
+              double ofs = Double.NaN;
+              try {
+                ofs =
+                    new JSONObject(Http.postJson(SYNC_SUBS_URL, body.toString()))
+                            .getLong("offsetMs")
+                        / 1000.0;
+              } catch (Exception e) {
+                Log.e(TAG, "subtitle sync failed: " + e);
+              }
+              double synced = ofs;
+              ui.post(
+                  () -> {
+                    shifting = false;
+                    if (playing != was) return;
+                    if (Double.isNaN(synced)) {
+                      events.onVideoError(SYNC_FAILED_TOAST);
+                      return;
+                    }
+                    // The file now has the asr's timing, so a + or - is void.
+                    subOfs = 0;
+                    syncOfs = synced;
+                    reload();
+                    events.onSubtitles(subtitleList());
+                  });
+            },
+            "sub-sync")
         .start();
   }
 

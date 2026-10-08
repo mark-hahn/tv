@@ -448,7 +448,19 @@ let queryUrl;
 async function findShows(page, query) {
   const srchQuery = query.replace(/[^\d](19|20)\d{2}\)?$/, "").trim();
   queryUrl = `${BASE}/search?search=${encodeURIComponent(srchQuery)}`;
-  await page.goto(queryUrl, { waitUntil: "domcontentloaded" });
+  for (let i = 1; i <= 3; i++) {
+    try {
+      await page.goto(queryUrl, { waitUntil: "domcontentloaded" });
+      break;
+    } catch (e) {
+      if (i < 3) {
+        unilog(2773, `rotten search.goto failed for ${query} (attempt ${i}): ${e.message}`);
+        await delay(1000);
+        continue;
+      }
+      throw e;
+    }
+  }
 
   await dismissOverlays(page, query);
   const rows = page.locator(

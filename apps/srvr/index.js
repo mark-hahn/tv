@@ -85,6 +85,7 @@ import {
 } from "./src/tvRemoteKey.js";
 import * as subsQueue from "./src/subsQueue.js";
 import * as subs from "./src/subs.js";
+import * as asrCost from "./src/asrCost.js";
 import { subsCountEpisodes } from "./src/opensubtitles.js";
 import * as stills from "./src/stills.js";
 import * as recode from "./src/recode.js";
@@ -2626,28 +2627,12 @@ app.get("/api/asr/log", (req, res) => {
   res.json({ lines: subsState.asrLogBuffer });
 });
 
-// Speechmatics audio hours per day of a month ("yyyy-mm"), for the ASR pane's
-// Cost chart. The usage API counts whole UTC days, one request per day.
-const SM_KEY_PATH = "/root/dev/apps/tv/apps/asr/secrets/speechmatics-key.txt";
-const SM_USAGE_URL = "https://asr.api.speechmatics.com/v2/usage";
+// Speechmatics audio hours per LA day of a month ("yyyy-mm"), for the ASR
+// pane's Cost chart.
 app.get(
   "/api/asr/cost",
   apiWrapper(async ({ month }) => {
-    const key = (await fsp.readFile(SM_KEY_PATH, "utf8")).trim();
-    const [y, m] = month.split("-").map(Number);
-    const nDays = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    const hrs = await Promise.all(
-      Array.from({ length: nDays }, async (_, i) => {
-        const day = `${month}-${String(i + 1).padStart(2, "0")}`;
-        const r = await fetch(`${SM_USAGE_URL}?since=${day}&until=${day}`, {
-          headers: { Authorization: `Bearer ${key}` },
-        });
-        if (!r.ok) throw new Error(`speechmatics usage ${day}: ${r.status}`);
-        const { summary } = await r.json();
-        return (summary ?? []).reduce((n, s) => n + s.duration_hrs, 0);
-      }),
-    );
-    return { hrs };
+    return { hrs: await asrCost.monthHrs(month) };
   }),
 );
 

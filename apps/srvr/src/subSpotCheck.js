@@ -43,6 +43,7 @@ import {
   srtTimeToMs,
   msToSrtTime,
   unilog,
+  logHere,
 } from "@tv/share";
 import { BATCH_SCHED } from "./batchQueue.js";
 import { sidecarType } from "./subOrigin.js";
@@ -54,6 +55,7 @@ const SM_API = "https://asr.api.speechmatics.com/v2";
 const SM_OPERATING_POINT = "enhanced";
 const SM_POLL_MS = 1000;
 const SM_POLL_MAX = 300;
+const SM_RETRY_MS = 2000;
 const CLIP_S = 120;
 const AUDIO_RATE = 16000;
 const TYPE_ORDER = ["T", "H", "V", "S", "+"];
@@ -190,6 +192,18 @@ function windowsByCount(cues, picks) {
   return [...counted].sort((a, b) => b[1] - a[1]).map(([fromS]) => fromS);
 }
 
+// A Speechmatics request, sent once more after SM_RETRY_MS when it fails with
+// no answer at all (a dropped connection): a job already submitted is paid for.
+async function smFetch(what, url, opts) {
+  try {
+    return await fetch(url, opts);
+  } catch (e) {
+    unilog(2813, `speechmatics ${what} failed, retrying: ${e.message} (${e.cause?.code || e.cause?.message})`);
+    await sleep(SM_RETRY_MS);
+    return fetch(url, opts);
+  }
+}
+
 // The words Speechmatics heard in the flac, [{w, ms}], ms from the clip's start.
 async function transcribe(flac) {
   const key = (await fsp.readFile(SM_KEY_PATH, "utf8")).trim();
@@ -203,21 +217,21 @@ async function transcribe(flac) {
     }),
   );
   form.append("data_file", new Blob([await fsp.readFile(flac)]), path.basename(flac));
-  const sub = await fetch(`${SM_API}/jobs`, { method: "POST", body: form, headers });
+  const sub = await smFetch("submit", `${SM_API}/jobs`, { method: "POST", body: form, headers });
   if (!sub.ok)
     throw new Error(`speechmatics submit: ${sub.status} ${(await sub.text()).slice(0, 200)}`);
   const { id } = await sub.json();
   for (let i = 0; ; i++) {
     if (i >= SM_POLL_MAX) throw new Error(`speechmatics job ${id} not done`);
     await sleep(SM_POLL_MS);
-    const res = await fetch(`${SM_API}/jobs/${id}`, { headers });
+    const res = await smFetch("poll", `${SM_API}/jobs/${id}`, { headers });
     if (!res.ok) throw new Error(`speechmatics poll: ${res.status}`);
     const { job } = await res.json();
     if (job.status === "done") break;
     if (job.status !== "running" && job.status !== "accepted")
       throw new Error(`speechmatics job ${id}: ${job.status}`);
   }
-  const res = await fetch(`${SM_API}/jobs/${id}/transcript?format=json-v2`, { headers });
+  const res = await smFetch("transcript", `${SM_API}/jobs/${id}/transcript?format=json-v2`, { headers });
   if (!res.ok) throw new Error(`speechmatics transcript: ${res.status}`);
   const { results } = await res.json();
   return results

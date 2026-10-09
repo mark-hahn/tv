@@ -679,6 +679,10 @@ async function processSubQueueEntry() {
       ]);
     }
     subs.markProcessed(videoFilePath);
+  } catch (e) {
+    // A failed fetch says only "fetch failed"; what went wrong is in its cause.
+    const cause = e.cause ? ` (${e.cause.code || e.cause.message})` : "";
+    unilog(2814, `${showNameFromFilePath(videoFilePath)}: subtitle steps of ${path.basename(videoFilePath)} failed at "${subsState.subStage}": ${e.message}${cause}`);
   } finally {
     // However it ended, the local pane is waiting to hear the file is done.
     if (entry.fromUI)

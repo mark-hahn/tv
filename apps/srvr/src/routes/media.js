@@ -492,7 +492,13 @@ export function registerMediaRoutes(app) {
       res.setHeader("Cache-Control", "no-cache");
       res.send(vtt);
     } catch (e) {
-      unilog(595, "sidecar error:", e.message);
+      // A file a play offered can be deleted by its check moments later.
+      if (e.code === "ENOENT") {
+        unilog(2811, `sidecar gone: ${srtFile}`);
+        if (!res.headersSent) res.status(404).json({ error: e.message });
+        return;
+      }
+      unilog(2812, `sidecar error: ${e.message}`);
       if (!res.headersSent) res.status(500).json({ error: e.message });
     }
   });

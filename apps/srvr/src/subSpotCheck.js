@@ -200,7 +200,14 @@ async function smFetch(what, url, opts) {
   } catch (e) {
     unilog(2813, `speechmatics ${what} failed, retrying: ${e.message} (${e.cause?.code || e.cause?.message})`);
     await sleep(SM_RETRY_MS);
-    return fetch(url, opts);
+    try {
+      return await fetch(url, opts);
+    } catch (e2) {
+      // A failed fetch says only "fetch failed"; why is in its cause.
+      const c = e2.cause;
+      const why = c ? `${c.code ? `${c.code} ` : ""}${c.message}` : e2.message;
+      throw new Error(`speechmatics ${what} ${url} failed twice: ${why}`);
+    }
   }
 }
 

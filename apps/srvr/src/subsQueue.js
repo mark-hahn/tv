@@ -708,7 +708,12 @@ function startSubQueueLoop() {
     if (subsState.subQueue.length === 0) {
       subsState.chkSubQueueDelay = 10_000;
     } else {
-      await processSubQueueEntry().catch((e) => unilog(521, "", e.message));
+      // The steps' own errors are logged inside it; one that lands here came
+      // from outside them.
+      await processSubQueueEntry().catch((e) => {
+        const cause = e.cause ? ` (${e.cause.code || e.cause.message})` : "";
+        unilog(2820, `${e.message}${cause}`);
+      });
     }
     setTimeout(loop, subsState.chkSubQueueDelay);
   };

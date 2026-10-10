@@ -3428,7 +3428,7 @@ export const setTvdbFields = async (params) => {
       saveShow(name, allTvdb[name]);
     }
     if (notifyCallback && name && !paramObj.$delTvdb && !paramObj.dontNotify)
-      notifyCallback(name);
+      notifyCallback(renamedTvdbName || name);
   }
   // Queue a full per-show refresh (disk + gap) for changes that matter
   if (name && !paramObj.$delTvdb && !paramObj.dontEnqueue) {
@@ -3655,6 +3655,7 @@ export const updateTvdbWithGapData = async (gapData) => {
       tvdbRecord.seasonWatchedThenNofileEpisode =
         gaps.seasonWatchedThenNofileEpisode;
       updatedCount++;
+      if (notifyCallback) notifyCallback(showName);
     }
   }
 

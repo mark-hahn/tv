@@ -12,6 +12,7 @@ import * as view from "./src/lastViewed.js";
 import * as utilNode from "util";
 import * as gaps from "./src/gaps.js";
 import * as tvdb from "./src/tvdb.js";
+import { setDeletedListener } from "./src/tvdbDb.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
@@ -436,6 +437,9 @@ const debouncedTvdbPush = (name) => {
 
 // Set up callbacks so tvdb.js can call back into index.js without circular imports
 tvdb.setNotifyCallback((name) => debouncedTvdbPush(name));
+// tvapp keeps its list current from these pushes alone, so a deleted or renamed
+// record has to say so as well.
+setDeletedListener((name) => notifyClients("tvdbDeleted", { name }));
 tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
 tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
 
@@ -827,6 +831,7 @@ const addShowRecord = async (params) => {
   }
   allTvdb[name] = nextRecord;
   await tvdb.saveTvdbSync();
+  debouncedTvdbPush(name);
   return "ok";
 };
 

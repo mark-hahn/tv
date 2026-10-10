@@ -28,8 +28,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -220,6 +222,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   // The first load gave up -- tvapp was started with no network, as it is
   // while the set sleeps -- so the next reload is a first load again.
   private boolean firstLoadFailed;
+  // A full load is on its way. Its records were read before any push that
+  // arrives meanwhile, so those pushes are kept and put in again once it lands.
+  private boolean loadInFlight;
+  private final Map<String, JSONObject> pushedDuringLoad = new LinkedHashMap<>();
   // The show tvapp stepped aside to play, so the next foreground turn can put
   // it where the Watched sort is about to put it anyway.
   private Shows.Show playedShow;
@@ -255,6 +261,8 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
    */
   private void loadShows(String selectedName, boolean showWait) {
     if (showWait) startShowsLoading(SHOWS_WAIT_LABEL);
+    loadInFlight = true;
+    pushedDuringLoad.clear();
     Shows.load(
         new Shows.Callback() {
           @Override
@@ -268,6 +276,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
                   showList.setShows(
                       shows,
                       showWait ? selectedName : (current == null ? null : current.name));
+                  loadInFlight = false;
+                  if (!pushedDuringLoad.isEmpty()) {
+                    Map<String, JSONObject> pushed = new LinkedHashMap<>(pushedDuringLoad);
+                    pushedDuringLoad.clear();
+                    applyShowUpdates(pushed);
+                  }
                   runPendingSelect();
                   if (showWait) endShowsLoadingWhenDrawn();
                 });
@@ -276,17 +290,45 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
           @Override
           public void onLoadFailed(String reason) {
             Log.e(TAG, "show list gave up: " + reason);
-            // Only the first load says so on the screen. A failed refresh
-            // leaves the list that is already up, which is the better of the
-            // two things to be looking at.
-            if (!showWait) return;
             ui.post(
                 () -> {
+                  loadInFlight = false;
+                  pushedDuringLoad.clear();
+                  // Only the first load says so on the screen. A failed
+                  // refresh leaves the list that is already up, which is the
+                  // better of the two things to be looking at.
+                  if (!showWait) return;
                   firstLoadFailed = true;
                   startShowsLoading(SHOWS_FAILED_LABEL);
                 });
           }
         });
+  }
+
+  /**
+   * Records tv-srvr pushed, put into the list in place of the old ones, a null
+   * record being a show it deleted. setShows keeps the card of every show
+   * whose record is unchanged, so only the pushed shows are built again.
+   */
+  private void applyShowUpdates(Map<String, JSONObject> changes) {
+    if (showsLoadedAt == 0) {
+      // No list to put them in yet, so a full load brings them instead.
+      reloadShows();
+      return;
+    }
+    if (loadInFlight) pushedDuringLoad.putAll(changes);
+    Map<String, Shows.Show> byName = new LinkedHashMap<>();
+    for (Shows.Show show : showList.getShows()) byName.put(show.name, show);
+    for (Map.Entry<String, JSONObject> change : changes.entrySet()) {
+      String name = change.getKey();
+      JSONObject record = change.getValue();
+      if (record == null) byName.remove(name);
+      else byName.put(name, new Shows.Show(name, record));
+    }
+    List<Shows.Show> merged = new ArrayList<>(byName.values());
+    Collections.sort(merged, Shows.order(Shows.Sort.ALPHA));
+    Shows.Show current = showList.getSelected();
+    showList.setShows(merged, current == null ? null : current.name);
   }
 
   /** The select, and any play behind it, that came in before the list did. */
@@ -329,7 +371,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     if (showsLoadedAt != 0 || firstLoadFailed) reloadShows();
     // Only while on screen: a socket held open behind another app would reload a list
     // nobody is looking at, and tv-srvr would keep a client it cannot reach.
-    updates = new Updates(this::reloadShows, video::addSubs);
+    updates = new Updates(this::applyShowUpdates, this::reloadShows, video::addSubs);
     updates.start();
   }
 

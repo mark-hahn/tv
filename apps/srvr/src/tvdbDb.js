@@ -44,10 +44,20 @@ export const saveShow = (name, record) => {
   lastSavedJson.set(name, json);
 };
 
+// Told the name of every stored show whose row is deleted, however it went --
+// a delete, a rename, or a save that no longer holds it -- so clients that keep
+// their own copy of the list can drop it too.
+let deletedListener = null;
+export const setDeletedListener = (fn) => {
+  deletedListener = fn;
+};
+
 export const deleteShow = (name) => {
   if (!name) return;
+  const existed = lastSavedJson.has(name);
   deleteStmt.run(name);
   lastSavedJson.delete(name);
+  if (existed && deletedListener) deletedListener(name);
 };
 
 export const saveAllShows = db.transaction((allTvdb) => {

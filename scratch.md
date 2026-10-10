@@ -1,4 +1,34 @@
 
+
+
+????????????????????????
+my phone ip is .172
+.opnXXXXX naming
+back up pause based on pause length
+=================
+
+tvapp reloads the whole list after every change,
+
+change epi-data-plan.md to treat season 0 episodes the same as seasons > 0.
+
+3 gaps is not a problem.  I can mark episodes as watched or flag episodes to ignore the gaps. i want shows that have unwatched season 0 episodes to count as not finished. 
+however, it would be very nice to be able to see where season 0 episodes should have been placed, based on airdate or tvdb placement info. do you have any ideas on how to show that?
+
+i really like the smart idea of putting specials with s00eyy in a non-zero season based on their air-date -- numbering specials as season zero is not logical to begin with. 
+for now forget the rest of the answer you just gave so we can concentrate on this idea.  
+are there specials with non-zero seasons?
+how do we know what episode is a special?
+
+# episode data cleanup
+- write a plan epi-data-plan.md
+  - don't change anything else
+- write only in prose and tables
+  - don't include file names or code lines
+- the plan should implement your suggestions in epi-data.md
+  - use your own judgement for unanswered questions
+  - the goal is to clean up the episode data mess and fix all bugs
+
+
 # episodeData 
 - episodeData should be authoritative and not be redundant with other stored data
   - what fields other than watchedCount have duplicate data
@@ -8,13 +38,6 @@
 
 - why would a function called  /api/getSeriesMapFromTvdb with word `get` in the name be sending data like the list of watched episodes?
 - make no changes
-
-i'm 172
-
-????????????????????????
-.opnXXXXX naming
-back up pause based on pause length
-=================
 
 when there is no data in how expensive would a backfill be only on shows that have a watched episode in the last month?
 change the sync button in the remote to run this fix -- if already run disable the sync button.

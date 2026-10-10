@@ -1,5 +1,13 @@
 
+# episodeData 
+- episodeData should be authoritative and not be redundant with other stored data
+  - what fields other than watchedCount have duplicate data
+- episode data should contain all data about episodes
+  - what is missing?
+- make no changes
 
+- why would a function called  /api/getSeriesMapFromTvdb with word `get` in the name be sending data like the list of watched episodes?
+- make no changes
 
 i'm 172
 

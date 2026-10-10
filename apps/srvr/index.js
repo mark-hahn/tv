@@ -1221,7 +1221,17 @@ app.post(
       return { success: false, error: "Missing tvdbId" };
     }
     try {
-      const seriesMap = await tvdb.getSeriesMap(tvdbId, watchedEpis || null);
+      // A show out of the library still keeps its watched marks in its
+      // record's episodeData; use them when the caller sent none.
+      let watched = watchedEpis || null;
+      if (!watched) {
+        const allTvdb = tvdb.getAllTvdbSync() || {};
+        const rec = Object.values(allTvdb).find(
+          (r) => String(r?.tvdbId) === String(tvdbId),
+        );
+        if (rec) watched = epd.episodeDataToWatchedEpis(rec.episodeData);
+      }
+      const seriesMap = await tvdb.getSeriesMap(tvdbId, watched);
       return { success: true, seriesMap };
     } catch (err) {
       unilog(569, "error:", err);

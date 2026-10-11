@@ -577,11 +577,13 @@ async function main() {
 
   // Files that stay on the usb are re-scanned every cycle, so a per-file skip
   // would be logged again on every pass. Log each file's skip only once.
-  // Lives outside the per-cycle state so it survives resetCycleState.
-  const skipLoggedFiles = new Set();
+  // Lives outside the per-cycle state so it survives resetCycleState, and in
+  // tv.sqlite so it survives a restart.
+  const skipLoggedFiles = new Set(tvJson.getSkipLogged());
   const skipLoggedOnce = (file) => {
     if (skipLoggedFiles.has(file)) return false;
     skipLoggedFiles.add(file);
+    tvJson.addSkipLogged(file);
     return true;
   };
 
@@ -2494,6 +2496,13 @@ async function main() {
           findUsbFailing = false;
           unilog(2672, `findUsb recovered`);
         }
+        var usbPathSet = new Set(
+          findLines.map((l) =>
+            String(l || "").trim().split("-").slice(0, -1).join("-").slice(11),
+          ),
+        );
+        for (var gonePath of tvJson.pruneSkipLogged(usbPathSet))
+          skipLoggedFiles.delete(gonePath);
       } catch (e) {
         if (!findUsbFailing) err("findUsb failed:", e.message || e);
         findUsbFailing = true;

@@ -786,6 +786,8 @@ const openDb = () => {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_tv_entries_procId_unique ON tv_entries(procId);
     CREATE INDEX IF NOT EXISTS idx_tv_entries_status_procId ON tv_entries(status, procId);
+
+    CREATE TABLE IF NOT EXISTS skip_logged (path TEXT PRIMARY KEY);
   `);
 
   // Add seriesName column if it doesn't exist yet (schema migration).
@@ -2007,6 +2009,32 @@ const abortEntry = (title) => {
   return true;
 };
 
+// Usb files whose skip has been logged. Kept across restarts so a deploy
+// doesn't log every skipped file on the usb again.
+const getSkipLogged = () => {
+  openDb();
+  return db.prepare("SELECT path FROM skip_logged").pluck().all();
+};
+
+const addSkipLogged = (usbPath) => {
+  openDb();
+  db.prepare("INSERT OR IGNORE INTO skip_logged (path) VALUES (?)").run(
+    usbPath,
+  );
+};
+
+// Forget the files that have left the usb, so one that comes back is logged
+// again. Returns the forgotten paths.
+const pruneSkipLogged = (usbPaths) => {
+  openDb();
+  const gone = getSkipLogged().filter((p) => !usbPaths.has(p));
+  const del = db.prepare("DELETE FROM skip_logged WHERE path = ?");
+  db.transaction(() => {
+    for (const p of gone) del.run(p);
+  })();
+  return gone;
+};
+
 export {
   addEntry,
   markFinished,
@@ -2026,4 +2054,7 @@ export {
   deleteDvdFileEntries,
   deleteByTitles,
   abortEntry,
+  getSkipLogged,
+  addSkipLogged,
+  pruneSkipLogged,
 };

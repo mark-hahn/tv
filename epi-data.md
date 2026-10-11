@@ -1,5 +1,11 @@
 # episodeData: duplicates and gaps
 
+> Historical. This describes episodeData before the cleanup in
+> `epi-data-plan.md`, which was carried out on 2026-10-10: episodes are now
+> records of named fields, the duplicated show fields are computed and never
+> stored, and season 0 counts like any other season. See that plan's
+> implementation notes for where the work differed.
+
 As of 2026-10-09. The tuple today is `episodeData[season][episode-1] =
 [aired, watched, file, res, pos]` (`packages/share/src/episodeData.js`),
 refreshed by `refreshEpisodeData()` in `apps/srvr/src/disk.js`. Shows out of

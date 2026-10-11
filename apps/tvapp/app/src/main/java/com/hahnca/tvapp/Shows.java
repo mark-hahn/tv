@@ -116,6 +116,12 @@ class Shows {
     // adds the imdb video to it and takes the unplayable ones back out.
     final List<Trailer> trailers;
     final JSONArray episodeData;
+    // tv-srvr's next-up for the show (computed there, story order) as
+    // [season, episode, the season's episode count, res], or null with none.
+    final int[] nextUp;
+    // Where each season 0 episode belongs among the regular ones, computed by
+    // tv-srvr: {"<episode>": {belongs, source}}, or null with no specials.
+    final JSONObject placements;
     // What getRemotes wants to be told about the show, and whether the list
     // above has been through TrailerList yet.
     final JSONArray remoteIds;
@@ -140,6 +146,14 @@ class Shows {
       notReady = rec.optBoolean("notReady", !rec.optBoolean("inLibrary", true));
       episodeData = rec.optJSONArray("episodeData");
       hasFile = anyFile(episodeData);
+      placements = rec.optJSONObject("placements");
+      JSONObject up = rec.optJSONObject("nextUp");
+      nextUp =
+          up == null
+              ? null
+              : new int[] {
+                up.optInt("season"), up.optInt("episode"), up.optInt("seasonEps"), up.optInt("res")
+              };
       averageRuntime = rec.optInt("averageRuntime", 0);
       seasonCount = rec.optInt("seasonCount", 0);
       episodeCount = rec.optInt("episodeCount", 0);
@@ -178,6 +192,21 @@ class Shows {
 
     boolean isComedy() {
       return genres.contains("Comedy");
+    }
+
+    /**
+     * Where a season 0 episode belongs, as the episode card shows it --
+     * "Belongs after S02E06 (air date)" -- or empty when tv-srvr has no word
+     * on it. The web map's episode pane shows the same line.
+     */
+    String belongsText(int episode) {
+      JSONObject place = placements == null ? null : placements.optJSONObject(String.valueOf(episode));
+      if (place == null) return "";
+      String belongs = place.isNull("belongs") ? "" : place.optString("belongs", "");
+      String source = place.optString("source", "");
+      return belongs.isEmpty()
+          ? "Has no place among the episodes (" + source + ")"
+          : "Belongs " + belongs + " (" + source + ")";
     }
 
     boolean isDrama() {
@@ -308,20 +337,17 @@ class Shows {
     return "";
   }
 
-  // episodeData is [season][episode] of [aired, watched, file, res, pos],
-  // seasons and episodes alike left null where there is none. A non-empty file
-  // slot anywhere is what "this show has something to play" means.
-  private static final int EPISODE_FILE_SLOT = 2;
-
+  // episodeData is [season][episode] of episodes (see Episode), seasons and
+  // episodes alike left null where there is none. An episode with a file
+  // anywhere is what "this show has something to play" means.
   private static boolean anyFile(JSONArray episodeData) {
     if (episodeData == null) return false;
     for (int season = 0; season < episodeData.length(); season++) {
       JSONArray episodes = episodeData.optJSONArray(season);
       if (episodes == null) continue;
-      for (int episode = 0; episode < episodes.length(); episode++) {
-        JSONArray fields = episodes.optJSONArray(episode);
-        if (fields == null || fields.isNull(EPISODE_FILE_SLOT)) continue;
-        if (!fields.optString(EPISODE_FILE_SLOT, "").isEmpty()) return true;
+      for (int index = 0; index < episodes.length(); index++) {
+        Episode episode = Episode.at(episodes, index);
+        if (episode != null && episode.hasFile()) return true;
       }
     }
     return false;

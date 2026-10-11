@@ -184,7 +184,18 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 - The disk decides what is in the library (`inLibrary`). tv-srvr's library
   sweep takes a show out when its folder goes, and puts a folder holding
   videos in under the record named like it.
-- episodeData tuples are `[aired, watched, file, res, pos]`, `pos` in ms.
+- episodeData is `[season][episode-1]` of episode records with named fields
+  (`aired`, `watched`, `file`, `res`, `pos` in ms, `tvdbId`, `title`,
+  `lastPlayed`, `playCount`, and TVDB's `airsBeforeSeason`,
+  `airsBeforeEpisode`, `airsAfterSeason` for a special), empty ones left out.
+  It is the only stored episode data. The show fields worked out from it
+  (counts, gaps, `waitStr`, `nextUp`, last aired and played, ...) are
+  computed by tv-srvr and never saved (`apps/srvr/src/computedFields.js`);
+  `setTvdbFields` ignores them.
+- Season 0 specials count like any other episode: counts, gaps, Finished
+  and next-up, in story order by air date, else by TVDB's placement. The map
+  shows them in season 0, and an episode card says where one belongs. They
+  are left out of intro marking, trim and skip.
 
 ## Subtitles
 
@@ -502,7 +513,7 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-10-08**. tvapp (`apps/tvapp`, native Java, package
+Current as of **2026-10-10**. tvapp (`apps/tvapp`, native Java, package
 `com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
 (`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
@@ -521,9 +532,17 @@ because the TV is unreachable from any wireless host here.
   (TMDB) for every show.
 - Full-screen overlays: `VideoPlayer`, `TrailerPlayer`, `CamOverlay`. Over the
   list: `RelatedActors`, `ShowCounts`.
-- Data comes from `getAllTvdb?hasLibrary=0`. It reloads on tv-srvr's
-  `tvdbUpdated` push (debounced 1.5 s) and each time tvapp returns to the
-  front.
+- Data comes from `getAllTvdb?hasLibrary=0`, loaded in full at startup, each
+  time tvapp returns to the front, and when its update socket reconnects.
+- In between, tv-srvr's pushes keep it current one show at a time:
+  `tvdbUpdated` carries the show's whole record and replaces it in place, and
+  `tvdbDeleted` carries a deleted or renamed-away show's name and removes it.
+  Pushes are gathered for 1.5 s and applied together. Only the changed shows'
+  cards are rebuilt, and the selection and the map cursor stay put. A push
+  that lands while a full load is on its way is applied again after it.
+- tv-srvr pushes a record whenever it changes, renames and deletes included.
+  The exceptions are the player's progress saves between a play's start and
+  stop, and the info pane's quiet count saves (`dontNotify`).
 
 **cardMisc** (`ShowListView`)
 - A card leaves `DESC` only while `MISC` has the focus. Right from the list
@@ -561,7 +580,7 @@ because the TV is unreachable from any wireless host here.
 - `VideoPlayer` gets `/api/getPlayUrl?showName[&season&episode]` from tv-srvr
   and plays the file straight off nginx in Media3 ExoPlayer.
 - It starts at the resume point, or past the intro (`trimPosMs`) if there is
-  none.
+  none. A season 0 special has no intro to trim or skip.
 - Subtitles: the video's sidecar `.srt` files are sideloaded (served as
   vtt). Embedded tracks are never shown. It starts on the one `getPlayUrl`
   picked (`subPick`); with none, subtitles are off. See Subtitles.

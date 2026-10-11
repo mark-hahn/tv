@@ -1038,31 +1038,7 @@ export default {
       this.videoPlayerMapEpisode = null;
       evtBus.emit("introPaneClosed");
       if (closingIntro && introShow) {
-        const hasConfiguredSeasonIntro =
-          introShow.seasonIntros != null &&
-          Object.values(introShow.seasonIntros).some(
-            (si) =>
-              si?.trimPos != null || si?.skipDur != null || si?.none === true,
-          );
-        const configured =
-          introShow.trimPos != null ||
-          introShow.skipDur != null ||
-          hasConfiguredSeasonIntro;
-        if (configured) {
-          introShow.needsIntro = false;
-        } else {
-          const hasFiles =
-            epd.seasonsWithFile(introShow.episodeData).length > 0;
-          const hasUnwatched =
-            Number(introShow.episodeCount ?? 0) >
-            Number(introShow.watchedCount ?? 0);
-          introShow.needsIntro = !!(
-            introShow.inLibrary &&
-            !introShow.inLinda &&
-            hasFiles &&
-            hasUnwatched
-          );
-        }
+        // needsIntro is computed by tv-srvr and follows every intro save there.
         this.introCount = this.allShows.filter((s) => s.needsIntro).length;
       }
     },
@@ -1126,17 +1102,6 @@ export default {
     },
 
     async handleOpenIntro({ show, path, source, season, episode }) {
-      if (show?.name) {
-        show.needsIntro = true;
-        try {
-          await srvr.setTvdbFields({ name: show.name, needsIntro: true });
-        } catch (e) {
-          unilog(
-            1928,
-            `setTvdbFields needsIntro failed for ${show.name}: ${e.message}`,
-          );
-        }
-      }
       // Always our own player: the intro pane opens on a film strip of stills
       // and streams a short window of the episode from the still you click.
       this.videoPlayerIntroShow = show;
@@ -1833,14 +1798,6 @@ export default {
       this.seriesMapEpis = data.seriesMapEpis;
       this.seriesMap = data.seriesMap;
       this.mapError = data.mapError || "";
-
-      // --- Emit: let Series pane derive counts from the same map ---
-      if (this.mapShow) {
-        evtBus.emit("seriesMapUpdated", {
-          show: this.mapShow,
-          seriesMap: this.seriesMap,
-        });
-      }
 
       // --- Guard: noSwitch means data update only, no pane change ---
       if (data.noSwitch) return;

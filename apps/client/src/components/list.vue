@@ -547,16 +547,15 @@ export default {
         // Re-fetch allTvdb in case async ops replaced the cached reference
         allTvdb = await tvdb.getAllTvdb();
         const tvdbData = allTvdb[name];
+        // notReady follows from inLibrary: tv-srvr computes it.
         if (tvdbData) {
           tvdbData.inLibrary = false;
           tvdbData.leftLibrary = leftLibrary;
-          tvdbData.notReady = true;
         }
         const updated = await srvr.setTvdbFields({
           name,
           inLibrary: false,
           leftLibrary,
-          notReady: true,
         });
         // Merge in place so the allShows entry (same object) stays current
         if (updated && typeof updated === "object") {
@@ -1500,9 +1499,6 @@ export default {
 
       const paramObj = {
         show: showSeed,
-        seasonCount: 0,
-        episodeCount: 0,
-        watchedCount: 0,
       };
       let tvdbData = null;
 
@@ -1522,11 +1518,13 @@ export default {
         let seriesMapSeasons = [];
         try {
           setWebAddStatus("Fetching season map...");
-          const seriesMapIn = await withTimeout(
-            tvdb.getSeriesMapByTvdbId(tvdbId),
+          // The new record's map, its episodes filled from TVDB by tv-srvr.
+          const mapResp = await withTimeout(
+            srvr.getSeriesMap({ showName: tvdbData?.name || name, tvdbId }),
             60000,
             "tvdb series map",
           );
+          const seriesMapIn = mapResp?.success ? mapResp.seriesMap : [];
           if (Array.isArray(seriesMapIn) && seriesMapIn.length > 0) {
             seriesMapSeasons = seriesMapIn
               .map((season) =>
@@ -2386,51 +2384,21 @@ export default {
         return;
       }
 
-      // toggle watched or set to specific value
-      if (show.inLibrary === false) {
-        // Show outside the library: toggle played locally and persist watchedEpis
-        const cell = this.seriesMap?.[season]?.[episode];
-        if (!cell) return;
-        cell.played = setWatched !== null ? setWatched : !cell.played;
-
-        // Convert this.seriesMap (object-of-objects) to array format for seriesMapToWatchedEpis
-        const seriesMapArr = [];
-        for (const sNum of Object.keys(this.seriesMap).sort((a, b) => a - b)) {
-          const episodes = [];
-          for (const eNum of Object.keys(this.seriesMap[sNum]).sort(
-            (a, b) => a - b,
-          )) {
-            episodes.push([+eNum, this.seriesMap[sNum][eNum]]);
-          }
-          seriesMapArr.push([+sNum, episodes]);
-        }
-        const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
-        await srvr.setWatchedEpis({ name: show.name, watchedEpis });
-        // Re-emit to App.vue so the map prop updates
-        this.$emit("show-map", {
-          mapShow: this.mapShow,
-          hideMapBottom: this.hideMapBottom,
-          seriesMapSeasons: this.seriesMapSeasons,
-          seriesMapEpis: this.seriesMapEpis,
-          seriesMap: this.seriesMap,
-          mapError: "",
-          noSwitch: true,
-        });
-      } else {
-        const cell = this.seriesMap?.[season]?.[episode];
-        const watched = setWatched !== null ? setWatched : !cell?.played;
-        const res = await srvr.setEpisodeWatched({
-          name: show.name,
-          season: Number(season),
-          episode: Number(episode),
-          watched,
-        });
-        if (!res?.ok)
-          throw new Error(
-            `setEpisodeWatched failed for ${show.name} S${season}E${episode}: ${res?.error}`,
-          );
-        await this.seriesMapAction("refresh", show, null);
-      }
+      // Toggle watched or set it to a value. tv-srvr keeps every show's
+      // watched marks, in the library or not.
+      const cell = this.seriesMap?.[season]?.[episode];
+      const watched = setWatched !== null ? setWatched : !cell?.played;
+      const res = await srvr.setEpisodeWatched({
+        name: show.name,
+        season: Number(season),
+        episode: Number(episode),
+        watched,
+      });
+      if (!res?.ok)
+        throw new Error(
+          `setEpisodeWatched failed for ${show.name} S${season}E${episode}: ${res?.error}`,
+        );
+      await this.seriesMapAction("refresh", show, null);
     },
 
     async deleteEpisodes(show, targets) {
@@ -2564,39 +2532,19 @@ export default {
         JSON.stringify(episodeStates),
       );
 
-      // Apply all episode states at once
+      // Shown at once, and stored on tv-srvr: just the episodes changing.
+      const episodes = [];
       for (const [episodeNum, watched] of Object.entries(episodeStates)) {
         const cell = seasonMap[episodeNum];
-        if (cell) cell.played = watched;
+        if (!cell) continue;
+        cell.played = watched;
+        episodes.push({
+          season: Number(season),
+          episode: Number(episodeNum),
+          watched: !!watched,
+        });
       }
-
-      // Log played state of all seasons
-      for (const sNum of Object.keys(this.seriesMap)) {
-        const eps = this.seriesMap[sNum];
-        const playedEps = Object.entries(eps)
-          .filter(([, c]) => c.played)
-          .map(([e]) => e);
-        unilog(
-          983,
-          `${show.name} S${sNum} played:`,
-          playedEps.length > 0 ? playedEps.join(",") : "none",
-        );
-      }
-
-      // Convert this.seriesMap to array format and persist once
-      const seriesMapArr = [];
-      for (const sNum of Object.keys(this.seriesMap).sort((a, b) => a - b)) {
-        const episodes = [];
-        for (const eNum of Object.keys(this.seriesMap[sNum]).sort(
-          (a, b) => a - b,
-        )) {
-          episodes.push([+eNum, this.seriesMap[sNum][eNum]]);
-        }
-        seriesMapArr.push([+sNum, episodes]);
-      }
-      const watchedEpis = tvdb.seriesMapToWatchedEpis(seriesMapArr);
-      unilog(984, `watchedEpis for ${show.name}:`, JSON.stringify(watchedEpis));
-      await srvr.setWatchedEpis({ name: show.name, watchedEpis });
+      await srvr.setEpisodesWatched({ name: show.name, episodes });
       // Re-emit to App.vue so the map prop updates
       this.$emit("show-map", {
         mapShow: this.mapShow,
@@ -2657,20 +2605,13 @@ export default {
       // unaired, path, quality}]], ...], ...].
       let seriesMapIn = [];
       try {
-        let resp;
-        if (show.inLibrary === false) {
-          const tvdbId = show.tvdbId;
-          if (!tvdbId) {
-            errorMessage = "Preview show has no tvdbId.";
-          } else {
-            resp = await srvr.getSeriesMapFromTvdb({ tvdbId });
-          }
-        } else {
-          resp = await srvr.getSeriesMap({
-            showName: show.name,
-            stale: useStale,
-          });
-        }
+        // One request for every show: tv-srvr builds the map from the show's
+        // own episodes, or for a preview with no record yet from TVDB.
+        const resp = await srvr.getSeriesMap({
+          showName: show.name,
+          tvdbId: show.tvdbId,
+          stale: useStale,
+        });
         if (resp?.success && Array.isArray(resp.seriesMap)) {
           seriesMapIn = resp.seriesMap;
           // Sync fresh episodeData into the in-memory cache so the Position

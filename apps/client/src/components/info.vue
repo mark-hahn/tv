@@ -790,22 +790,6 @@ export default {
       }
     },
 
-    getMapCounts(seriesMap) {
-      try {
-        const seasonKeys = Object.keys(seriesMap || {}).filter(
-          (s) => seriesMap?.[s] && Object.keys(seriesMap[s]).length > 0,
-        );
-        const seasonCount = seasonKeys.length;
-        const episodeCount = seasonKeys.reduce((sum, s) => {
-          const epis = seriesMap?.[s] || {};
-          return sum + Object.keys(epis).length;
-        }, 0);
-        return { seasonCount, episodeCount };
-      } catch (e) {
-        return { seasonCount: 0, episodeCount: 0 };
-      }
-    },
-
     async handleBodyClick() {
       // In preview mode, do not open/switch to Map.
       if (this.previewMode) return;
@@ -1149,84 +1133,27 @@ export default {
     },
 
     async setSeasonsTxt(tvdbData) {
+      const name = this.show?.name;
       if (!(tvdbData instanceof Object)) {
         unilog(927, "setSeasonsTxt, tvdbData:", name, { tvdbData });
         return;
       }
       // Do NOT clear seasonsTxt/watchedValTxt here. Compute the new values
-      // into locals and assign the reactive props once, at the end.
-      const show = this.show;
-      const name = show.name;
-
-      let epiCounts;
-      let watchedCountIsNull = false;
-      if (show.inLibrary === false) {
-        // For shows outside the library, use stored watchedCount from tvdb
-        const watchedCount = tvdbData.watchedCount;
-        watchedCountIsNull =
-          watchedCount === null || watchedCount === undefined;
-
-        epiCounts = {
-          seasonCount: tvdbData.seasonCount || 0,
-          episodeCount: tvdbData.episodeCount || 0,
-          watchedCount: watchedCountIsNull ? null : watchedCount,
-        };
-      } else {
-        // For library shows, count from episodeData and save to tvdb:
-        // seasons past the specials, every episode TVDB lists in them
-        // (missing and unaired too), and the watched ones.
-        const ed = tvdbData.episodeData;
-        const seasons = new Set();
-        let episodeCount = 0;
-        let watchedCount = 0;
-        epd.forEachEpisode(ed, (s, e) => {
-          if (s <= 0) return;
-          seasons.add(s);
-          episodeCount++;
-          if (epd.isWatched(ed, s, e)) watchedCount++;
-        });
-        epiCounts = { seasonCount: seasons.size, episodeCount, watchedCount };
-
-        // Save the calculated counts back to tvdb only if they changed
-        // dontEnqueue: skip triggering a full background refresh just for count updates
-        const prev = tvdbData;
-        if (
-          epiCounts.seasonCount !== prev.seasonCount ||
-          epiCounts.episodeCount !== prev.episodeCount ||
-          epiCounts.watchedCount !== prev.watchedCount
-        ) {
-          const fields = Object.assign({ name, dontEnqueue: true }, epiCounts);
-          srvr
-            .setTvdbFields(fields)
-            .catch((e) =>
-              unilog(928, `setTvdbFields ${name}: ${e.message || e}`),
-            );
-        }
-      }
-
-      Object.assign(tvdbData, epiCounts);
-      tvdb.upsertTvdbCacheRecord(
-        allTvdb,
-        tvdbData,
-        name || this.show?.name || "",
-      );
+      // into locals and assign the reactive props once, at the end. The counts
+      // are tv-srvr's, computed from the show's episodes, season 0 included.
       const { episodeCount, seasonCount, watchedCount } = tvdbData;
 
       // Compute watched text into a local (no reactive write yet).
       let newWatchedValTxt = "";
       if (episodeCount > 0) {
-        if (watchedCountIsNull) {
-          // Show "?" when watchedCount is null for shows outside the library
-          newWatchedValTxt = `? of ${episodeCount}`;
-        } else {
-          newWatchedValTxt =
-            watchedCount === episodeCount
-              ? `all ${episodeCount} episodes`
-              : `${watchedCount} of ${episodeCount}`;
-        }
-      } else if (show.inLibrary === false) {
-        // For shows outside the library with no episode count yet, still show watched status
-        newWatchedValTxt = watchedCountIsNull ? "?" : "0";
+        newWatchedValTxt =
+          watchedCount === episodeCount
+            ? `all ${episodeCount} episodes`
+            : `${watchedCount ?? 0} of ${episodeCount}`;
+      } else if (this.show?.inLibrary === false) {
+        // A show outside the library with no episodes yet still shows how
+        // many were watched.
+        newWatchedValTxt = String(watchedCount ?? 0);
       }
 
       // Compute seasons text into a local.
@@ -1563,9 +1490,6 @@ export default {
                 };
                 const paramObj = {
                   show: showSeed,
-                  seasonCount: 0,
-                  episodeCount: 0,
-                  watchedCount: 0,
                   transient: this.previewMode,
                 };
                 tvdbData = await srvr.getNewTvdb(paramObj);
@@ -1647,9 +1571,6 @@ export default {
             };
             const paramObj = {
               show: showSeed,
-              seasonCount: 0,
-              episodeCount: 0,
-              watchedCount: 0,
               transient: this.previewMode,
             };
             try {
@@ -1723,87 +1644,6 @@ export default {
         }
       }, 10);
     },
-
-    async onSeriesMapUpdated({ show, seriesMap }) {
-      if (!show || !seriesMap) return;
-      if (!this.show || this.show.name !== show.name) return;
-      if (this.show.inLibrary !== false) return;
-
-      const { seasonCount, episodeCount } = this.getMapCounts(seriesMap);
-      if (!episodeCount || !seasonCount) return;
-
-      // Watch status is unknown only when there is no episodeData at all.
-      const tvdbData = allTvdb?.[show.name];
-      const watchedEpisMissing = !Array.isArray(tvdbData?.episodeData);
-
-      // Calculate watchedCount from seriesMap
-      let watchedCount = 0;
-      try {
-        const seasonKeys = Object.keys(seriesMap || {});
-        for (const seasonKey of seasonKeys) {
-          const episodes = seriesMap[seasonKey] || {};
-          const episodeKeys = Object.keys(episodes);
-          for (const episodeKey of episodeKeys) {
-            const epiObj = episodes[episodeKey];
-            if (epiObj?.played) {
-              watchedCount++;
-            }
-          }
-        }
-      } catch (e) {
-        unilog(
-          944,
-          `Error calculating watchedCount from seriesMap for ${show.name}:`,
-          e,
-        );
-      }
-
-      const seasonsTxt =
-        seasonCount === 1 ? "1 Season" : `${seasonCount} Seasons`;
-      this.seasonsTxt = " &nbsp; " + seasonsTxt;
-
-      // If watchedEpis is missing (null or undefined), preserve existing watchedCount
-      // and show it if available, rather than showing ? or overwriting with 0
-      if (watchedEpisMissing) {
-        // Preserve the existing watchedCount instead of overwriting with 0
-        const existingWatchedCount = tvdbData?.watchedCount;
-        if (
-          existingWatchedCount != null &&
-          existingWatchedCount !== undefined
-        ) {
-          // We have a stored watchedCount - use it
-          watchedCount = existingWatchedCount;
-          this.watchedValTxt =
-            existingWatchedCount === episodeCount
-              ? `all ${episodeCount} episodes`
-              : `${existingWatchedCount} of ${episodeCount}`;
-        } else {
-          // No stored count either - truly unknown
-          watchedCount = 0;
-          this.watchedValTxt = `? of ${episodeCount}`;
-        }
-      } else {
-        this.watchedValTxt =
-          watchedCount > 0
-            ? `${watchedCount} of ${episodeCount}`
-            : `0 of ${episodeCount}`;
-      }
-
-      if (tvdbData && !this.previewMode) {
-        try {
-          await srvr.setTvdbFields({
-            name: show.name,
-            seasonCount,
-            episodeCount,
-            watchedCount,
-            dontEnqueue: true,
-            dontNotify: true,
-          });
-        } catch (e) {
-          // Non-fatal: UI already corrected.
-        }
-      }
-    },
   },
 
   /////////////////  MOUNTED  /////////////////
@@ -1826,10 +1666,6 @@ export default {
         .map((p) => p.device);
     };
     evtBus.on("nowPlaying", this._onNowPlaying);
-
-    // Keep the Series infobox totals in sync with the actual Map grid.
-    // This matters for shows outside the library, whose counts can be stale / mismatched.
-    evtBus.on("seriesMapUpdated", this.onSeriesMapUpdated);
 
     // Refresh remotes/buttons when server pushes updated tvdb data (push2 or push3).
     this.onTvdbUpdated = async ({ name, record } = {}) => {
@@ -1957,7 +1793,6 @@ export default {
     evtBus.off("previewMode", this.onPreviewMode);
     evtBus.off("previewSrchChoice", this.onPreviewSrchChoice);
     evtBus.off("addPreviewShowDone", this.onAddPreviewShowDone);
-    evtBus.off("seriesMapUpdated", this.onSeriesMapUpdated);
     if (this._onNowPlaying) evtBus.off("nowPlaying", this._onNowPlaying);
     if (this.onTvdbUpdated) evtBus.off("tvdbUpdated", this.onTvdbUpdated);
     if (this.onShowUpdating) evtBus.off("showUpdating", this.onShowUpdating);

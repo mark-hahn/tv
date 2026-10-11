@@ -1477,7 +1477,7 @@ export default {
       this._seriesMapInForArrows = null;
       this._seriesMapInForArrowsPromise = (async () => {
         try {
-          const in2 = await tvdb.getSeriesMap(show);
+          const in2 = await showData.getSeriesMap(show);
           if (this._seriesMapInForArrowsShowKey === showKey) {
             this._seriesMapInForArrows = Array.isArray(in2) ? in2 : [];
           }
@@ -1655,17 +1655,10 @@ export default {
         }
       }
 
-      // Prefer the library's map, but for shows outside it (and other
-      // failures), fall back to TVDB (same strategy as map pane).
+      // tv-srvr's map, the same one the map pane shows.
       try {
         const in1 = await showData.getSeriesMap(show);
         if (in1 && in1.length) return in1;
-      } catch {
-        // ignore
-      }
-      try {
-        const in2 = await tvdb.getSeriesMap(show);
-        if (in2 && in2.length) return in2;
       } catch {
         // ignore
       }

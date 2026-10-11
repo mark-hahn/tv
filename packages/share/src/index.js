@@ -656,24 +656,6 @@ export function normalizeVideoHeightToQuality(height) {
   return null;
 }
 
-export function computeShowQuality(fileQuality) {
-  if (!fileQuality || Object.keys(fileQuality).length === 0) return null;
-  const counts = {};
-  for (const q of Object.values(fileQuality)) {
-    counts[q] = (counts[q] ?? 0) + 1;
-  }
-  let best = null;
-  let bestCount = 0;
-  for (const [res, cnt] of Object.entries(counts)) {
-    const r = Number(res);
-    if (cnt > bestCount || (cnt === bestCount && r > best)) {
-      best = r;
-      bestCount = cnt;
-    }
-  }
-  return best;
-}
-
 export function getResolution(
   nameOrPath,
   { probeFileFn, findShowFileFn } = {},
@@ -769,6 +751,9 @@ const EMPTY_SEASON_INTRO = {
 };
 
 export function getSeasonIntro(seasonIntros, season) {
+  // Season 0 takes no part in intros: a special's opening may not match the
+  // show's, so it plays from its start and never borrows another season's.
+  if (Number(season) === 0) return { ...EMPTY_SEASON_INTRO };
   const map = seasonIntros;
   if (!map || typeof map !== "object") return { ...EMPTY_SEASON_INTRO };
   const keys = Object.keys(map);

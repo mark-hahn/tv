@@ -142,11 +142,6 @@ class ShowListView extends ScrollView {
   private static final float MAP_CELL_TEXT_SIZE_SP = 12f;
   private static final int MAP_CELL_TEXT_COLOR = 0xFF000000;
   private static final int MAP_CELL_BORDER = 0xFFCCCCCC;
-  private static final int ED_AIRED = 0;
-  private static final int ED_WATCHED = 1;
-  private static final int ED_FILE = 2;
-  private static final int ED_RES = 3;
-  private static final int ED_POS = 4;
   // One up/down press of the description, which has no cursor to move: a
   // couple of lines, so a held key runs down it at a readable rate.
   private static final int DESC_SCROLL_LINES = 2;
@@ -734,7 +729,7 @@ class ShowListView extends ScrollView {
    * the cursor is on is that many episodes in.
    */
   int focusedEpisodeNumber() {
-    return focusedEpisodeTuple() == null ? -1 : mapEpisodeIndex + 1;
+    return focusedEpisode() == null ? -1 : mapEpisodeIndex + 1;
   }
 
   /**
@@ -745,14 +740,11 @@ class ShowListView extends ScrollView {
    * when there is no episode under the cursor to flip.
    */
   Boolean toggleFocusedEpisodeWatched() {
-    JSONArray tuple = focusedEpisodeTuple();
-    if (tuple == null) return null;
-    boolean watched = tuple.optInt(ED_WATCHED, 0) != 1;
+    Episode episode = focusedEpisode();
+    if (episode == null) return null;
+    boolean watched = !episode.watched();
     try {
-      tuple.put(ED_WATCHED, watched ? 1 : 0);
-      // Only when the slot is already there: putting it on a tuple whose
-      // trailing slots were dropped would pad the ones between with nulls.
-      if (tuple.length() > ED_POS) tuple.put(ED_POS, 0);
+      episode.setWatched(watched);
     } catch (JSONException e) {
       android.util.Log.e("tvapp", "watched mark failed for " + active.name + ": " + e);
       return null;
@@ -1321,7 +1313,7 @@ class ShowListView extends ScrollView {
     }
 
     String infoFor(int step) {
-      int[] up = nextUp(show.episodeData);
+      int[] up = show.nextUp;
       String[] parts = {
         show.originalCountry.toUpperCase(Locale.US),
         years(show),
@@ -1499,25 +1491,6 @@ class ShowListView extends ScrollView {
       out.append(part);
     }
     return out.toString();
-  }
-
-  /**
-   * tv-srvr's next-up (nextUpEpisode): the first episode past season 0 with a
-   * file and not watched, as [season, episode, the season's episode count,
-   * res], or null with none.
-   */
-  private static int[] nextUp(JSONArray episodeData) {
-    for (int season = 1; episodeData != null && season < episodeData.length(); season++) {
-      JSONArray episodes = episodeData.optJSONArray(season);
-      for (int i = 0; episodes != null && i < episodes.length(); i++) {
-        JSONArray tuple = episodes.optJSONArray(i);
-        if (tuple == null || tuple.optInt(ED_WATCHED, 0) == 1) continue;
-        Object file = tuple.opt(ED_FILE);
-        if (!(file instanceof String) || ((String) file).isEmpty()) continue;
-        return new int[] {season, i + 1, episodes.length(), tuple.optInt(ED_RES, 0)};
-      }
-    }
-    return null;
   }
 
   // The parts the card's name row and the video time bar both show.
@@ -1727,6 +1700,10 @@ class ShowListView extends ScrollView {
     final View card = episodeCard;
     final ImageView still = episodeStill;
     final TextView desc = episodeDesc;
+    // A special says where it belongs among the regular episodes, above its
+    // description, the same as the web map's episode pane.
+    final String belongs = season == 0 ? show.belongsText(episode) : "";
+    desc.setText(belongs);
     Episodes.get(
         show,
         season,
@@ -1735,7 +1712,7 @@ class ShowListView extends ScrollView {
           // The cursor may have moved on while tv-srvr was answering, and this
           // card is thrown away and rebuilt on every move.
           if (episodeCard != card) return;
-          desc.setText(info.overview);
+          desc.setText(belongs.isEmpty() ? info.overview : belongs + "\n\n" + info.overview);
           if (!info.image.isEmpty()) Images.into(still, info.image, card);
         });
   }
@@ -1928,25 +1905,26 @@ class ShowListView extends ScrollView {
     FlowLayout cells = new FlowLayout(getContext());
     for (int i = 0; i < count; i++) {
       cells.addView(
-          mapCell(show, episodes.optJSONArray(i), focusable && i == mapEpisodeIndex, metrics),
+          mapCell(show, Episode.at(episodes, i), focusable && i == mapEpisodeIndex, metrics),
           mapCellParams(metrics));
     }
     row.addView(cells, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
     return row;
   }
 
-  private View mapCell(Shows.Show show, JSONArray tuple, boolean focused, MapMetrics metrics) {
-    boolean played = tuple != null && tuple.optInt(ED_WATCHED, 0) == 1;
-    boolean hasFile = tuple != null && !tuple.optString(ED_FILE, "").isEmpty() && !"0".equals(tuple.optString(ED_FILE, ""));
-    boolean noFile = tuple != null && !hasFile;
-    String aired = tuple == null ? "" : tuple.optString(ED_AIRED, "");
-    boolean unaired = noFile && isFutureDate(aired);
-    int quality = tuple == null ? 0 : tuple.optInt(ED_RES, 0);
-    long pos = tuple == null ? 0 : tuple.optLong(ED_POS, 0);
+  private View mapCell(Shows.Show show, Episode episode, boolean focused, MapMetrics metrics) {
+    boolean played = episode != null && episode.watched();
+    boolean hasFile = episode != null && episode.hasFile();
+    boolean noFile = episode != null && !hasFile;
+    String aired = episode == null ? "" : episode.aired();
+    // An episode with no air date yet has not aired either.
+    boolean unaired = noFile && (aired.isEmpty() || isFutureDate(aired));
+    int quality = episode == null ? 0 : episode.res();
+    long pos = episode == null ? 0 : episode.pos();
 
     TextView view = new TextView(getContext());
     view.setText(
-        tuple == null
+        episode == null
             ? ""
             : MapCells.text(played, hasFile, noFile, unaired, quality, pos, show.inLibrary));
     view.setTextColor(MAP_CELL_TEXT_COLOR);
@@ -1954,7 +1932,7 @@ class ShowListView extends ScrollView {
     view.setGravity(Gravity.CENTER);
     view.setSingleLine(true);
     GradientDrawable bg = new GradientDrawable();
-    bg.setColor(tuple == null ? MapCells.BG_NORMAL : MapCells.background(false, noFile));
+    bg.setColor(episode == null ? MapCells.BG_NORMAL : MapCells.background(false, noFile));
     if (focused) bg.setStroke((int) dp(FOCUS_BORDER_DP), FOCUS_BORDER);
     else bg.setStroke((int) dp(1f), MAP_CELL_BORDER);
     view.setBackground(bg);
@@ -1996,7 +1974,7 @@ class ShowListView extends ScrollView {
 
   private boolean hasAnyEpisode(JSONArray episodes) {
     for (int i = 0; episodes != null && i < episodes.length(); i++) {
-      if (episodes.optJSONArray(i) != null) return true;
+      if (Episode.at(episodes, i) != null) return true;
     }
     return false;
   }
@@ -2006,9 +1984,9 @@ class ShowListView extends ScrollView {
       JSONArray episodes = episodeData.optJSONArray(season);
       boolean sawWatched = false;
       for (int i = 0; episodes != null && i < episodes.length(); i++) {
-        JSONArray tuple = episodes.optJSONArray(i);
-        if (tuple == null) continue;
-        boolean watched = tuple.optInt(ED_WATCHED, 0) == 1;
+        Episode episode = Episode.at(episodes, i);
+        if (episode == null) continue;
+        boolean watched = episode.watched();
         if (sawWatched && !watched) return season;
         if (watched) sawWatched = true;
       }
@@ -2021,8 +1999,8 @@ class ShowListView extends ScrollView {
       int season = seasons.get(i);
       JSONArray episodes = episodeData.optJSONArray(season);
       for (int e = 0; episodes != null && e < episodes.length(); e++) {
-        JSONArray tuple = episodes.optJSONArray(e);
-        if (tuple != null && tuple.optInt(ED_WATCHED, 0) == 1) return season;
+        Episode episode = Episode.at(episodes, e);
+        if (episode != null && episode.watched()) return season;
       }
     }
     return -1;
@@ -2032,8 +2010,8 @@ class ShowListView extends ScrollView {
     for (int season : seasons) {
       JSONArray episodes = episodeData.optJSONArray(season);
       for (int e = 0; episodes != null && e < episodes.length(); e++) {
-        JSONArray tuple = episodes.optJSONArray(e);
-        if (tuple != null && !tuple.optString(ED_FILE, "").isEmpty() && !"0".equals(tuple.optString(ED_FILE, ""))) return season;
+        Episode episode = Episode.at(episodes, e);
+        if (episode != null && episode.hasFile()) return season;
       }
     }
     return -1;
@@ -2434,8 +2412,8 @@ class ShowListView extends ScrollView {
     if (season < 0 || active.episodeData == null) return 0;
     JSONArray episodes = active.episodeData.optJSONArray(season);
     for (int i = (episodes == null ? 0 : episodes.length()) - 1; i >= 0; i--) {
-      JSONArray tuple = episodes.optJSONArray(i);
-      if (tuple != null && tuple.optInt(ED_WATCHED, 0) == 1) return i;
+      Episode episode = Episode.at(episodes, i);
+      if (episode != null && episode.watched()) return i;
     }
     return 0;
   }
@@ -2447,12 +2425,11 @@ class ShowListView extends ScrollView {
     return episodes == null ? 0 : episodes.length();
   }
 
-  private JSONArray focusedEpisodeTuple() {
+  private Episode focusedEpisode() {
     if (!hasEpisodeFocus()) return null;
     int season = focusedSeason();
     if (season < 0 || active.episodeData == null) return null;
-    JSONArray episodes = active.episodeData.optJSONArray(season);
-    return episodes == null ? null : episodes.optJSONArray(mapEpisodeIndex);
+    return Episode.at(active.episodeData.optJSONArray(season), mapEpisodeIndex);
   }
 
   /** The actor under the cast strip's cursor, or null when there is none. */

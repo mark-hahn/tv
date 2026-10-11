@@ -485,7 +485,6 @@ handleMsg = async (msg) => {
 };
 
 export async function deleteShowFromSrvr(show) {
-  await delGap({ gapId: show.id, save: true });
   await delShowRecord(show.name);
 
   // Delete entire show folder from disk
@@ -721,10 +720,6 @@ export function delShowRecord(name) {
   return httpCall("/api/delShowRecord", { name }, "POST");
 }
 
-export function getGaps() {
-  return httpCall("/api/getGaps");
-}
-
 export function triggerShowGapCheck(showId, showName) {
   return httpCall("/api/triggerShowGapCheck", { showId, showName }, "POST");
 }
@@ -749,12 +744,6 @@ export function dupeFolderMerge(showName) {
 export function triggerShowSelect(showName) {
   return httpCall("/api/triggerShowSelect", { showName }, "POST");
 }
-export function addGap(params) {
-  return httpCall("/api/addGap", params, "POST");
-}
-export function delGap(gapIdSave) {
-  return httpCall("/api/delGap", gapIdSave, "POST");
-}
 
 export function getAllTvdb(hasLibrary = 0) {
   return httpCall(`/api/getAllTvdb?hasLibrary=${hasLibrary}`);
@@ -765,10 +754,6 @@ export function getNewTvdb(params) {
 
 export function searchTvdbByImdbId(params) {
   return httpCall("/api/searchTvdbByImdbId", params, "POST");
-}
-
-export function getSeriesMapFromTvdb(params) {
-  return httpCall("/api/getSeriesMapFromTvdb", params, "POST");
 }
 
 export async function getSeriesMap(params) {
@@ -784,8 +769,10 @@ export function clearEpisodePositions(showName, cells) {
   return httpCall("/api/clearEpisodePositions", { showName, cells }, "POST");
 }
 
-export function setWatchedEpis(params) {
-  return httpCall("/api/setWatchedEpis", params, "POST");
+// The watched marks of just the episodes changing: { name, episodes:
+// [{ season, episode, watched }] }.
+export function setEpisodesWatched(params) {
+  return httpCall("/api/setEpisodesWatched", params, "POST");
 }
 
 export function setEpisodeWatched(params) {

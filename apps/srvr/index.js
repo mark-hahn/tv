@@ -13,6 +13,7 @@ import * as utilNode from "util";
 import * as gaps from "./src/gaps.js";
 import * as tvdb from "./src/tvdb.js";
 import { setDeletedListener } from "./src/tvdbDb.js";
+import { nextUpAfter } from "./src/derived.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
@@ -373,49 +374,6 @@ function sleep(ms) {
   });
 }
 
-function gapEntryHasGap(gap) {
-  if (!gap || typeof gap !== "object") return false;
-
-  // Boolean flags that indicate a gap condition.
-  if (gap.fileGap === true) return true;
-  if (gap.watchGap === true) return true;
-  if (gap.notReady === true) return true;
-
-  // Explicit season/episode markers (allow 0).
-  if (gap.fileGapSeason !== null && gap.fileGapSeason !== undefined)
-    return true;
-  if (gap.fileGapEpisode !== null && gap.fileGapEpisode !== undefined)
-    return true;
-  if (gap.watchGapSeason !== null && gap.watchGapSeason !== undefined)
-    return true;
-  if (gap.watchGapEpisode !== null && gap.watchGapEpisode !== undefined)
-    return true;
-
-  // Non-empty wait string can also indicate a gap state.
-  if (typeof gap.waitStr === "string" && gap.waitStr.trim() !== "") return true;
-
-  return false;
-}
-
-function stripGapTransientFields(gap) {
-  if (!gap || typeof gap !== "object") return false;
-  let changed = false;
-
-  // `Waiting` is transient client state; never persist it.
-  if (Object.prototype.hasOwnProperty.call(gap, "Waiting")) {
-    delete gap.Waiting;
-    changed = true;
-  }
-
-  // Legacy field removed from the data model; never persist it.
-  if (Object.prototype.hasOwnProperty.call(gap, "BlockedGap")) {
-    delete gap.BlockedGap;
-    changed = true;
-  }
-
-  return changed;
-}
-
 // Debounced per-show push so rapid tvdb changes coalesce into one notification
 const PUSH_DEBOUNCE_MS = 500;
 const pendingPushes = new Map();
@@ -429,6 +387,8 @@ const debouncedTvdbPush = (name) => {
       pendingPushes.delete(name);
       const record = tvdb.getAllTvdbSync()[name];
       if (record) {
+        // Whatever changed in the meantime, the computed values go out fresh.
+        tvdb.refreshDerived(name);
         notifyClients("tvdbUpdated", { name, record });
       }
     }, PUSH_DEBOUNCE_MS),
@@ -440,6 +400,24 @@ tvdb.setNotifyCallback((name) => debouncedTvdbPush(name));
 // tvapp keeps its list current from these pushes alone, so a deleted or renamed
 // record has to say so as well.
 setDeletedListener((name) => notifyClients("tvdbDeleted", { name }));
+// What a show's computed values moving sets off: a log line as stray files turn
+// up, and the intro stills of a show that newly needs its intro marked, jumped
+// to the front of the build queue since that is the earliest sign they are
+// wanted.
+tvdb.setDerivedChangeCallback((showName, before, rec) => {
+  if (!before.stray && rec.stray) {
+    unilog(2837, `${showName}: ${rec.strayCount} file(s) for episodes it never aired, from S${rec.straySeason}E${rec.strayEpisode}: ${(rec.strayFiles || []).join(", ")}`);
+  }
+  if (!before.needsIntro && rec.needsIntro) {
+    const introFile = epd.selectIntroFile(rec);
+    if (introFile?.path)
+      stills
+        .startStills(introFile.path, { urgent: true })
+        .catch((e) =>
+          unilog(2838, `intro stills start failed for ${showName}: ${e.message}`),
+        );
+  }
+});
 tvdb.setEnqueueCallback((name) => notifyClients("showUpdating", { name }));
 tvdb.setQueueDrainCallback(() => notifyClients("showQueueEmpty", {}));
 
@@ -475,142 +453,14 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     if (tvdbRecord.inLibrary) {
       removeFromSnoozeByShow(showName, tvdbRecord.tvdbId);
     }
-    // Disk check, date/size/noFiles, filesOnDisk/fileQuality/quality and
-    // episodeData are all refreshed by refreshEpisodeData (called from the tvdb
-    // loop before this callback), so no separate disk scan is needed here.
-    const diskChanges = [];
-    // Gap check
-    let gapChanges = [];
-    const prevNeedsIntro = !!tvdbRecord.needsIntro;
-    if (tvdbRecord.inLibrary && tvdbRecord.id) {
-      const gapData = await gaps.gapCheckOne(
-        tvdbRecord.id,
-        showName,
-        tvdbRecord,
-      );
-      if (gapData) {
-        const gapFields = [
-          "notReady",
-          "watchGap",
-          "watchGapSeason",
-          "watchGapEpisode",
-          "fileGap",
-          "fileGapSeason",
-          "fileGapEpisode",
-          "resDrop",
-          "resDropSeason",
-          "resDropEpisode",
-          "fileEndError",
-          "fileEndErrorSeason",
-          "fileEndErrorEpisode",
-          "seasonWatchedThenNofile",
-          "seasonWatchedThenNofileSeason",
-          "seasonWatchedThenNofileEpisode",
-          "anyWatched",
-          "stray",
-          "strayCount",
-        ];
-        for (const f of gapFields) {
-          if (tvdbRecord[f] !== gapData[f])
-            gapChanges.push(`${f}:${tvdbRecord[f]}->${gapData[f]}`);
-        }
-        // Files for episodes this show never aired. Logged as it turns on, so
-        // a standing condition does not repeat every gap check.
-        const strayIsNew = !tvdbRecord.stray && gapData.stray;
-        if (strayIsNew) {
-          unilog(
-            2156,
-            `${showName}: ${gapData.strayCount} file(s) for episodes it never aired, from S${gapData.straySeason}E${gapData.strayEpisode}: ${(gapData.strayFiles || []).join(", ")}`,
-          );
-        }
-        Object.assign(tvdbRecord, gapData);
-        // The live flag clears the moment the files go -- moved out, deleted,
-        // or TVDB finally publishing the air date. strayNote is the record
-        // that it happened at all, and is never cleared automatically, so a
-        // single non-aired file always leaves something to verify against.
-        // Written whenever the flag is up and no note exists yet, not only on
-        // the transition, so a show already flagged still gets one.
-        if (gapData.stray && !tvdbRecord.strayNote) {
-          tvdbRecord.strayNote = `${gapData.strayCount} non-aired file(s) from S${gapData.straySeason}E${gapData.strayEpisode} seen ${strayEpisodes.strayStamp()}`;
-        }
-        tvdbRecord.lastGapCheck = util.toPstDateTimeMs(new Date());
-        delete tvdbRecord.allAiredHaveFile;
-        delete tvdbRecord.allAiredWatched;
-        delete tvdbRecord.allWatchedOrHaveFile;
-      }
-      // Compute full: every episode is either watched or has a file
-      const newFull = !!(tvdbRecord.inLibrary && gapData.allWatchedOrHaveFile);
-      if (!!tvdbRecord.full !== newFull) {
-        gapChanges.push(`full:${tvdbRecord.full}->${newFull}`);
-        tvdbRecord.full = newFull;
-      }
-      // Compute needsIntro. A season with trimPos/skipDur OR one explicitly
-      // marked "none" (checked, no intro) counts as configured.
-      const hasConfiguredIntro =
-        tvdbRecord.seasonIntros != null &&
-        Object.values(tvdbRecord.seasonIntros).some(
-          (si) =>
-            si?.trimPos != null || si?.skipDur != null || si?.none === true,
-        );
-      const newNeedsIntro = !!(
-        tvdbRecord.inLibrary &&
-        !hasConfiguredIntro &&
-        Number(tvdbRecord.episodeCount ?? 0) >
-          Number(tvdbRecord.watchedCount ?? 0) &&
-        epd.seasonsWithFile(tvdbRecord.episodeData).length > 0
-      );
-      if (!!tvdbRecord.needsIntro !== newNeedsIntro) {
-        gapChanges.push(
-          `needsIntro:${tvdbRecord.needsIntro}->${newNeedsIntro}`,
-        );
-        tvdbRecord.needsIntro = newNeedsIntro;
-      }
-    } else if (!tvdbRecord.inLibrary) {
-      // For shows not in the library, set error fields to known constants
-      const nonLibraryConstants = [
-        ["fileGap", false],
-        ["fileGapSeason", null],
-        ["fileGapEpisode", null],
-        ["fileEndError", false],
-        ["fileEndErrorSeason", null],
-        ["fileEndErrorEpisode", null],
-        ["watchGap", false],
-        ["watchGapSeason", null],
-        ["watchGapEpisode", null],
-        ["seasonWatchedThenNofile", false],
-        ["seasonWatchedThenNofileSeason", null],
-        ["seasonWatchedThenNofileEpisode", null],
-        ["full", false],
-        ["needsIntro", false],
-        ["notReady", true],
-      ];
-      for (const [f, v] of nonLibraryConstants) {
-        if (tvdbRecord[f] !== v) {
-          gapChanges.push(`${f}:${tvdbRecord[f]}->${v}`);
-          tvdbRecord[f] = v;
-        }
-      }
-    }
-    const nowNeedsIntro = !!tvdbRecord.needsIntro;
-    if (nowNeedsIntro !== prevNeedsIntro) {
-      // The client sets needsIntro immediately before opening the intro player,
-      // so this is the earliest warning that its stills are wanted — jump them
-      // to the front of the build queue.
-      if (nowNeedsIntro) {
-        try {
-          const introFile = epd.selectIntroFile(tvdbRecord);
-          if (introFile?.path)
-            await stills.startStills(introFile.path, { urgent: true });
-        } catch (e) {
-          unilog(2402, `intro stills start failed for ${showName}: ${e.message}`);
-        }
-      }
-    }
-    // Auto collection updates (run after the gap check, which sets anyWatched)
+    // refreshEpisodeData, called from the tvdb loop before this callback,
+    // already recomputed the show's computed values; this catches anything
+    // else that has moved them since.
+    const derivedChanged = tvdb.refreshDerived(showName);
+    // Auto collection updates (read the computed anyWatched, notReady, ...)
     const collectionChanges = applyAutoCollections(showName, tvdbRecord);
     const push2Changes = [
-      ...diskChanges,
-      ...gapChanges,
+      ...(derivedChanged ? ["computed values"] : []),
       ...collectionChanges,
     ];
     if (push2Changes.length) {
@@ -668,6 +518,26 @@ tvdb.setWaitStrChangedCallback(
     }
   },
 );
+
+// The computed values that move with the day -- the wait date, readiness, the
+// aired dates -- are worked out again for every show as the PST date turns
+// over, and each show whose values changed is pushed. Checked each minute
+// rather than timed to midnight, so a DST change or a stalled timer cannot
+// skip a day.
+const DAY_TURN_CHECK_MS = 60 * 1000;
+let derivedDay = util.toPstDateIso(new Date());
+setInterval(() => {
+  const today = util.toPstDateIso(new Date());
+  if (today === derivedDay) return;
+  derivedDay = today;
+  try {
+    const changed = tvdb.refreshAllDerived();
+    for (const name of changed) debouncedTvdbPush(name);
+    unilog(2839, `new day ${today}: computed values changed for ${changed.length} shows`);
+  } catch (e) {
+    unilog(2840, `new day recompute failed: ${e.message}`);
+  }
+}, DAY_TURN_CHECK_MS);
 
 function rpcParamToString(param) {
   // Param is usually a raw string, but tolerate JSON-stringified strings.
@@ -860,71 +730,6 @@ const delShowRecord = async (params) => {
   unilog(2551, `deleting record outside the library: ${deleteKey}`);
   delete allTvdb[deleteKey];
   await tvdb.saveTvdbSync();
-  return "ok";
-};
-
-const getGaps = async (_param) => {
-  // Phase 5: Read from tvdb instead of separate gaps object
-  const allTvdb = tvdb.getAllTvdbSync();
-  const gapsFromTvdb = {};
-
-  for (const [name, record] of Object.entries(allTvdb)) {
-    if (record.gap && record.id) {
-      gapsFromTvdb[record.id] = record.gap;
-    }
-  }
-
-  return gapsFromTvdb;
-};
-
-const addGap = async (params) => {
-  const { gapId, gap, save } = params || {};
-
-  if (gapId !== null && gapId !== undefined) {
-    stripGapTransientFields(gap);
-
-    // Phase 5: Update tvdb.gap field
-    const allTvdb = tvdb.getAllTvdbSync();
-    let showName = null;
-
-    for (const [name, record] of Object.entries(allTvdb)) {
-      if (record.id === gapId && record.inLibrary) {
-        showName = name;
-        break;
-      }
-    }
-
-    if (showName) {
-      if (gapEntryHasGap(gap)) {
-        allTvdb[showName].gap = gap;
-      } else {
-        allTvdb[showName].gap = null;
-      }
-      // Only save tvdb when save flag is true
-      if (save) await tvdb.saveTvdbSync();
-    }
-  }
-
-  return "ok";
-};
-
-const delGap = async (params) => {
-  const { gapId, save } = params || {};
-
-  if (gapId !== null) {
-    // Phase 5: Update tvdb.gap field
-    const allTvdb = tvdb.getAllTvdbSync();
-
-    for (const [name, record] of Object.entries(allTvdb)) {
-      if (record.id === gapId) {
-        record.gap = null;
-        // Only save tvdb when save flag is true
-        if (save) await tvdb.saveTvdbSync();
-        break;
-      }
-    }
-  }
-
   return "ok";
 };
 
@@ -1199,7 +1004,6 @@ app.get(
   }),
 );
 app.get("/api/getShowsFromDisk", apiWrapper(getShowsFromDisk));
-app.get("/api/getGaps", apiWrapper(getGaps));
 app.get("/api/getPlayUrl", apiWrapper(getPlayUrl));
 // The browser's player for the info and map panes' Play button.
 app.get("/api/play", (req, res) =>
@@ -1218,32 +1022,6 @@ app.post("/api/getRemotes", apiWrapper(tvdb.getRemotesCmd));
 app.post("/api/debugTvdb", apiWrapper(tvdb.debugTvdb));
 app.post("/api/getNewTvdb", apiWrapper(tvdb.getNewTvdb));
 app.post("/api/searchTvdbByImdbId", apiWrapper(tvdb.searchTvdbByImdbId));
-app.post(
-  "/api/getSeriesMapFromTvdb",
-  apiWrapper(async (params) => {
-    const { tvdbId, watchedEpis } = params;
-    if (!tvdbId) {
-      return { success: false, error: "Missing tvdbId" };
-    }
-    try {
-      // A show out of the library still keeps its watched marks in its
-      // record's episodeData; use them when the caller sent none.
-      let watched = watchedEpis || null;
-      if (!watched) {
-        const allTvdb = tvdb.getAllTvdbSync() || {};
-        const rec = Object.values(allTvdb).find(
-          (r) => String(r?.tvdbId) === String(tvdbId),
-        );
-        if (rec) watched = epd.episodeDataToWatchedEpis(rec.episodeData);
-      }
-      const seriesMap = await tvdb.getSeriesMap(tvdbId, watched);
-      return { success: true, seriesMap };
-    } catch (err) {
-      unilog(569, "error:", err);
-      return { success: false, error: err.message };
-    }
-  }),
-);
 // Every show folder in the media tree.
 async function showFolders() {
   const entries = await fsp.readdir(tvDir, { withFileTypes: true });
@@ -1533,7 +1311,10 @@ app.post(
     const removing = params?.remove === true;
     if (removing) removeIgnoreGaps(rec, episodes);
     else addIgnoreGaps(rec, episodes);
+    // The gap fields are computed with the ignores applied.
+    tvdb.refreshDerived(showName);
     await tvdb.saveTvdbSync();
+    debouncedTvdbPush(showName);
     const changed = Math.abs((rec.ignoreGaps || []).length - before);
     if (changed) {
       unilog(
@@ -1566,7 +1347,9 @@ app.post(
       rec,
       accepting.map((a) => ({ season: a.season, episode: a.episode })),
     );
+    tvdb.refreshDerived(showName);
     await tvdb.saveTvdbSync();
+    debouncedTvdbPush(showName);
     unilog(
       2183,
       `${showName}: accepted ${added} stray file(s) as this show's episodes: ${accepting.map((a) => a.key).join(", ")}`,
@@ -1586,6 +1369,7 @@ app.post(
     if (!rec) return { success: false, error: "show not found" };
     delete rec.strayNote;
     await tvdb.saveTvdbSync();
+    debouncedTvdbPush(showName);
     return { success: true };
   }),
 );
@@ -1628,20 +1412,46 @@ app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
 app.post(
   "/api/getSeriesMap",
   apiWrapper(async (params) => {
-    const { showName, stale } = params;
-    if (!showName) return { success: false, error: "Missing showName" };
-    const allTvdb = tvdb.getAllTvdbSync();
-    const rec = allTvdb?.[showName];
-    if (!rec) return { success: false, error: "Show not found" };
+    // Every map comes from here: a show with a record has its map built from
+    // its own episodes, in the library or not; only a preview of a show with
+    // no record yet (sent as tvdbId) is built live from TVDB, with nothing
+    // watched.
+    const { stale, tvdbId } = params;
+    const allTvdb = tvdb.getAllTvdbSync() || {};
+    const showName =
+      allTvdb[params.showName] || !tvdbId
+        ? params.showName
+        : Object.keys(allTvdb).find(
+            (key) => String(allTvdb[key]?.tvdbId) === String(tvdbId),
+          );
+    const rec = showName ? allTvdb[showName] : null;
+    if (!rec) {
+      if (!tvdbId)
+        return { success: false, error: showName ? "Show not found" : "Missing showName" };
+      try {
+        return { success: true, seriesMap: await tvdb.getSeriesMap(tvdbId) };
+      } catch (err) {
+        unilog(2845, `preview map for tvdbId ${tvdbId}: ${err.message}`);
+        return { success: false, error: err.message };
+      }
+    }
     try {
       const folder = showPaths.showFolderFor(showName, rec);
       const today = util.toPstDateIso(new Date());
 
+      // A record made a moment ago (the add-show steps) has no episodes yet:
+      // fill them from TVDB first.
+      if (!epd.seasonsPresent(rec.episodeData).length && rec.tvdbId) {
+        await refreshEpisodeData(showName, rec, { sources: ["tvdb"] });
+        await tvdb.saveTvdbSync();
+      }
+
       // Fast path: build the map from the stored episodeData (populated by
       // the periodic full refresh) with no disk access. The client paints this
       // instantly, then requests a live refresh (stale omitted) in the
-      // background to catch any file changes since the last sweep.
-      if (stale) {
+      // background to catch any file changes since the last sweep. A show out
+      // of the library has no folder to read, so it always takes this path.
+      if (stale || rec.inLibrary === false) {
         const seriesMap = epd.markGapErrors(
           epd.toSeriesMap(rec.episodeData, folder, today),
           rec,
@@ -1727,7 +1537,6 @@ app.post("/api/getFile", apiWrapper(getFile));
 app.post("/api/accessTvdb", apiWrapper(tvdb.accessTvdb));
 app.post("/api/getPoster", apiWrapper(tvdb.getPoster));
 app.post("/api/getTvmazeCrew", apiWrapper(tvdb.getTvmazeCrew_cmd));
-app.post("/api/migrateWatchedCount", apiWrapper(tvdb.migrateWatchedCount));
 // The remote's address rides along so a collision log can name the device
 // behind a sender id. Browsers arrive through nginx, hence the forwarded
 // header; the phone app hits the port directly.
@@ -1848,22 +1657,6 @@ app.post(
 );
 
 app.post(
-  "/api/populateShowQuality",
-  apiWrapper(async () => {
-    const allTvdb = tvdb.getAllTvdbSync();
-    let updated = 0;
-    for (const tvdbRecord of Object.values(allTvdb)) {
-      const q = epd.computeQuality(tvdbRecord.episodeData) ?? null;
-      tvdbRecord.quality = q;
-      if (q !== null) updated++;
-    }
-    await tvdb.saveTvdbSync();
-    unilog(38, `Done: updated=${updated}`);
-    return { ok: true, updated };
-  }),
-);
-
-app.post(
   "/api/refreshAllEpisodeData",
   apiWrapper(async (params) => {
     const onlyName = params?.name || null;
@@ -1971,7 +1764,8 @@ async function snoozeWaitStr({ tvdbId, name }) {
     let premiereSeason = 0;
     for (const [s, eps] of seriesMap)
       for (const [e, { aired }] of eps) {
-        if (!aired || !Number.isInteger(e) || e < 1) continue;
+        // Specials say nothing about when a snoozed show's next season comes.
+        if (s < 1 || !aired || !Number.isInteger(e) || e < 1) continue;
         epd.setEpisode(ed, s, e, { aired });
         if (s < 1 || s < premiereSeason) continue;
         if (s > premiereSeason || aired < premiere) {
@@ -2082,43 +1876,35 @@ app.post(
 // CRUD operations
 app.post("/api/addShowRecord", apiWrapper(addShowRecord));
 app.post("/api/delShowRecord", apiWrapper(delShowRecord));
-app.post("/api/addGap", apiWrapper(addGap));
-app.post("/api/delGap", apiWrapper(delGap));
 app.post("/api/setTvdbFields", apiWrapper(tvdb.setTvdbFields));
 
-// Persist watched state into episodeData (used by the map for shows outside
-// the library). `watchedEpis` is the legacy [[season, ep, ...], ...] array built by
-// the client from the current seriesMap.
+// Set the watched marks on several episodes at once -- the web map's season
+// toggle. `episodes` names just the ones changing: [{ season, episode,
+// watched }].
 app.post(
-  "/api/setWatchedEpis",
+  "/api/setEpisodesWatched",
   apiWrapper(async (params) => {
-    const { name, watchedEpis } = params || {};
-    const allTvdb = tvdb.getAllTvdbSync();
-    const rec = allTvdb?.[name];
+    const { name, episodes } = params || {};
+    if (!name || !Array.isArray(episodes))
+      return { ok: false, error: "Missing params" };
+    const rec = tvdb.getAllTvdbSync()?.[name];
     if (!rec) return { ok: false, error: "Show not found" };
-    if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
-    const ed = rec.episodeData;
-    const watchedSet = new Set();
-    for (const row of watchedEpis || []) {
-      if (!Array.isArray(row) || row.length < 1) continue;
-      const [s, ...eps] = row;
-      for (const e of eps) watchedSet.add(`${s}.${e}`);
+    let changed = 0;
+    for (const { season, episode, watched } of episodes) {
+      if (!Number.isInteger(season) || !Number.isInteger(episode)) continue;
+      if (!epd.getEp(rec.episodeData, season, episode)) continue;
+      // As for one episode, the resume point goes with the mark.
+      epd.setEpisode(rec.episodeData, season, episode, {
+        watched: !!watched,
+        pos: 0,
+      });
+      changed++;
     }
-    // Apply watched flag to every existing episode.
-    epd.forEachEpisode(ed, (s, e) => {
-      epd.setEpisode(ed, s, e, { watched: watchedSet.has(`${s}.${e}`) });
-    });
-    // Create slots for any watched episodes not yet present.
-    for (const row of watchedEpis || []) {
-      if (!Array.isArray(row) || row.length < 1) continue;
-      const [s, ...eps] = row;
-      for (const e of eps) {
-        if (!epd.getEp(ed, s, e)) epd.setEpisode(ed, s, e, { watched: true });
-      }
-    }
-    rec.watchedCount = epd.countWatched(ed);
+    tvdb.refreshDerived(name);
     await tvdb.saveTvdbSync();
-    return { ok: true };
+    debouncedTvdbPush(name);
+    unilog(2846, `${name}: watched marks set on ${changed} episode(s)`);
+    return { ok: true, changed };
   }),
 );
 
@@ -2142,11 +1928,63 @@ app.post(
       watched: !!watched,
       pos: 0,
     });
-    rec.watchedCount = epd.countWatched(rec.episodeData);
+    tvdb.refreshDerived(name);
     await tvdb.saveTvdbSync();
     debouncedTvdbPush(name);
     unilog(2518, `${name} S${season}E${episode} watched=${!!watched}`);
     return { ok: true, watched: !!watched };
+  }),
+);
+
+// One paced pass over every show, refreshing its episodes from TVDB, so what a
+// new kind of refresh writes reaches every show without waiting for the
+// background loop to come round to each. It runs in the background; a deploy's
+// restart ends it, and starting it again simply starts over.
+const EPISODE_BACKFILL_GAP_MS = 2000;
+const EPISODE_BACKFILL_PROGRESS_EVERY = 100;
+let episodeBackfillRunning = false;
+
+async function runEpisodeBackfill(onlyNames = null) {
+  const names = onlyNames || Object.keys(tvdb.getAllTvdbSync() || {});
+  let refreshed = 0;
+  let failed = 0;
+  for (const [index, name] of names.entries()) {
+    const rec = tvdb.getAllTvdbSync()?.[name];
+    if (!rec?.tvdbId) continue;
+    try {
+      const before = JSON.stringify(rec.episodeData);
+      await refreshEpisodeData(name, rec, { sources: ["tvdb"] });
+      if (JSON.stringify(rec.episodeData) !== before) {
+        await tvdb.saveTvdbSync();
+        debouncedTvdbPush(name);
+      }
+      refreshed++;
+    } catch (e) {
+      failed++;
+      unilog(2830, `${name}: ${e.message}`);
+    }
+    if ((index + 1) % EPISODE_BACKFILL_PROGRESS_EVERY === 0)
+      unilog(2831, `${index + 1} of ${names.length} shows`);
+    await new Promise((resolve) => setTimeout(resolve, EPISODE_BACKFILL_GAP_MS));
+  }
+  unilog(2832, `done: ${refreshed} shows refreshed, ${failed} failed`);
+}
+
+// `names`, when given, limits the pass to those shows.
+app.post(
+  "/api/backfillEpisodeData",
+  apiWrapper(async (params) => {
+    if (episodeBackfillRunning) return { ok: false, error: "already running" };
+    const names = Array.isArray(params?.names) ? params.names : null;
+    episodeBackfillRunning = true;
+    runEpisodeBackfill(names)
+      .catch((e) =>
+        unilog(2833, `stopped: ${e.message}`),
+      )
+      .finally(() => {
+        episodeBackfillRunning = false;
+      });
+    return { ok: true };
   }),
 );
 
@@ -2584,11 +2422,9 @@ app.post("/api/saveSeasonIntro", async (req, res) => {
     return;
   }
   try {
+    // The save recomputes needsIntro too, so a show whose intro is now
+    // configured stops needing one at once.
     await tvdb.saveSeasonIntro(record, season, field, value);
-    // Once the show has a configured intro (trimPos, skipDur, or an explicit
-    // "none"), it no longer needsIntro. Clear the flag immediately instead of
-    // waiting for the next background update.
-    await intro.reconcileNeedsIntro(name);
     res.json({ ok: true });
   } catch (err) {
     unilog(601, "error:", err.message);
@@ -2961,23 +2797,9 @@ const EARLY_STOP_MS = 10000;
 const PREFETCH_PLAYED_MS = 30 * 24 * 60 * 60 * 1000;
 const NEAR_END_MS = 4 * 60 * 1000;
 
-// Next-up: the first episode past season 0 with a file and not watched, after
-// the episode `after` ({season, episode}) when it is given.
-function nextUpEpisode(ed, after = null) {
-  let found = null;
-  epd.forEachEpisode(ed, (season, episode) => {
-    if (found || season <= 0) return;
-    if (
-      after &&
-      (season < after.season ||
-        (season === after.season && episode <= after.episode))
-    )
-      return;
-    if (epd.hasFile(ed, season, episode) && !epd.isWatched(ed, season, episode))
-      found = { season, episode };
-  });
-  return found;
-}
+// Next-up: the first unwatched episode with a file in story order, after the
+// episode `after` ({season, episode}) when it is given (see derived.js).
+const nextUpEpisode = (ed, after = null) => nextUpAfter(ed, after);
 
 // Start the subtitle downloads for the episode that plays next, so its play
 // has them at once: next-up, or the one after `after`, the episode playing.
@@ -3126,7 +2948,6 @@ async function playProgress({ showName, season, episode, posMs, durMs, state, su
       episode,
       ended ? { watched: true, pos } : earlyStop ? { watched: false, pos } : { pos },
     );
-  if (ended || earlyStop) rec.watchedCount = epd.countWatched(ed);
   // The subtitle showing when the video stops is the one chosen for the
   // episode. A stop that counts as never played chooses nothing.
   if (stopped && !earlyStop && sub) {
@@ -3140,16 +2961,23 @@ async function playProgress({ showName, season, episode, posMs, durMs, state, su
     if (file) subs.subStopped(String(rec.id), season, episode, file, sub);
   }
   if (started || stopped) {
-    rec.lastPlayedDate = util.toPstDateTimeMs(new Date());
-    rec.lastPlayedEpisode = code;
     rec.fakeLastPlayed = null;
     rec.hiddenFromRow = false;
+    // The episode keeps its own record of being played: when last, and how
+    // many times through to the end. The show's lastPlayedDate and
+    // lastPlayedEpisode are computed from these.
+    const playCount = epd.getEp(ed, season, episode)?.playCount || 0;
+    epd.setEpisode(ed, season, episode, {
+      lastPlayed: util.toPstDateTimeMs(new Date()),
+      ...(ended ? { playCount: playCount + 1 } : {}),
+    });
     unilog(2497, `${showName} ${code} ${state} at ${Math.round(posMs / 1000)}s`);
   }
+  // Watched, the resume point and the last play all feed computed values.
+  tvdb.refreshDerived(showName);
   await tvdb.saveTvdbSync();
-  // Only when the list would show it: every push makes tvapp reload all its
-  // shows, and one every report while a 4K video fills tvapp's heap ran it
-  // out of memory.
+  // Only when the list would show it: a push on every progress report would
+  // have tvapp rebuild the show's card every few seconds while a video plays.
   if (started || stopped) debouncedTvdbPush(showName);
   tvappNowPlaying = stopped
     ? null
@@ -3434,12 +3262,17 @@ async function runLibrarySweep(caller = "unknown") {
       if (await isDirectory(path.join(tvDir, folder))) continue;
       unilog(2519, `${name} left the library: its folder ${folder} is gone`);
       rec.inLibrary = false;
-      rec.notReady = true;
       rec.inContinue = false;
       rec.inLinda = false;
       rec.inMark = false;
       rec.inToTry = false;
+      tvdb.clearFolderFacts(rec);
       handlePickupChange(name, false, rec.status);
+    }
+    // However a show left the library, it keeps no folder facts.
+    for (const rec of Object.values(allTvdb)) {
+      if (!isTvdbShow(rec) || rec.inLibrary || rec.noFiles === true) continue;
+      tvdb.clearFolderFacts(rec);
     }
 
     // Step 3: A folder holding videos that no library show claims joins the
@@ -3473,14 +3306,11 @@ async function runLibrarySweep(caller = "unknown") {
     // skipped.
     await mergeDuplicateShowFolders("librarySweep");
 
-    // Step 4: Fix any pre-existing inLibrary=false records with stale error fields
+    // Step 4: A show out of the library is in none of the collections. Its
+    // computed values (notReady, the gap fields) say so on their own.
     for (const [name, rec] of Object.entries(allTvdb)) {
       if (isTvdbShow(rec) && rec.inLibrary === false) {
         const nonLibraryConstants = [
-          ["fileGap", false],
-          ["fileEndError", false],
-          ["full", false],
-          ["notReady", true],
           ["inContinue", false],
           ["inLinda", false],
           ["inMark", false],
@@ -3493,6 +3323,12 @@ async function runLibrarySweep(caller = "unknown") {
           }
         }
       }
+    }
+
+    // The computed values of every show the sweep changed follow it.
+    for (const [name, rec] of Object.entries(allTvdb)) {
+      if (isTvdbShow(rec) && preSnap.get(name) !== snapRecord(rec))
+        tvdb.refreshDerived(name);
     }
 
     await tvdb.saveTvdbSync();
@@ -3577,53 +3413,21 @@ function addToLibrary(name, rec, folder) {
 }
 
 /**
- * Run gap check for specific shows
- * @param {Array} shows - Array of {showId, showName, tvdbRecord}
- * @param {boolean} checkDiskFirst - If true, check disk for each show before gap checking
+ * Recompute the gap fields, with the rest of a show's computed values, for
+ * shows whose disk just changed, and push any show they moved.
+ * @param {Array} shows - Array of {showName}
  */
-async function runGapCheckForShows(shows, checkDiskFirst = true) {
-  if (!shows || shows.length === 0) return;
-
-  const startTime = Date.now();
-  try {
-    let diskUpdateCount = 0;
-
-    // Check disk for each show individually if requested
-    if (checkDiskFirst) {
-      for (const { showId, showName, tvdbRecord } of shows) {
-        // Refresh episodeData file info (also updates date/size/noFiles/quality).
-        await refreshEpisodeData(showName, tvdbRecord, { sources: ["disk"] });
-        diskUpdateCount++;
-      }
-
-      if (diskUpdateCount > 0) {
-        await tvdb.saveTvdbSync();
-        unilog(661, `Updated disk info for ${diskUpdateCount} shows`);
-      }
-    }
-
-    // Now run gap check with fresh disk data
-    const gapData = await gaps.gapCheckBatch(shows);
-    for (const { showId, showName } of shows) {
-      const g = gapData?.[showId];
-      if (g) {
-        appendWatchgapLog(
-          `  ${showName}: notReady=${g.notReady} fileGap=${g.fileGap} anyWatched=${g.anyWatched}${g.fileEndError ? " fileEndError=true" : ""}${g.seasonWatchedThenNofile ? " sWTNF=true" : ""}`,
-        );
-      } else {
-        appendWatchgapLog(`  ${showName}: no gap data (error or skipped)`);
-      }
-    }
-    const updatedCount = await tvdb.updateTvdbWithGapData(gapData);
-
-    const elapsed = Math.round((Date.now() - startTime) / 1000);
-    unilog(75, `finished, ${elapsed} secs, ${shows.length} shows`);
-  } catch (err) {
-    unilog(663, "error:", err.message);
+function runGapCheckForShows(shows) {
+  for (const { showName } of shows || []) {
+    if (tvdb.refreshDerived(showName)) debouncedTvdbPush(showName);
+    const g = tvdb.getAllTvdbSync()?.[showName];
+    if (!g) continue;
+    appendWatchgapLog(
+      `  ${showName}: notReady=${g.notReady} fileGap=${g.fileGap} anyWatched=${g.anyWatched}${g.fileEndError ? " fileEndError=true" : ""}${g.seasonWatchedThenNofile ? " sWTNF=true" : ""}`,
+    );
   }
 }
 
-const GAP_CHECK_BATCH_SIZE = 10;
 const WATCHGAP_LOG = path.join(SRVR_DATA_DIR, "watchgap.log");
 
 function appendWatchgapLog(line) {
@@ -3631,44 +3435,6 @@ function appendWatchgapLog(line) {
     .toLocaleString("sv-SE", { timeZone: "America/Los_Angeles" })
     .slice(0, 19);
   fs.appendFileSync(WATCHGAP_LOG, `${ts} ${line}\n`);
-}
-
-/**
- * Phase 3.3: Background gap check - processes shows least-recently-checked first
- */
-async function runGapCheckBatch() {
-  try {
-    const allTvdb = tvdb.getAllTvdbSync();
-    if (!allTvdb || Object.keys(allTvdb).length === 0) return;
-
-    const showsToCheck = Object.entries(allTvdb)
-      .filter(([_, tvdbRecord]) => tvdbRecord?.inLibrary && tvdbRecord?.id)
-      .map(([showName, tvdbRecord]) => ({
-        showId: tvdbRecord.id,
-        showName,
-        tvdbRecord,
-      }))
-      .sort((a, b) => {
-        const aLast = a.tvdbRecord.lastGapCheck || "";
-        const bLast = b.tvdbRecord.lastGapCheck || "";
-        if (aLast !== bLast) return aLast < bLast ? -1 : 1;
-        return compareShowNames({ name: a.showName }, { name: b.showName });
-      });
-
-    if (showsToCheck.length === 0) return;
-
-    const batch = showsToCheck.slice(0, GAP_CHECK_BATCH_SIZE);
-    unilog(
-      664,
-      `${batch.length}/${showsToCheck.length} shows, oldest: ${batch[0].showName}`,
-    );
-    appendWatchgapLog(
-      `[batch ${batch.length}/${showsToCheck.length}] ${batch.map((s) => s.showName).join(", ")}`,
-    );
-    await runGapCheckForShows(batch, true);
-  } catch (err) {
-    unilog(665, "runGapCheckBatch error:", err.message);
-  }
 }
 
 // Auto collection rules (applied in the background tvdb update, per show).
@@ -3824,16 +3590,6 @@ const pendingDiskChanges = new Set();
 /**
  * Handle disk change for a show (debounced)
  */
-// This handler never re-scrapes TVDB, so a waitStr recompute here can read as
-// cleared just because TVDB has not announced the next episode's air date yet.
-// Persisting that clear also eats the set->clear flip the background loop
-// compares against the record, and that flip is the only thing that unhides a
-// show and stamps its wait as over -- so the old value is put back and the
-// clear is left entirely to the loop, which re-scrapes TVDB first.
-function keepWaitStrForLoop(rec, waitStrBefore) {
-  if (waitStrBefore && !rec.waitStr) rec.waitStr = waitStrBefore;
-}
-
 async function handleShowDiskChange(showName) {
   if (inFlightDiskChanges.has(showName)) {
     pendingDiskChanges.add(showName);
@@ -3865,7 +3621,6 @@ async function handleShowDiskChange(showName) {
       if (tvdbRecord) {
         // Refresh episodeData file info (also sets date/size/noFiles/quality).
         await refreshEpisodeData(showName, tvdbRecord, { sources: ["disk"] });
-        keepWaitStrForLoop(tvdbRecord, waitStrBefore);
         await tvdb.saveTvdbSync();
         debouncedTvdbPush(showName);
         unilog(
@@ -3891,10 +3646,7 @@ async function handleShowDiskChange(showName) {
       if (!tvdbRecord?.inLibrary || !tvdbRecord?.id) return;
 
       // Refresh fileGap, watchGap, etc.
-      await runGapCheckForShows(
-        [{ showId: tvdbRecord.id, showName, tvdbRecord }],
-        false,
-      );
+      runGapCheckForShows([{ showName }]);
       unilog(85, `Gap check refreshed for ${showName}`);
 
       // Hide immediately when the show newly enters the "waiting, with

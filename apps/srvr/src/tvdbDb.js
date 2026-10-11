@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
+import { COMPUTED_FIELDS } from "./computedFields.js";
 
 const TVDB_DB_PATH = path.join(SRVR_DATA_DIR, "tvdb.db");
 const TVDB_DB_BAK_PATH = path.join(SRVR_DATA_DIR, "tvdb.db.bak");
@@ -36,9 +37,17 @@ export const loadAllShows = () => {
   return out;
 };
 
+// The record as stored: everything but the computed fields, which tv-srvr
+// works out afresh from the rest.
+const storedJson = (record) => {
+  const stored = { ...record };
+  for (const field of COMPUTED_FIELDS) delete stored[field];
+  return JSON.stringify(stored);
+};
+
 export const saveShow = (name, record) => {
   if (!name || !record) return;
-  const json = JSON.stringify(record);
+  const json = storedJson(record);
   if (lastSavedJson.get(name) === json) return;
   upsertStmt.run(name, json);
   lastSavedJson.set(name, json);

@@ -337,10 +337,10 @@
           </button>
           <button
             @click.stop="handleMapIntroClick"
-            :disabled="!firstSelectedCellPath"
+            :disabled="!introCellPath"
             :style="{
-              opacity: firstSelectedCellPath ? 1 : 0.35,
-              cursor: firstSelectedCellPath ? 'pointer' : 'default',
+              opacity: introCellPath ? 1 : 0.35,
+              cursor: introCellPath ? 'pointer' : 'default',
             }"
             style="
               font-size: 13.5px;
@@ -982,6 +982,9 @@
               {{ episodeInfo.runtime }} mins
             </span>
           </div>
+          <div v-if="selectedEpisodeBelongs" style="font-style: italic">
+            {{ selectedEpisodeBelongs }}
+          </div>
           <div v-if="episodeInfo.overview">
             {{ episodeInfo.overview }}
           </div>
@@ -1242,6 +1245,18 @@ export default {
       return this.formatEpisodeAired(aired);
     },
 
+    // Where a selected season 0 episode belongs among the regular episodes,
+    // from tv-srvr's computed placements, and where that came from.
+    selectedEpisodeBelongs() {
+      const sel = this.selectedEpisode;
+      if (!sel || sel.s !== 0) return "";
+      const place = this.tvdbData?.placements?.[sel.e];
+      if (!place) return "";
+      return place.belongs
+        ? `Belongs ${place.belongs} (${place.source})`
+        : `Has no place among the episodes (${place.source})`;
+    },
+
     hdr2Parts() {
       const parts = [];
 
@@ -1393,6 +1408,13 @@ export default {
       const firstKey = Array.from(this.selectedCells)[0];
       const { season, episode } = this.parseCellKey(firstKey);
       return this.seriesMap?.[season]?.[episode]?.path || null;
+    },
+    // The file intro marking would open for the selection: never a season 0
+    // episode, whose opening may not match the show's intro.
+    introCellPath() {
+      if (this.selectedCells.size === 0) return null;
+      const { season } = this.parseCellKey(Array.from(this.selectedCells)[0]);
+      return season === 0 ? null : this.firstSelectedCellPath;
     },
     hasSelectedCell() {
       return this.selectedCells.size > 0;
@@ -2269,6 +2291,8 @@ export default {
       if (this.selectedCells.size === 0) return;
       const firstKey = Array.from(this.selectedCells)[0];
       const { season, episode } = this.parseCellKey(firstKey);
+      // Season 0 takes no part in intro marking.
+      if (season === 0) return;
       const cell = this.seriesMap?.[season]?.[episode];
       const path = cell?.path || null;
       if (!path) return;
@@ -2355,6 +2379,8 @@ export default {
             if (s === currentSeason && e === currentEpisode) found = true;
             continue;
           }
+          // Season 0 takes no part in intro marking.
+          if (s === 0) continue;
           const ep = this.seriesMap?.[s]?.[e];
           const needsIntro = !!ep && !ep.played;
           if (needsIntro && ep?.path && !ep?.noFile) {
@@ -2377,6 +2403,8 @@ export default {
             if (s === currentSeason && e === currentEpisode) found = true;
             continue;
           }
+          // Season 0 takes no part in intro marking.
+          if (s === 0) continue;
           const ep = this.seriesMap?.[s]?.[e];
           if (ep?.path && !ep?.noFile) {
             this.selectedSeasons = new Set();

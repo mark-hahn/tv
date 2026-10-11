@@ -1,6 +1,5 @@
 import * as tvdb from "./tvdb.js";
 import * as srvr from "./srvr.js";
-import { episodeDataToWatchedEpis } from "@tv/share";
 import { logHere } from "./log.js";
 import { unilog } from "./log.js";
 
@@ -43,45 +42,24 @@ export async function loadAllShows() {
 // Server will send updated tvdb data via WebSocket RPC
 
 export const getSeriesMap = async (show, prune = false) => {
-
-  // A show outside the library (or a preview) comes straight from TVDB.
-  if (show.inLibrary === false) {
-    const tvdbId = show.tvdbId;
-    if (!tvdbId) {
-      unilog(2568, `getSeriesMap: Preview show ${show.name} has no tvdbId`);
-      return [];
-    }
-    try {
-      const allTvdbData = await tvdb.getAllTvdb(0);
-      // Get watchedEpis if it exists, otherwise pass undefined (not null)
-      // Passing null means "unknown/cleared", passing undefined means "use default"
-      // This preserves watchedCount when watchedEpis array is not available
-      const tvdbRecord = allTvdbData?.[show.name];
-      const watchedEpis = episodeDataToWatchedEpis(tvdbRecord?.episodeData);
-      const result = await srvr.getSeriesMapFromTvdb({ tvdbId, watchedEpis });
-      if (result.success && result.seriesMap) {
-        return result.seriesMap;
-      }
-      unilog(2569, `getSeriesMap: Failed to fetch ${show.name} from TVDB: ${result.error}`);
-      return [];
-    } catch (err) {
-      unilog(2570, `getSeriesMap: Error fetching ${show.name} from TVDB: ${err.message || err}`);
-      return [];
-    }
-  }
-
-  // Library shows come from tv-srvr, which refreshes episodeData from its
-  // sources and builds the map from it, TVDB's episodes included.
-  const res = await srvr.getSeriesMap({ showName: show.name });
+  // Every show's map comes from tv-srvr, built from its own episodes -- a
+  // library show's files refreshed first -- or, for a preview with no record
+  // yet, from TVDB.
+  const res = await srvr.getSeriesMap({
+    showName: show.name,
+    tvdbId: show.tvdbId,
+  });
   if (!res?.success || !Array.isArray(res.seriesMap))
     throw new Error(`getSeriesMap failed for ${show.name}: ${res?.error}`);
   const seriesMap = res.seriesMap;
 
   if (prune) {
     // Watched files go, in order, up to the first unwatched episode that
-    // has a file.
+    // has a file. Season 0 is passed over: a special neither stops the prune
+    // nor goes with it.
     const pathsToDeleteBatch = [];
-    stop: for (const [, episodes] of seriesMap) {
+    stop: for (const [seasonNum, episodes] of seriesMap) {
+      if (seasonNum === 0) continue;
       for (const [, cell] of episodes) {
         if (!cell.played && cell.avail) break stop;
         if (cell.path) pathsToDeleteBatch.push(cell.path);

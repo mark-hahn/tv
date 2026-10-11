@@ -2,7 +2,8 @@
 // stray episodes, all read off the record's episodeData and the disk.
 import fs from "fs";
 import * as epd from "@tv/share";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
+import { storySeasons } from "./storyOrder.js";
 
 const toYyyyMmDd = (d) => {
   const year = d.getFullYear();
@@ -86,6 +87,12 @@ const folderOfRecord = (showName, rec) =>
     .split("/")
     .pop();
 
+// An episode TVDB lists with no air date yet, and no file or watched mark, is
+// passed over as if it were not there: it has not aired, and nothing about it
+// can be a gap.
+const isPending = (ed, s, e) =>
+  !epd.getAired(ed, s, e) && !epd.hasFile(ed, s, e) && !epd.isWatched(ed, s, e);
+
 const getShowState = (showName, showMeta) => {
   // active rows have watched with no watched at end
   // or last epi in last row watched
@@ -152,7 +159,18 @@ const getShowState = (showName, showMeta) => {
 
   try {
     const ed = showMeta?.episodeData;
-    const seasons = epd.seasonsPresent(ed);
+    // The episodes in story order, cut into seasons: each placed special in
+    // the season it belongs to, those with no place in a season 0 at the end
+    // (storyOrder.js). Pending episodes are passed over, and a season made
+    // only of them is as good as not there.
+    const seasons = storySeasons(ed)
+      .map((storySeason) => ({
+        ...storySeason,
+        episodes: storySeason.episodes.filter(
+          (x) => !isPending(ed, x.season, x.episode),
+        ),
+      }))
+      .filter((storySeason) => storySeason.episodes.length > 0);
 
     // If show has no seasons/episodes, it's not ready to watch
     if (seasons.length === 0) {
@@ -183,20 +201,27 @@ const getShowState = (showName, showMeta) => {
     // Once we hit an unaired episode, treat all later episodes as unaired.
     let unairedFromHere = false;
 
-    for (const seasonNumber of seasons) {
-      const season = ed[seasonNumber];
+    for (const storySeason of seasons) {
       let watchedSeason = false;
 
+      // Where a run or a season starts, by the episode's own season and
+      // number, which for a placed special is season 0.
       let fileEndCount = 0;
+      let fileEndStartSeason = null;
       let fileEndStartEpisode = null;
+      let firstEpisodeSeason = null;
       let firstEpisodeOfSeason = null;
       let seasonNotWatchedNoFiles = true;
       let allSeasonWatched = true;
 
-      for (let i = 0; i < season.length; i++) {
-        if (!Array.isArray(season[i])) continue;
-        const episodeNumber = i + 1;
-        if (firstEpisodeOfSeason === null) firstEpisodeOfSeason = episodeNumber;
+      for (const {
+        season: seasonNumber,
+        episode: episodeNumber,
+      } of storySeason.episodes) {
+        if (firstEpisodeOfSeason === null) {
+          firstEpisodeSeason = seasonNumber;
+          firstEpisodeOfSeason = episodeNumber;
+        }
         sawAnyEpisode = true;
         const watched = epd.isWatched(ed, seasonNumber, episodeNumber);
         // File on disk is authoritative; it also overrides "unaired".
@@ -307,10 +332,14 @@ const getShowState = (showName, showMeta) => {
         }
 
         if (!haveFile && !watched && !unaired) {
-          if (fileEndCount === 0) fileEndStartEpisode = episodeNumber;
+          if (fileEndCount === 0) {
+            fileEndStartSeason = seasonNumber;
+            fileEndStartEpisode = episodeNumber;
+          }
           fileEndCount++;
         } else {
           fileEndCount = 0;
+          fileEndStartSeason = null;
           fileEndStartEpisode = null;
         }
 
@@ -352,23 +381,20 @@ const getShowState = (showName, showMeta) => {
         lastWatched = watched;
       }
       if (!seasonNotWatchedNoFiles && fileEndCount > 2)
-        hit("fileEndError", seasonNumber, fileEndStartEpisode);
+        hit("fileEndError", fileEndStartSeason, fileEndStartEpisode);
       if (!seasonNotWatchedNoFiles && fileEndCount > 2) {
-        unilog(
-          2511,
-          `fileEndError set for ${showName} S${seasonNumber}: fileEndCount=${fileEndCount} fileCount=${fileCount}`,
-        );
+        unilog(2842, `fileEndError set for ${showName} S${storySeason.season}: fileEndCount=${fileEndCount} fileCount=${fileCount}`);
         fileEndError = true;
         if (fileEndErrorSeason === null) {
-          fileEndErrorSeason = seasonNumber;
+          fileEndErrorSeason = fileEndStartSeason;
           fileEndErrorEpisode = fileEndStartEpisode;
         }
       }
       if (lastSeasonWatched && !allSeasonWatched && seasonNotWatchedNoFiles)
-        hit("seasonWatchedThenNofile", seasonNumber, firstEpisodeOfSeason);
+        hit("seasonWatchedThenNofile", firstEpisodeSeason, firstEpisodeOfSeason);
       if (lastSeasonWatched && !allSeasonWatched && seasonNotWatchedNoFiles) {
         if (seasonWatchedThenNofileSeason === null) {
-          seasonWatchedThenNofileSeason = seasonNumber;
+          seasonWatchedThenNofileSeason = firstEpisodeSeason;
           seasonWatchedThenNofileEpisode = firstEpisodeOfSeason;
         }
         seasonWatchedThenNofile = true;
@@ -443,7 +469,7 @@ const getShowState = (showName, showMeta) => {
       !anyWatched && firstEpisodeFileUnwatched && onlyFirstEpisodeHasFile;
 
     const allEpisodesUnaired = sawAnyEpisode && anyUnaired && !anyAiredEpisode;
-    const showStatus = String(showMeta?.tvdbStatus || "").trim();
+    const showStatus = String(showMeta?.status || "").trim();
     const firstAired = String(showMeta?.firstAired || "").trim();
     const startDateInFuture = !!firstAired && firstAired > today;
     const skipMissingFileGap =
@@ -545,102 +571,6 @@ const getShowState = (showName, showMeta) => {
   };
 };
 
-/**
- * Check gaps for a single show
- * @param {string} showId - the show's id
- * @param {string} showName - Show name
- * @param {Object} tvdbRecord - tvdb record for the show
- * @returns {Promise<Object|null>} - Gap data for the show
- */
-export const gapCheckOne = async (showId, showName, tvdbRecord) => {
-  if (!showId || !tvdbRecord) return null;
-
-  const showState = getShowState(showName, tvdbRecord);
-
-  if (!showState) {
-    unilog(2509, `getShowState returned null for ${showName}`);
-    return null;
-  }
-
-  const {
-    notReady,
-    anyWatched,
-    fileEndError,
-    fileEndErrorSeason,
-    fileEndErrorEpisode,
-    watchGap,
-    watchGapSeason,
-    watchGapEpisode,
-    fileGap,
-    fileGapSeason,
-    fileGapEpisode,
-    resDrop,
-    resDropSeason,
-    resDropEpisode,
-    stray,
-    strayCount,
-    strayFiles,
-    straySeason,
-    strayEpisode,
-    ignoreGaps,
-    gapSig,
-    ignoreStrays,
-    strayOk,
-    seasonWatchedThenNofile,
-    seasonWatchedThenNofileSeason,
-    seasonWatchedThenNofileEpisode,
-    allAiredHaveFile,
-    allAiredWatched,
-    allWatchedOrHaveFile,
-  } = showState;
-
-  return {
-    notReady,
-    anyWatched,
-    watchGap,
-    watchGapSeason,
-    watchGapEpisode,
-    fileGap,
-    fileGapSeason,
-    fileGapEpisode,
-    resDrop,
-    resDropSeason,
-    resDropEpisode,
-    stray,
-    strayCount,
-    strayFiles,
-    straySeason,
-    strayEpisode,
-    ignoreGaps,
-    gapSig,
-    ignoreStrays,
-    strayOk,
-    fileEndError,
-    fileEndErrorSeason,
-    fileEndErrorEpisode,
-    seasonWatchedThenNofile,
-    seasonWatchedThenNofileSeason,
-    seasonWatchedThenNofileEpisode,
-    allAiredHaveFile,
-    allAiredWatched,
-    allWatchedOrHaveFile,
-  };
-};
-
-/**
- * Check gaps for multiple shows
- * @param {Array<{showId: string, showName: string, tvdbRecord: Object}>} shows - Array of shows to check
- * @returns {Promise<Object>} - Gap data keyed by show Id
- */
-export const gapCheckBatch = async (shows) => {
-  const gapData = {};
-
-  for (const { showId, showName, tvdbRecord } of shows) {
-    const data = await gapCheckOne(showId, showName, tvdbRecord);
-    if (data) {
-      gapData[showId] = data;
-    }
-  }
-
-  return gapData;
-};
+// The gap check's whole result for one show, or null when it failed -- what
+// derived.js works the gap fields out from.
+export const gapStateOf = (showName, rec) => getShowState(showName, rec);

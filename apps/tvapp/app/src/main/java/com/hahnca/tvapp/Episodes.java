@@ -10,8 +10,8 @@ import java.util.concurrent.Executors;
 import org.json.JSONObject;
 
 /**
- * One episode's still, description and aired date, which the show record does
- * not carry -- its episodeData holds only what the map cells are drawn from.
+ * One episode's still, description and aired date. The show record's
+ * episodeData carries no still or description.
  *
  * The same tv-srvr call the web client's map pane makes when an episode cell is
  * clicked, so the episode card here shows what that pane shows. Answers are

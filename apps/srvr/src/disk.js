@@ -147,7 +147,7 @@ function probeRawHeight(filePath) {
   return h;
 }
 
-// A probed height is already persisted in the record's episodeData (res slot)
+// A probed height is already persisted in the record's episodeData (res field)
 // next to the file it came from, so reuse it instead of running ffprobe again.
 // probedRawHeightByPath is empty after a restart; without this, every file whose
 // name carries no <N>p tag gets re-probed, and execFileSync stalls the server.
@@ -155,10 +155,6 @@ const savedRes = (ed, season, episode, fname) =>
   ed && epd.getFileName(ed, season, episode) === fname
     ? epd.getRes(ed, season, episode)
     : null;
-
-function toEpisodeKey(season, episode) {
-  return `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
-}
 
 let diskShowsCache = null;
 
@@ -204,10 +200,6 @@ export const getShowsFromDisk = async (_params) => {
   const shows = {};
 
   let maxDate, totalSize;
-  let episodesBySeason;
-  let fileQuality;
-  let showFolderName;
-  let showEpisodeData;
 
   const recurs = async (path) => {
     if (errFlg || path == tvDir + "/.stfolder") return;
@@ -225,30 +217,6 @@ export const getShowsFromDisk = async (_params) => {
       if (videoFileExtensions.includes(sfx)) {
         const date = fmtDateWithTZ(fstat.mtime);
         maxDate = Math.max(maxDate, date);
-        const fname = path.split("/").pop();
-        const folderName = path.split("/").slice(-2, -1)[0];
-        const parsed = parseFileSeasonEpisode(fname, folderName);
-        if (
-          parsed &&
-          Number.isInteger(parsed.season) &&
-          Number.isInteger(parsed.episode)
-        ) {
-          if (!episodesBySeason.has(parsed.season))
-            episodesBySeason.set(parsed.season, new Set());
-          episodesBySeason.get(parsed.season).add(parsed.episode);
-          const ptt = parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""));
-          const title = parseTitleFromFilename(fname, folderName, ptt);
-          const titleMatch =
-            !title || !!smartTitleMatch(title, [showFolderName], null, true);
-          const quality =
-            savedRes(showEpisodeData, parsed.season, parsed.episode, fname) ??
-            getResolution(path, { probeFileFn: probeRawHeight });
-          if (titleMatch && quality != null) {
-            const epKey = toEpisodeKey(parsed.season, parsed.episode);
-            const existing = fileQuality[epKey];
-            if (!existing || quality > existing) fileQuality[epKey] = quality;
-          }
-        }
       }
       totalSize += fstat.size;
     } catch (err) {
@@ -256,7 +224,6 @@ export const getShowsFromDisk = async (_params) => {
     }
   };
 
-  const folderIndex = folderToRecord();
   const dir = await fsp.readdir(tvDir);
   for (const dirent of dir) {
     if (isHiddenName(dirent)) continue;
@@ -264,21 +231,10 @@ export const getShowsFromDisk = async (_params) => {
     const fstat = await fsp.stat(showPath);
     const maxDate = fmtDateWithTZ(fstat.mtime);
     totalSize = 0;
-    episodesBySeason = new Map();
-    fileQuality = {};
-    showFolderName = dirent;
-    showEpisodeData = folderIndex.get(dirent)?.rec?.episodeData ?? null;
 
     await recurs(showPath);
 
-    const filesOnDisk = Array.from(episodesBySeason.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([season, epSet]) => [
-        season,
-        ...Array.from(epSet).sort((a, b) => a - b),
-      ]);
-
-    shows[dirent] = [maxDate, totalSize, filesOnDisk, fileQuality];
+    shows[dirent] = [maxDate, totalSize];
   }
   if (errFlg) {
     throw new Error(`getShowsFromDisk: Error: ${errFlg.message}`);
@@ -291,7 +247,7 @@ export const getShowsFromDisk = async (_params) => {
 /**
  * Check disk for a single show folder
  * @param {string} showFolderName - The show folder name (e.g., "Breaking Bad")
- * @returns {Promise<[number, number, Array, Object, Object]|null>} - [maxDate, totalSize, filesOnDisk, fileQuality, diskByEp] or null if not found
+ * @returns {Promise<[number, number, Object]|null>} - [maxDate, totalSize, diskByEp] or null if not found
  *   diskByEp: { [season]: { [episode]: { file, res } } } — per-episode file name + resolution
  */
 export const getShowDiskInfo = async (showFolderName) => {
@@ -300,9 +256,6 @@ export const getShowDiskInfo = async (showFolderName) => {
   let maxDate = 0;
   let totalSize = 0;
   let errFlg = null;
-  // Track which episodes are on disk: { season -> Set<episode> }
-  const episodesBySeason = new Map();
-  const fileQuality = {};
   // Per-episode file name + resolution: { [season]: { [episode]: { file, res } } }
   const diskByEp = {};
   // Read before the caller overwrites it, so already-probed files keep their res.
@@ -336,9 +289,6 @@ export const getShowDiskInfo = async (showFolderName) => {
           Number.isInteger(parsed.season) &&
           Number.isInteger(parsed.episode)
         ) {
-          if (!episodesBySeason.has(parsed.season))
-            episodesBySeason.set(parsed.season, new Set());
-          episodesBySeason.get(parsed.season).add(parsed.episode);
           const ptt = parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""));
           const title = parseTitleFromFilename(fname, folderName, ptt);
           const titleMatch =
@@ -349,11 +299,6 @@ export const getShowDiskInfo = async (showFolderName) => {
               probeFileFn: probeRawHeight,
             });
           if (titleMatch) {
-            if (quality != null) {
-              const epKey = toEpisodeKey(parsed.season, parsed.episode);
-              const existing = fileQuality[epKey];
-              if (!existing || quality > existing) fileQuality[epKey] = quality;
-            }
             // Track per-episode file name; prefer the higher-resolution file.
             if (!diskByEp[parsed.season]) diskByEp[parsed.season] = {};
             const cur = diskByEp[parsed.season][parsed.episode];
@@ -383,15 +328,7 @@ export const getShowDiskInfo = async (showFolderName) => {
       return null;
     }
 
-    // Encode filesOnDisk in same format as watchedEpis: [[season, ep1, ep2, ...], ...]
-    const filesOnDisk = Array.from(episodesBySeason.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([season, epSet]) => [
-        season,
-        ...Array.from(epSet).sort((a, b) => a - b),
-      ]);
-
-    return [maxDate, totalSize, filesOnDisk, fileQuality, diskByEp];
+    return [maxDate, totalSize, diskByEp];
   } catch (err) {
     // Show folder doesn't exist or not accessible
     return null;
@@ -417,20 +354,28 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
   let tvdbOk = false;
   let diskOk = false;
 
-  // 1. TVDB aired dates — adds slots for every aired episode.
+  // 1. TVDB — an episode for every one it lists, dated or not and season 0
+  // included, with its air date, its TVDB id, its title, and for a special
+  // TVDB's placement of it among the regular episodes.
   let tvdbMap = null;
   if (sources.includes("tvdb") && rec.tvdbId) {
     try {
-      tvdbMap = await tvdb.getSeriesMap(rec.tvdbId, null);
+      tvdbMap = await tvdb.getSeriesMap(rec.tvdbId);
       for (const [seasonNum, episodes] of tvdbMap || []) {
         if (!Number.isInteger(seasonNum)) continue;
         for (const [epNum, epData] of episodes) {
           if (!Number.isInteger(epNum) || epNum < 1) continue;
-          // Vouch for every episode TVDB lists, even undated ones that get no
-          // slot written here — otherwise the prune would treat them as ghosts.
           seen.add(`${seasonNum}.${epNum}`);
-          if (epData?.aired)
-            epd.setEpisode(ed, seasonNum, epNum, { aired: epData.aired });
+          // An air date TVDB has dropped is left as it was.
+          const fields = {
+            tvdbId: epData?.tvdbId,
+            title: epData?.title,
+            airsBeforeSeason: epData?.airsBeforeSeason,
+            airsBeforeEpisode: epData?.airsBeforeEpisode,
+            airsAfterSeason: epData?.airsAfterSeason,
+          };
+          if (epData?.aired) fields.aired = epData.aired;
+          epd.setEpisode(ed, seasonNum, epNum, fields);
         }
       }
       tvdbOk =
@@ -447,7 +392,7 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
     try {
       const diskInfo = await getShowDiskInfo(folder);
       if (diskInfo) {
-        const [newDate, newSize, , , diskByEp] = diskInfo;
+        const [newDate, newSize, diskByEp] = diskInfo;
         rec.date = newDate;
         rec.size = newSize;
         rec.noFiles = false;
@@ -495,9 +440,9 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
     unilog(2515, `slow refreshEpisodeData ${showName}: disk=${diskMs}ms sources=${sources.join("+")}`);
   }
 
-  // Shows out of the library never keep files — drop id/file/res, keep
-  // aired/watched.
-  if (!rec.inLibrary) epd.stripToAiredWatched(ed);
+  // Shows out of the library never keep files: each episode loses its file,
+  // res and pos, and keeps everything else.
+  if (!rec.inLibrary) epd.stripFileFacts(ed);
 
   // Prune ghost episodes: slots left behind by an episode that has since
   // vanished from TVDB and the disk, which nothing else ever removed. Only
@@ -516,32 +461,8 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
     }
   }
 
-  // Derived record fields.
-  rec.quality = epd.computeQuality(ed) ?? null;
-  rec.watchedCount = epd.countWatched(ed);
-
-  // seasonPremiereDates: first time only, from TVDB map (month of episode 1).
-  if (!rec.seasonPremiereDates && Array.isArray(tvdbMap)) {
-    const spd = {};
-    for (const [seasonNum, episodes] of tvdbMap) {
-      const sorted = [...episodes].sort((a, b) => Number(a[0]) - Number(b[0]));
-      const first = sorted.find(([n]) => Number(n) === 1) || sorted[0];
-      if (first?.[1]?.aired) {
-        spd[String(seasonNum)] = first[1].aired.slice(0, 7).replace("-", "/");
-      }
-    }
-    if (Object.keys(spd).length > 0) rec.seasonPremiereDates = spd;
-  }
-
-  // waitStr recompute now that aired/watched/files are fresh.
-  const freshWaitStr = tvdb.calculateWaitStr(ed, rec.lastPlayedDate);
-  if (freshWaitStr !== null) rec.waitStr = freshWaitStr || null;
-
-  // episodeData supersedes these legacy per-episode props.
-  delete rec.watchedEpis;
-  delete rec.filesOnDisk;
-  delete rec.fileQuality;
-  delete rec.episodeAiredDates;
+  // The show's computed values follow its fresh episodes.
+  tvdb.refreshDerived(showName);
 
   return ed;
 }

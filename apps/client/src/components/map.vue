@@ -728,6 +728,15 @@
                               : seriesMap[season]?.[episode]?.noFile
                                 ? '#faa'
                                 : 'white',
+                      boxShadow:
+                        [
+                          storyMarks.bottom.has(cellKey(season, episode)) &&
+                            'inset 0 -3px 0 red',
+                          storyMarks.top.has(cellKey(season, episode)) &&
+                            'inset 0 3px 0 red',
+                        ]
+                          .filter(Boolean)
+                          .join(', ') || 'none',
                     }"
                   >
                     <span
@@ -1460,6 +1469,23 @@ export default {
       return place.belongs
         ? `Belongs ${place.belongs} (${place.source})`
         : `Has no place among the episodes (${place.source})`;
+    },
+    // The nearest regular cells on either side of each selected season 0
+    // episode in story order, from tv-srvr's placements: the one before gets
+    // a red line on its bottom, the one after on its top.
+    storyMarks() {
+      const bottom = new Set();
+      const top = new Set();
+      for (const key of this.selectedCells) {
+        const { season, episode } = this.parseCellKey(key);
+        if (season !== 0) continue;
+        const place = this.tvdbData?.placements?.[episode];
+        if (place?.prev)
+          bottom.add(this.cellKey(place.prev.season, place.prev.episode));
+        if (place?.next)
+          top.add(this.cellKey(place.next.season, place.next.episode));
+      }
+      return { bottom, top };
     },
 
     hdr2Parts() {

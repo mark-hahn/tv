@@ -114,6 +114,23 @@ function nextUpOf(ed, places) {
   };
 }
 
+// The placements as the clients get them (see deriveShow), each with the
+// nearest regular episodes on either side of it in story order.
+function placementsOut(ed, places) {
+  const order = storyOrder(ed, places);
+  const at = (x) => (x ? { season: x.season, episode: x.episode } : null);
+  return Object.fromEntries(
+    [...places].map(([episode, { belongs, source }]) => {
+      const i = order.findIndex(
+        (x) => x.season === 0 && x.episode === episode,
+      );
+      const prev = order.slice(0, i).findLast((x) => x.season > 0);
+      const next = order.slice(i + 1).find((x) => x.season > 0);
+      return [episode, { belongs, source, prev: at(prev), next: at(next) }];
+    }),
+  );
+}
+
 // firstAired/lastAired/nextAired, "YYYY/MM/DD" or empty, from the air dates of
 // every episode: the earliest, the latest that has aired, and the earliest
 // still to air.
@@ -298,16 +315,11 @@ export function deriveShow(name, rec, today) {
       : null,
     nextUp: nextUpOf(ed, places),
     // Each season 0 episode's place, for the web map's episode pane and
-    // tvapp's episode card: { <episode>: { belongs, source } }, null with no
-    // specials.
-    placements: places.size
-      ? Object.fromEntries(
-          [...places].map(([episode, { belongs, source }]) => [
-            episode,
-            { belongs, source },
-          ]),
-        )
-      : null,
+    // tvapp's episode card: { <episode>: { belongs, source, prev, next } },
+    // null with no specials. prev and next are the nearest regular episodes
+    // on either side of it in story order, as { season, episode }, null at
+    // either end; the web map marks them.
+    placements: places.size ? placementsOut(ed, places) : null,
   };
 
   if (!rec.inLibrary) return { values: { ...values, ...NO_GAPS } };

@@ -1,5 +1,17 @@
 
-show matching spot in table
+
+
+The Bear should automatically be on the pickups list and you say it isn't
+
+The season-gap rule is a check on flexget downloads only. It stops flexget from downloading a season further ahead than the seasons you already have, so episodes arrive in order. Nothing else uses it: tor pane sends, tv-down and the gap flags are separate.
+
+????????????????????????
+my phone ip is .172
+.opnXXXXX naming
+back up pause based on pause length
+=================
+
+in the web map pane, when a map cell for a season 0 counted episode is selected then put a red border line on the bottom of the story order cell before that episode and a red border line on the top of the cell after that 
 
 # extras table in map pane
 - i want the extras to be shown in a pane like many other subpanes in the app
@@ -12,16 +24,6 @@ show matching spot in table
   - the Extras button should toggle the extras pane open/closed
 - the episode pane should close when extras button is clicked
 - the extras pane should close when episode button is clicked
-
-The Bear should automatically be on the pickups list and you say it isn't
-
-The season-gap rule is a check on flexget downloads only. It stops flexget from downloading a season further ahead than the seasons you already have, so episodes arrive in order. Nothing else uses it: tor pane sends, tv-down and the gap flags are separate.
-
-????????????????????????
-my phone ip is .172
-.opnXXXXX naming
-back up pause based on pause length
-=================
 
 there are a lot of recent errors for show `Madam.Secretary`
 

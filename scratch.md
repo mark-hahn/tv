@@ -1,6 +1,5 @@
 
 
-
 The Bear should automatically be on the pickups list and you say it isn't
 
 The season-gap rule is a check on flexget downloads only. It stops flexget from downloading a season further ahead than the seasons you already have, so episodes arrive in order. Nothing else uses it: tor pane sends, tv-down and the gap flags are separate.

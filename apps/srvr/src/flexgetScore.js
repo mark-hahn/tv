@@ -1,8 +1,8 @@
 // Pure Flexget candidate scoring & comparison helpers: PST timestamp
 // formatting, bit-depth/resolution parsing, same-run and cross-run "is better"
-// comparators, and first-season-gap detection. No shared state.
+// comparators, and next-season detection. No shared state.
 
-import { getResolution, isHevc } from "@tv/share";
+import { getResolution, isHevc, episodeFields } from "@tv/share";
 import { isBadGroup } from "./badGroups.js";
 
 export function flexgetFmtSent() {
@@ -77,34 +77,18 @@ export function parseResolutionStrict(title, quality) {
   return 0; // unknown — do not fall back
 }
 
-// Season 0 takes no part: specials are not a season in the run, and a special
-// on disk ahead of a deleted season 1 made season 1 look like the first gap,
-// which then turned away every candidate for season 2 and later.
-export function getFirstFilesOnDiskSeasonGap(diskSeasons, torrentSeason) {
-  const seasons = [];
-
-  if (Array.isArray(diskSeasons)) {
-    seasons.push(...diskSeasons.filter((n) => Number.isInteger(n) && n >= 1));
+// The season after the latest one holding a file or a watched episode, or 1
+// when no season holds either.
+export function getFlexgetNextSeason(ed) {
+  if (!Array.isArray(ed)) return 1;
+  for (let s = ed.length - 1; s >= 0; s--) {
+    const season = ed[s];
+    if (!Array.isArray(season)) continue;
+    const used = season.some((ep) => {
+      const f = episodeFields(ep);
+      return !!f && ((typeof f.file === "string" && f.file) || f.watched);
+    });
+    if (used) return s + 1;
   }
-
-  if (Number.isInteger(torrentSeason) && torrentSeason >= 1) {
-    seasons.push(torrentSeason);
-  }
-
-  if (seasons.length === 0) return null;
-
-  seasons.sort((a, b) => a - b);
-
-  const dedupedSeasons = seasons.filter(
-    (seasonNum, index) => index === 0 || seasonNum !== seasons[index - 1],
-  );
-
-  let expectedSeason = dedupedSeasons[0];
-  for (let i = 0; i < dedupedSeasons.length; i += 1) {
-    const seasonNum = dedupedSeasons[i];
-    if (seasonNum > expectedSeason) return expectedSeason;
-    if (seasonNum === expectedSeason) expectedSeason += 1;
-  }
-
-  return null;
+  return 1;
 }

@@ -67,7 +67,6 @@ import {
   flexgetIsBetterSameRun,
   flexgetIsBetterCrossRun,
   parseResolutionStrict,
-  getFirstFilesOnDiskSeasonGap,
 } from "./src/flexgetScore.js";
 import {
   wss,

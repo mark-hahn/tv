@@ -8,7 +8,7 @@ import * as path from "node:path";
 import * as cp from "child_process";
 import { promisify } from "util";
 import fetch from "node-fetch";
-import { unilog, smartTitleMatch } from "@tv/share";
+import { unilog, smartTitleMatch, logHere } from "@tv/share";
 import * as epd from "@tv/share";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { SRVR_ROOT_DIR, SRVR_DATA_DIR } from "./srvrPaths.js";
@@ -17,7 +17,7 @@ import * as tvdb from "./tvdb.js";
 import {
   flexgetFmtSent,
   parseResolutionStrict,
-  getFirstFilesOnDiskSeasonGap,
+  getFlexgetNextSeason,
   flexgetIsBetterSameRun,
   flexgetIsBetterCrossRun,
 } from "./flexgetScore.js";
@@ -286,13 +286,11 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const list = flexgetHistory[histKey] || [];
 
   const isWatched = epd.isWatched(rec.episodeData, season, episode);
-  const firstSeasonGap = getFirstFilesOnDiskSeasonGap(
-    epd.seasonsWithFile(rec.episodeData),
-    season,
-  );
-  const isPastSeasonGap = firstSeasonGap !== null && season > firstSeasonGap;
+  // Next season is at least 1, so season 0 is never past it.
+  const nextSeason = getFlexgetNextSeason(rec.episodeData);
+  const isPastNextSeason = season > nextSeason;
 
-  if (isWatched || isPastSeasonGap) {
+  if (isWatched || isPastNextSeason) {
     await storeFlexgetRejectedCandidate(
       list,
       histKey,
@@ -305,11 +303,8 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         `Flexget: episode watched ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
       );
     }
-    if (isPastSeasonGap) {
-      unilog(
-        1179,
-        `Flexget: past season gap S${String(firstSeasonGap).padStart(2, "0")} ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-      );
+    if (isPastNextSeason) {
+      unilog(2870, `Flexget: past next season S${String(nextSeason).padStart(2, "0")} ${matchedName} ${sKey}${eKey} "${rawTitle}"`);
     }
     return;
   }

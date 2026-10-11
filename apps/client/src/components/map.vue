@@ -158,6 +158,24 @@
               Episode
             </button>
             <button
+              @click.stop="toggleExtrasPane"
+              :disabled="extrasRows.length === 0"
+              :style="{
+                '--btn-bg': extrasOpen ? 'lightgray' : 'whitesmoke',
+                opacity: extrasRows.length > 0 ? 1 : 0.35,
+                cursor: extrasRows.length > 0 ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Extras
+            </button>
+            <button
               v-if="mapShow?.inLibrary !== false"
               @click.stop="handleSelectedPlay"
               :disabled="!selectedPlayPath"
@@ -215,6 +233,24 @@
               "
             >
               Episode
+            </button>
+            <button
+              @click.stop="toggleExtrasPane"
+              :disabled="extrasRows.length === 0"
+              :style="{
+                '--btn-bg': extrasOpen ? 'lightgray' : 'whitesmoke',
+                opacity: extrasRows.length > 0 ? 1 : 0.35,
+                cursor: extrasRows.length > 0 ? 'pointer' : 'default',
+              }"
+              style="
+                font-size: 13.5px;
+                cursor: pointer;
+                margin: 4.5px 0 4.5px 4.5px;
+                max-height: 21.5px;
+                border-radius: 7px;
+              "
+            >
+              Extras
             </button>
             <button
               v-if="mapShow?.inLibrary !== false"
@@ -1012,31 +1048,21 @@
       </div>
     </div>
 
-    <!-- TVDB's season 0 entries that are not counted specials: featurettes,
-         podcasts, interviews and the like. For reading only -- nothing in the
-         table can be selected or acted on. Collapsed when a show opens. -->
+    <!-- The extras pane: TVDB's season 0 entries that are not counted
+         specials: featurettes, podcasts, interviews and the like. For reading
+         only -- nothing in the table can be selected or acted on. It takes the
+         episode pane's place; the Extras button toggles it, and it is closed
+         when a show opens. -->
     <div
-      v-if="!hideMapBottom && extrasRows.length > 0"
+      v-if="!hideMapBottom && extrasOpen && extrasRows.length > 0"
       style="
         border-top: 3px solid black;
         flex: 0 0 auto;
-        max-height: 40vh;
-        display: flex;
-        flex-direction: column;
+        height: min(320px, 45vh);
+        overflow-y: auto;
       "
     >
-      <div
-        @click="extrasOpen = !extrasOpen"
-        style="
-          padding: 4px 8px;
-          font-weight: bold;
-          cursor: pointer;
-          user-select: none;
-        "
-      >
-        {{ extrasOpen ? "▾" : "▸" }} TVDB extras ({{ extrasRows.length }})
-      </div>
-      <div v-if="extrasOpen" style="overflow-y: auto; min-height: 0">
+      <div>
         <table
           style="
             width: 100%;
@@ -2341,7 +2367,16 @@ export default {
       if (season == null || Number.isNaN(season) || !episode) return null;
       return { key: firstKey, season, episode };
     },
+    toggleExtrasPane() {
+      if (this.extrasOpen) {
+        this.extrasOpen = false;
+        return;
+      }
+      this.clearMapSelectionDetails();
+      this.extrasOpen = true;
+    },
     async toggleEpisodePane() {
+      this.extrasOpen = false;
       const target = this.getFirstSelectedCellTarget();
       if (!target) return;
 

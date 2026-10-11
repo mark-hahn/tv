@@ -1,4 +1,18 @@
 
+show matching spot in table
+
+# extras table in map pane
+- i want the extras to be shown in a pane like many other subpanes in the app
+- remove the `TVDB Extras (N)` button that expands the extras table.
+- add a button `Extras` to the right of the episode button.
+  - disable `Extras` button when no extras
+  - highlight button the same style as for the episode button when extras pane is open
+- the extras table should occupy the same space as the expisode pane in the map pane
+  - we can call that the extras pane
+  - the Extras button should toggle the extras pane open/closed
+- the episode pane should close when extras button is clicked
+- the extras pane should close when episode button is clicked
+
 The Bear should automatically be on the pickups list and you say it isn't
 
 The season-gap rule is a check on flexget downloads only. It stops flexget from downloading a season further ahead than the seasons you already have, so episodes arrive in order. Nothing else uses it: tor pane sends, tv-down and the gap flags are separate.

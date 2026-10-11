@@ -463,6 +463,9 @@ export default {
       pickerSel: { mo: "", da: "", hr: "", mi: "" },
       filterLevels: [],
       filterPids: [],
+      // The level/pid lists last put into the header filters, so loadLogs
+      // only rebuilds those columns when the lists actually change.
+      headerListsSig: "",
       pendingRows: [],
       flushTimer: null,
       selectedIds: new Set(),
@@ -1812,13 +1815,24 @@ export default {
         if (this.table) {
           // Header filters were built (in ensureTable) before the level/pid
           // lists arrived; refresh those two column defs so the list
-          // dropdowns pick up the now-populated values.
-          this.table.updateColumnDefinition("level", {
-            headerFilterParams: { values: this.filterLevels, clearable: true },
-          });
-          this.table.updateColumnDefinition("pid", {
-            headerFilterParams: { values: this.filterPids, clearable: true },
-          });
+          // dropdowns pick up the now-populated values. Only when the lists
+          // changed: each updateColumnDefinition replaces the column and
+          // rebuilds every displayed row several times, and with up to
+          // MAX_ROWS still loaded here the pair froze the pane for ~6s on
+          // every filter search.
+          const listsSig = JSON.stringify([this.filterLevels, this.filterPids]);
+          if (listsSig !== this.headerListsSig) {
+            this.headerListsSig = listsSig;
+            this.table.updateColumnDefinition("level", {
+              headerFilterParams: {
+                values: this.filterLevels,
+                clearable: true,
+              },
+            });
+            this.table.updateColumnDefinition("pid", {
+              headerFilterParams: { values: this.filterPids, clearable: true },
+            });
+          }
           this.applyGlobalSearchHeaderUi();
         }
         await this.applyEvents(events);

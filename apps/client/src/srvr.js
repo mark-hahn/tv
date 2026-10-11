@@ -114,14 +114,19 @@ const REPORTED_EVENT_NAMES = new Set([
 ]);
 let eventTimingObserver = null;
 if (window.PerformanceObserver?.supportedEntryTypes?.includes("event")) {
+  // One line per freeze, not per input: every input queued behind one block
+  // (a held key repeats ~30/s) arrives in the same callback, so report the
+  // worst one — its wait is the length of the freeze — plus how many piled up.
   eventTimingObserver = new PerformanceObserver((list) => {
-    for (const entry of list.getEntries()) {
-      if (!REPORTED_EVENT_NAMES.has(entry.name)) continue;
-      unilog(
-        1776,
-        `${entry.name} took ${Math.round(entry.duration)}ms to respond`,
-      );
-    }
+    const entries = list
+      .getEntries()
+      .filter((entry) => REPORTED_EVENT_NAMES.has(entry.name));
+    if (!entries.length) return;
+    const worst = entries.reduce((a, b) => (b.duration > a.duration ? b : a));
+    const names = [...new Set(entries.map((entry) => entry.name))].join(",");
+    const pileup =
+      entries.length > 1 ? ` (${entries.length} inputs: ${names})` : "";
+    unilog(2869, `${worst.name} took ${Math.round(worst.duration)}ms to respond${pileup}`);
   });
   eventTimingObserver.observe({
     type: "event",

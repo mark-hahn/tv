@@ -181,6 +181,21 @@
             >
               Hold
             </button>
+            <button
+              @click.stop="torForceClick"
+              :disabled="selectedItems.size === 0"
+              :class="{ 'btn-disabled': selectedItems.size === 0 }"
+              title="Send to qbt even if already downloaded or a higher quality is in qbt"
+              style="
+                font-size: 13px;
+                cursor: pointer;
+                border-radius: 7px;
+                padding: 4px 8px;
+                border: 1px solid #bbb;
+              "
+            >
+              Force
+            </button>
             <span
               v-if="loading"
               style="font-size: 13px; color: #666; align-self: center"
@@ -4116,6 +4131,26 @@ export default {
             const newBad = torBadGroup(newTitle);
             const newHevc = isHevc(newTitle);
             const newShow = showName(newTitle);
+            // qbt keeps a finished torrent after its usb files are deleted or
+            // pruned by tv-down; such a torrent no longer has the episode.
+            let usbNames = null;
+            const onUsb = async (qt) => {
+              if (!usbNames) {
+                const usbRes = await this.fetchWithTimeout(
+                  `${config.torrentsApiUrl}/api/usb/files`,
+                  {},
+                  15000,
+                );
+                if (!usbRes?.ok)
+                  throw new Error(`usb files HTTP ${usbRes?.status}`);
+                const usbTree = await usbRes.json();
+                usbNames = new Set(usbTree.map((n) => n.name));
+              }
+              const relPath = String(qt?.content_path || "")
+                .slice(String(qt?.save_path || "").length)
+                .replace(/^\/+/, "");
+              return usbNames.has(relPath.split("/")[0]);
+            };
             try {
               const qbtInfoUrl = new URL(
                 `${config.torrentsApiUrl}/api/qbt/info`,
@@ -4154,6 +4189,8 @@ export default {
                         !qBad &&
                         newBad);
                     if (qIsHigherQuality) {
+                      if (Number(qt?.progress) >= 1 && !(await onUsb(qt)))
+                        continue;
                       const showName =
                         this.currentShow?.name || newShow || "unknown show";
                       unilog(

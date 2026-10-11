@@ -19,6 +19,7 @@ import {
 import * as epd from "@tv/share";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import * as tvdb from "./tvdb.js";
+import * as season0 from "./season0.js";
 import { showFolderFor, folderToRecord } from "./showPaths.js";
 import * as util from "./util.js";
 import { videoFileExtensions } from "./videoFiles.js";
@@ -338,7 +339,8 @@ export const getShowDiskInfo = async (showFolderName) => {
 // Single authoritative refresh of rec.episodeData from its two sources:
 // TVDB (aired) and the disk scan (file name + resolution). The watched marks
 // and resume points are the record's own, written by setEpisodeWatched and
-// playProgress. `opts.sources` limits which sources run.
+// playProgress. `opts.sources` limits which sources run. Season 0 is sorted
+// last into counted specials and extras (season0.js).
 export async function refreshEpisodeData(showName, rec, opts = {}) {
   const sources = opts.sources || ["tvdb", "disk"];
   if (!Array.isArray(rec.episodeData)) rec.episodeData = [];
@@ -354,10 +356,12 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
   let tvdbOk = false;
   let diskOk = false;
 
-  // 1. TVDB — an episode for every one it lists, dated or not and season 0
-  // included, with its air date, its TVDB id, its title, and for a special
-  // TVDB's placement of it among the regular episodes.
+  // 1. TVDB — an episode for every one it lists, dated or not, with its air
+  // date, its TVDB id and its title. Season 0 is collected here and sorted at
+  // the end, with each entry's runtime, its TVDB placement among the regular
+  // episodes, and when TVDB last changed it.
   let tvdbMap = null;
+  const freshSeason0 = new Map();
   if (sources.includes("tvdb") && rec.tvdbId) {
     try {
       tvdbMap = await tvdb.getSeriesMap(rec.tvdbId);
@@ -375,6 +379,14 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
             airsAfterSeason: epData?.airsAfterSeason,
           };
           if (epData?.aired) fields.aired = epData.aired;
+          if (seasonNum === 0) {
+            freshSeason0.set(epNum, {
+              ...fields,
+              runtime: epData?.runtime,
+              lastUpdated: epData?.lastUpdated,
+            });
+            continue;
+          }
           epd.setEpisode(ed, seasonNum, epNum, fields);
         }
       }
@@ -384,6 +396,11 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
       unilog(30, `tvdb ${showName}: ${e.message}`);
     }
   }
+
+  // Each fresh season 0 entry's TVDB tags, read for the entries TVDB has
+  // changed since they were last read. Before the disk scan, so the sort below
+  // runs with no wait between the scan and it.
+  if (freshSeason0.size > 0) await season0.readTags(showName, rec, freshSeason0);
 
   // 2. Disk scan — authoritative file name + resolution, plus date/size/noFiles.
   let diskMs = 0;
@@ -443,6 +460,11 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
   // Shows out of the library never keep files: each episode loses its file,
   // res and pos, and keeps everything else.
   if (!rec.inLibrary) epd.stripFileFacts(ed);
+
+  // Season 0 sorted by the counting rule: counted specials stay in the
+  // episodes, the rest go to the show's extras. Nothing awaits between here
+  // and the disk scan's writes, so no one ever sees the show half sorted.
+  season0.sortSeason0(rec, freshSeason0, tvdbOk);
 
   // Prune ghost episodes: slots left behind by an episode that has since
   // vanished from TVDB and the disk, which nothing else ever removed. Only

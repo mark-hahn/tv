@@ -78,6 +78,44 @@ export const saveAllShows = db.transaction((allTvdb) => {
   }
 });
 
+// The season 0 extras of each show -- the entries TVDB lists in season 0 that
+// are not specials counted as episodes (season0.js) -- kept apart from the show
+// records so that nothing counting episodes, and no client loading the show
+// list, ever sees them. Keyed by the show's TVDB id, which a rename leaves
+// alone. Loaded whole at start and written through on every change.
+db.exec(
+  `CREATE TABLE IF NOT EXISTS extras (tvdbId TEXT PRIMARY KEY, json TEXT NOT NULL)`,
+);
+const upsertExtrasStmt = db.prepare(`
+  INSERT INTO extras (tvdbId, json) VALUES (?, ?)
+  ON CONFLICT(tvdbId) DO UPDATE SET json = excluded.json
+`);
+const deleteExtrasStmt = db.prepare(`DELETE FROM extras WHERE tvdbId = ?`);
+const extrasJson = new Map();
+for (const row of db.prepare(`SELECT tvdbId, json FROM extras`).iterate()) {
+  extrasJson.set(row.tvdbId, row.json);
+}
+
+// A show's extras, [] when it has none.
+export const getExtras = (tvdbId) => {
+  const json = extrasJson.get(String(tvdbId));
+  return json ? JSON.parse(json) : [];
+};
+
+export const setExtras = (tvdbId, extras) => {
+  const key = String(tvdbId);
+  if (extras.length === 0) {
+    if (!extrasJson.has(key)) return;
+    deleteExtrasStmt.run(key);
+    extrasJson.delete(key);
+    return;
+  }
+  const json = JSON.stringify(extras);
+  if (extrasJson.get(key) === json) return;
+  upsertExtrasStmt.run(key, json);
+  extrasJson.set(key, json);
+};
+
 export const backupDb = () => {
   fs.rmSync(TVDB_DB_BAK_PATH, { force: true });
   db.exec(`VACUUM INTO '${TVDB_DB_BAK_PATH.replace(/'/g, "''")}'`);

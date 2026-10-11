@@ -1,11 +1,36 @@
 
-
+right-justify epi and mins cells
 
 ????????????????????????
 my phone ip is .172
 .opnXXXXX naming
 back up pause based on pause length
 =================
+
+# extras table changes
+- all extras table font and dividers should be black, not gray
+
+- episode column header should be `Epi`
+- episode column cell should just be episode integer since it always starts with `S00E`
+
+- runtime column header should be `Mins`
+- runtime column cell should just be integer of runtime minutes
+
+- increase font size in extras table by 20%
+- crop category cell to 20 chars with elipsis
+
+implement epi-0.md. the extras list should be in table form in the map pane at the bottom
+
+# update epi-0.md
+- The counting rule should be the recommended one With tags.
+- there should be a new backfill for episode marking
+  - nothing should be lazy updated
+  - after backfilled, episodes should not keep counting as they do now
+- make no changes other than updating epi-0.md
+- if this has a problem, is inconsistent, or you have a different idea then let me know
+
+changing the status of episodes based on show ended is a band-aid -- remove that logic. i think undoing all changes since commit would do this so just going back to the last commit should fix it.
+i want season 0 episodes treated properly -- does your new recommendation affect the unaired `children's hospital` problem? 
 
 tvapp reloads the whole list after every change,
 

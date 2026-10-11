@@ -609,6 +609,9 @@ export default {
       seriesMapSeasons: [],
       seriesMapEpis: [],
       seriesMap: {},
+      // TVDB's season 0 entries that are not counted specials, which the map
+      // pane lists at its bottom; only tv-srvr's map answer carries them.
+      seriesExtras: [],
       watchingName: "---",
       lastWatchingName: null,
       currentPlayingSeason: null,
@@ -2368,6 +2371,7 @@ export default {
           seriesMapSeasons: this.seriesMapSeasons,
           seriesMapEpis: this.seriesMapEpis,
           seriesMap: this.seriesMap,
+          extras: this.seriesExtras,
           mapError: "",
           noSwitch: true,
         });
@@ -2484,6 +2488,7 @@ export default {
           seriesMapSeasons: this.seriesMapSeasons,
           seriesMapEpis: this.seriesMapEpis,
           seriesMap: this.seriesMap,
+          extras: this.seriesExtras,
           mapError: "",
           noSwitch: true,
         });
@@ -2552,6 +2557,7 @@ export default {
         seriesMapSeasons: this.seriesMapSeasons,
         seriesMapEpis: this.seriesMapEpis,
         seriesMap: this.seriesMap,
+        extras: this.seriesExtras,
         mapError: "",
         noSwitch: true,
       });
@@ -2604,6 +2610,7 @@ export default {
       // the legacy wire shape: [[season, [[ep, {error, played, avail, noFile,
       // unaired, path, quality}]], ...], ...].
       let seriesMapIn = [];
+      let extras = [];
       try {
         // One request for every show: tv-srvr builds the map from the show's
         // own episodes, or for a preview with no record yet from TVDB.
@@ -2614,6 +2621,8 @@ export default {
         });
         if (resp?.success && Array.isArray(resp.seriesMap)) {
           seriesMapIn = resp.seriesMap;
+          // A preview of a show with no record yet has none.
+          extras = resp.extras ?? [];
           // Sync fresh episodeData into the in-memory cache so the Position
           // filter reflects changes made outside the web client.
           if (resp.episodeData) {
@@ -2652,6 +2661,7 @@ export default {
       this.seriesMapSeasons = seriesMapSeasons.filter((x) => x !== null);
       this.seriesMapEpis = seriesMapEpis.filter((x) => x !== null);
       this.seriesMap = seriesMap;
+      this.seriesExtras = extras;
 
       this.hideMapBottom = false;
 
@@ -2688,6 +2698,7 @@ export default {
         seriesMapSeasons: this.seriesMapSeasons,
         seriesMapEpis: this.seriesMapEpis,
         seriesMap: this.seriesMap,
+        extras: this.seriesExtras,
         mapError: errorMessage,
         noSwitch: isRefresh || !!options.noSwitch,
       });

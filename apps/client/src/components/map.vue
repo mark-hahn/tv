@@ -992,6 +992,91 @@
       </div>
     </div>
 
+    <!-- TVDB's season 0 entries that are not counted specials: featurettes,
+         podcasts, interviews and the like. For reading only -- nothing in the
+         table can be selected or acted on. Collapsed when a show opens. -->
+    <div
+      v-if="!hideMapBottom && extrasRows.length > 0"
+      style="
+        border-top: 3px solid black;
+        flex: 0 0 auto;
+        max-height: 40vh;
+        display: flex;
+        flex-direction: column;
+      "
+    >
+      <div
+        @click="extrasOpen = !extrasOpen"
+        style="
+          padding: 4px 8px;
+          font-weight: bold;
+          cursor: pointer;
+          user-select: none;
+        "
+      >
+        {{ extrasOpen ? "▾" : "▸" }} TVDB extras ({{ extrasRows.length }})
+      </div>
+      <div v-if="extrasOpen" style="overflow-y: auto; min-height: 0">
+        <table
+          style="
+            width: 100%;
+            font-size: 16.8px;
+            border-collapse: collapse;
+            color: black;
+            user-select: none;
+          "
+        >
+          <thead>
+            <tr>
+              <th
+                v-for="heading in [
+                  'Epi',
+                  'Aired',
+                  'Title',
+                  'Category',
+                  'Mins',
+                  'Belongs',
+                ]"
+                :key="heading"
+                style="
+                  padding: 2px 6px;
+                  border: 1px solid black;
+                  text-align: left;
+                  background-color: white;
+                  position: sticky;
+                  top: 0;
+                "
+              >
+                {{ heading }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in extrasRows" :key="row.key">
+              <td style="padding: 2px 6px; border: 1px solid black; white-space: nowrap; text-align: right">
+                {{ row.episode }}
+              </td>
+              <td style="padding: 2px 6px; border: 1px solid black; white-space: nowrap">
+                {{ row.aired }}
+              </td>
+              <td style="padding: 2px 6px; border: 1px solid black">
+                {{ row.title }}
+              </td>
+              <td style="padding: 2px 6px; border: 1px solid black; white-space: nowrap">
+                {{ row.category }}
+              </td>
+              <td style="padding: 2px 6px; border: 1px solid black; white-space: nowrap; text-align: right">
+                {{ row.runtime }}
+              </td>
+              <td style="padding: 2px 6px; border: 1px solid black; white-space: nowrap">
+                {{ row.belongs }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Gapchk confirmation: the complete list of what the button would do.
          Two of the steps move files, so nothing runs until this is accepted. -->
     <div
@@ -1126,6 +1211,8 @@ import * as epd from "@tv/share";
 
 const MAP_ARROW_PAN_PX_PER_SEC = 400;
 const MAP_PAN_SMOOTH_TAU_SEC = 0.1;
+// The extras table crops a longer TVDB category to this many characters.
+const EXTRAS_CATEGORY_MAX = 20;
 
 export default {
   name: "Map",
@@ -1152,6 +1239,13 @@ export default {
       type: Object,
       default: () => ({}),
     },
+    // TVDB's season 0 entries that are not counted specials, for the extras
+    // table at the bottom: [{ episode, aired, title, category, runtime,
+    // belongs }].
+    seriesExtras: {
+      type: Array,
+      default: () => [],
+    },
     mapError: {
       type: String,
       default: "",
@@ -1170,6 +1264,7 @@ export default {
     return {
       seasonStates: {}, // Track original state for each season
       tvdbData: null,
+      extrasOpen: false,
 
       mapWorking: false,
       mapWorkingTitle: "",
@@ -1218,6 +1313,25 @@ export default {
   },
 
   computed: {
+    // The extras table's rows, as shown. Every extra is in season 0, so the
+    // episode is just its number.
+    extrasRows() {
+      return this.seriesExtras.map((extra) => {
+        const category = extra.category || "untagged";
+        return {
+          key: extra.episode,
+          episode: extra.episode,
+          aired: this.formatEpisodeAired(extra.aired) || "no date",
+          title: this.displayEpisodeTitle(extra.title),
+          category:
+            category.length > EXTRAS_CATEGORY_MAX
+              ? category.slice(0, EXTRAS_CATEGORY_MAX - 1) + "…"
+              : category,
+          runtime: extra.runtime || "",
+          belongs: extra.belongs || "",
+        };
+      });
+    },
     datesLine() {
       if (!this.tvdbData) return "";
       const { firstAired, lastAired, status } = this.tvdbData;
@@ -1468,6 +1582,7 @@ export default {
         this.selectedEpisode = null;
         this.episodeInfo = null;
         this.mapImageExpanded = false;
+        this.extrasOpen = false;
       }
       if (newShow && newShow.name) {
         this.seasonStates = {}; // Clear season states when show changes

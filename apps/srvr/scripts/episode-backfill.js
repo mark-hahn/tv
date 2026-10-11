@@ -1,14 +1,17 @@
 // Episode backfill driver: refreshes every show's episodes from TVDB through
 // tv-srvr, one show at a time, from outside tv-srvr -- so a deploy's restart of
-// tv-srvr only pauses it. A show whose request is cut off because tv-srvr is
-// down is asked for again once tv-srvr is back. tv-srvr does the writing, as
-// the single writer of tvdb.db.
+// tv-srvr only pauses it. Each refresh also reads the TVDB tags of the show's
+// season 0 entries and sorts them into counted specials and extras, which makes
+// this the marking backfill of epi-0.md too. A show whose request is cut off
+// because tv-srvr is down is asked for again once tv-srvr is back. tv-srvr
+// does the writing, as the single writer of tvdb.db.
 //
 //   cd /root/dev/apps/tv/apps/srvr
 //   nohup node scripts/episode-backfill.js [startIndex] > /tmp/episode-backfill.log 2>&1 &
 //
-// Shows go in name order. startIndex (default 0) starts part way through it,
-// at the index a progress line last reported.
+// Library shows go first, then the rest, each in name order. startIndex
+// (default 0) starts part way through that order, at the index a progress line
+// last reported.
 
 const SRVR_URL = "http://127.0.0.1:8739/api";
 // Between shows, to pace TVDB.
@@ -55,7 +58,11 @@ async function call(path, options) {
 async function main() {
   const start = Number(process.argv[2] ?? 0);
   const { body: allTvdb } = await call("getAllTvdb?hasLibrary=0");
-  const names = Object.keys(allTvdb).sort();
+  const names = Object.keys(allTvdb).sort(
+    (a, b) =>
+      (allTvdb[b].inLibrary === true) - (allTvdb[a].inLibrary === true) ||
+      a.localeCompare(b),
+  );
   log(`${names.length} shows, starting at ${start}`);
   let changed = 0;
   let failed = 0;

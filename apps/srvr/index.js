@@ -15,6 +15,7 @@ import * as tvdb from "./src/tvdb.js";
 import { setDeletedListener } from "./src/tvdbDb.js";
 import { nextUpAfter } from "./src/derived.js";
 import { storyOrder } from "./src/storyOrder.js";
+import * as season0 from "./src/season0.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
@@ -1468,6 +1469,7 @@ app.post(
           seriesMap,
           episodeData: rec.episodeData,
           storyOrder: storyOrderPairs(rec.episodeData),
+          extras: season0.extrasForDisplay(rec),
           stale: true,
         };
       }
@@ -1492,6 +1494,7 @@ app.post(
         seriesMap,
         episodeData: rec.episodeData,
         storyOrder: storyOrderPairs(rec.episodeData),
+        extras: season0.extrasForDisplay(rec),
       };
     } catch (err) {
       unilog(570, "error:", err);
@@ -1995,6 +1998,12 @@ async function runEpisodeBackfill(onlyNames = null) {
 // and so carries on across tv-srvr's restarts.
 app.post(
   "/api/backfillShowEpisodes",
+  (req, res, next) => {
+    // Slow by design and waited on by nobody: a show's first refresh reads
+    // the TVDB tags of every one of its season 0 entries.
+    res.locals.slowExempt = true;
+    next();
+  },
   apiWrapper(async (params) => {
     const name = params?.name;
     if (!tvdb.getAllTvdbSync()?.[name]?.tvdbId)
@@ -2406,6 +2415,9 @@ app.get("/api/introFirstFile", async (req, res) => {
     let fallbackSeason = null;
     let fallbackEpisode = null;
     for (const [season, episodes] of sorted) {
+      // Season 0 takes no part in intro marking: a special's opening may not
+      // match the show's intro.
+      if (season === 0) continue;
       const sortedEps = [...episodes].sort((a, b) => a[0] - b[0]);
       for (const [episode, ep] of sortedEps) {
         if (!fallbackPath && ep.path && !ep.noFile) {
@@ -2493,6 +2505,9 @@ app.get("/api/introNextFile", async (req, res) => {
     );
     let found = false;
     for (const [season, episodes] of sorted) {
+      // Season 0 takes no part in intro marking: a special's opening may not
+      // match the show's intro.
+      if (season === 0) continue;
       const sortedEps = [...episodes].sort((a, b) => a[0] - b[0]);
       for (const [episode, ep] of sortedEps) {
         if (!found) {

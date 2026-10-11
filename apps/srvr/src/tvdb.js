@@ -489,6 +489,10 @@ async function getSeriesMap(tvdbId) {
         airsBeforeSeason: epData.airsBeforeSeason ?? null,
         airsBeforeEpisode: epData.airsBeforeEpisode ?? null,
         airsAfterSeason: epData.airsAfterSeason ?? null,
+        runtime: epData.runtime ?? null,
+        // When TVDB last changed the episode, which tells a refresh whether
+        // the tags it read for a season 0 entry may have changed (season0.js).
+        lastUpdated: epData.lastUpdated ?? null,
       },
     ]);
   }

@@ -203,6 +203,7 @@
             :seriesMapSeasons="seriesMapSeasons"
             :seriesMapEpis="seriesMapEpis"
             :seriesMap="seriesMap"
+            :seriesExtras="seriesExtras"
             :mapError="mapError"
             :simpleMode="simpleMode"
             :sizing="activeSizing"
@@ -674,6 +675,7 @@ export default {
       seriesMapSeasons: [],
       seriesMapEpis: [],
       seriesMap: {},
+      seriesExtras: [],
       mapError: "",
       allShows: [],
       filteredShows: [],
@@ -1746,6 +1748,7 @@ export default {
           this.seriesMapSeasons = [];
           this.seriesMapEpis = [];
           this.seriesMap = {};
+          this.seriesExtras = [];
           this.mapError = "";
         }
         this.currentPane = "map";
@@ -1797,6 +1800,7 @@ export default {
       this.seriesMapSeasons = data.seriesMapSeasons;
       this.seriesMapEpis = data.seriesMapEpis;
       this.seriesMap = data.seriesMap;
+      this.seriesExtras = data.extras;
       this.mapError = data.mapError || "";
 
       // --- Guard: noSwitch means data update only, no pane change ---

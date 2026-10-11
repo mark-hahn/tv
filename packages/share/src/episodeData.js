@@ -15,6 +15,13 @@
 //     playCount   plays watched through to the end
 //     airsBeforeSeason, airsBeforeEpisode, airsAfterSeason
 //                 TVDB's placement of a season 0 special
+//     runtime     minutes, season 0 only
+//     category, critical
+//                 TVDB's Special Category tag and whether it calls the
+//                 special critical to the story, season 0 only
+//     tagged      TVDB's lastUpdated for the episode when its tags were read
+// Season 0 holds only the specials that count as episodes; TVDB's other
+// season 0 entries are tv-srvr's extras, kept elsewhere (season0.js).
 //
 // Season index is 0-based (episodeData[0] = season 0). Episode index is 1-based
 // (episodeData[s][0] = episode 1). Helpers take a 1-based `e`.
@@ -205,6 +212,10 @@ const RECORD_FIELDS = [
   "airsBeforeSeason",
   "airsBeforeEpisode",
   "airsAfterSeason",
+  "runtime",
+  "category",
+  "critical",
+  "tagged",
 ];
 
 // The fields worth storing, in RECORD_FIELDS order: anything empty, false or
@@ -229,11 +240,14 @@ function encodeRecord(fields) {
 function normalizeField(name, value) {
   switch (name) {
     case "watched":
+    case "critical":
       return !!value;
     case "aired":
     case "file":
     case "title":
     case "lastPlayed":
+    case "category":
+    case "tagged":
       return typeof value === "string" && value ? value : null;
     case "res":
     case "pos":
@@ -242,6 +256,7 @@ function normalizeField(name, value) {
     case "airsBeforeSeason":
     case "airsBeforeEpisode":
     case "airsAfterSeason":
+    case "runtime":
       return typeof value === "number" && value > 0 ? value : null;
     default:
       return value;

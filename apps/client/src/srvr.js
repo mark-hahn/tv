@@ -112,21 +112,74 @@ const REPORTED_EVENT_NAMES = new Set([
   "pointerdown",
   "pointerup",
 ]);
+// A bare modifier press (Shift, Ctrl, Alt, Meta) is never something anyone
+// waits on, yet a laggy Shift+wheel scroll reported dozens of them:
+// FastScroll.ahk lifts and re-presses Shift around each wheel notch it sends,
+// and Windows auto-repeats a held Shift. Event Timing entries don't carry the
+// key, so remember when modifier events happened and drop the entries that
+// start at one of those times (an entry's startTime is its event's timeStamp).
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta"]);
+const MODIFIER_KEEP_MS = 30 * 1000;
+let modifierTimes = [];
+const noteModifierKey = (e) => {
+  if (!MODIFIER_KEYS.has(e.key)) return;
+  modifierTimes.push(e.timeStamp);
+  const cutoff = e.timeStamp - MODIFIER_KEEP_MS;
+  if (modifierTimes[0] < cutoff)
+    modifierTimes = modifierTimes.filter((t) => t >= cutoff);
+};
+window.addEventListener("keydown", noteModifierKey, true);
+window.addEventListener("keyup", noteModifierKey, true);
+const isModifierEntry = (entry) =>
+  (entry.name === "keydown" || entry.name === "keyup") &&
+  modifierTimes.some((t) => Math.abs(t - entry.startTime) < 1);
+// One line per slow stretch, not per input or per observer callback: a held
+// key repeats ~30/s, and while the page lags behind it the browser still
+// paints, so the observer fires every few frames with a handful of entries.
+// Slow inputs are gathered until none arrive for this long, then the stretch
+// is logged once: its worst wait, how many inputs, and how long it lasted.
+const SLOW_INPUT_QUIET_MS = 2000;
+let slowInputs = null;
+let slowInputTimer = null;
+const flushSlowInputs = () => {
+  const { worst, count, names, firstStart, lastStart } = slowInputs;
+  slowInputs = null;
+  slowInputTimer = null;
+  const secs = ((lastStart - firstStart) / 1000).toFixed(1);
+  const pileup =
+    count > 1 ? ` (${count} inputs over ${secs}s: ${[...names].join(",")})` : "";
+  unilog(2874, `${worst.name} took ${Math.round(worst.duration)}ms to respond${pileup}`);
+};
 let eventTimingObserver = null;
 if (window.PerformanceObserver?.supportedEntryTypes?.includes("event")) {
-  // One line per freeze, not per input: every input queued behind one block
-  // (a held key repeats ~30/s) arrives in the same callback, so report the
-  // worst one — its wait is the length of the freeze — plus how many piled up.
   eventTimingObserver = new PerformanceObserver((list) => {
     const entries = list
       .getEntries()
-      .filter((entry) => REPORTED_EVENT_NAMES.has(entry.name));
+      .filter(
+        (entry) =>
+          REPORTED_EVENT_NAMES.has(entry.name) && !isModifierEntry(entry),
+      );
     if (!entries.length) return;
-    const worst = entries.reduce((a, b) => (b.duration > a.duration ? b : a));
-    const names = [...new Set(entries.map((entry) => entry.name))].join(",");
-    const pileup =
-      entries.length > 1 ? ` (${entries.length} inputs: ${names})` : "";
-    unilog(2869, `${worst.name} took ${Math.round(worst.duration)}ms to respond${pileup}`);
+    if (!slowInputs) {
+      slowInputs = {
+        worst: entries[0],
+        count: 0,
+        names: new Set(),
+        firstStart: entries[0].startTime,
+        lastStart: entries[0].startTime,
+      };
+    }
+    for (const entry of entries) {
+      slowInputs.count++;
+      slowInputs.names.add(entry.name);
+      if (entry.duration > slowInputs.worst.duration) slowInputs.worst = entry;
+      if (entry.startTime < slowInputs.firstStart)
+        slowInputs.firstStart = entry.startTime;
+      if (entry.startTime > slowInputs.lastStart)
+        slowInputs.lastStart = entry.startTime;
+    }
+    clearTimeout(slowInputTimer);
+    slowInputTimer = setTimeout(flushSlowInputs, SLOW_INPUT_QUIET_MS);
   });
   eventTimingObserver.observe({
     type: "event",

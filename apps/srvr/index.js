@@ -14,6 +14,7 @@ import * as gaps from "./src/gaps.js";
 import * as tvdb from "./src/tvdb.js";
 import { setDeletedListener } from "./src/tvdbDb.js";
 import { nextUpAfter } from "./src/derived.js";
+import { storyOrder } from "./src/storyOrder.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
@@ -1409,6 +1410,12 @@ app.post(
   }),
 );
 app.post("/api/getActorPage", apiWrapper(tvdb.getActorPage));
+// A show's episodes in story order as [[season, episode], ...], each special
+// where it belongs among the regular episodes, for a client walking the map in
+// viewing order -- the phone's pick of the first unwatched episode.
+const storyOrderPairs = (ed) =>
+  storyOrder(ed).map(({ season, episode }) => [season, episode]);
+
 app.post(
   "/api/getSeriesMap",
   apiWrapper(async (params) => {
@@ -1460,6 +1467,7 @@ app.post(
           success: true,
           seriesMap,
           episodeData: rec.episodeData,
+          storyOrder: storyOrderPairs(rec.episodeData),
           stale: true,
         };
       }
@@ -1479,7 +1487,12 @@ app.post(
       if (total > 3000) {
         unilog(2552, `slow getSeriesMap ${showName}: refresh=${tRefresh - t0}ms save=${tSave - tRefresh}ms build=${Date.now() - tSave}ms total=${total}ms`);
       }
-      return { success: true, seriesMap, episodeData: rec.episodeData };
+      return {
+        success: true,
+        seriesMap,
+        episodeData: rec.episodeData,
+        storyOrder: storyOrderPairs(rec.episodeData),
+      };
     } catch (err) {
       unilog(570, "error:", err);
       return { success: false, error: err.message };
@@ -1944,6 +1957,18 @@ const EPISODE_BACKFILL_GAP_MS = 2000;
 const EPISODE_BACKFILL_PROGRESS_EVERY = 100;
 let episodeBackfillRunning = false;
 
+// One show's part of the backfill: its episodes refreshed from TVDB, saved
+// and pushed when they changed. True when they did.
+async function backfillShowEpisodes(name) {
+  const rec = tvdb.getAllTvdbSync()?.[name];
+  const before = JSON.stringify(rec.episodeData);
+  await refreshEpisodeData(name, rec, { sources: ["tvdb"] });
+  if (JSON.stringify(rec.episodeData) === before) return false;
+  await tvdb.saveTvdbSync();
+  debouncedTvdbPush(name);
+  return true;
+}
+
 async function runEpisodeBackfill(onlyNames = null) {
   const names = onlyNames || Object.keys(tvdb.getAllTvdbSync() || {});
   let refreshed = 0;
@@ -1952,12 +1977,7 @@ async function runEpisodeBackfill(onlyNames = null) {
     const rec = tvdb.getAllTvdbSync()?.[name];
     if (!rec?.tvdbId) continue;
     try {
-      const before = JSON.stringify(rec.episodeData);
-      await refreshEpisodeData(name, rec, { sources: ["tvdb"] });
-      if (JSON.stringify(rec.episodeData) !== before) {
-        await tvdb.saveTvdbSync();
-        debouncedTvdbPush(name);
-      }
+      await backfillShowEpisodes(name);
       refreshed++;
     } catch (e) {
       failed++;
@@ -1969,6 +1989,19 @@ async function runEpisodeBackfill(onlyNames = null) {
   }
   unilog(2832, `done: ${refreshed} shows refreshed, ${failed} failed`);
 }
+
+// One show at a time, answered when it is done: for the backfill driver
+// (scripts/episode-backfill.js), which walks every show from outside tv-srvr
+// and so carries on across tv-srvr's restarts.
+app.post(
+  "/api/backfillShowEpisodes",
+  apiWrapper(async (params) => {
+    const name = params?.name;
+    if (!tvdb.getAllTvdbSync()?.[name]?.tvdbId)
+      return { ok: true, changed: false, skipped: true };
+    return { ok: true, changed: await backfillShowEpisodes(name) };
+  }),
+);
 
 // `names`, when given, limits the pass to those shows.
 app.post(

@@ -173,7 +173,8 @@ function displayEpisodeTitle(name) {
 }
 
 function formatSelectedSE(selectedSE) {
-  if (!selectedSE?.s || !selectedSE?.e) return "";
+  // Season 0 is a season like any other: only a missing one means no episode.
+  if (selectedSE?.s == null || !selectedSE?.e) return "";
   return `(S${String(selectedSE.s).padStart(2, "0")}E${String(selectedSE.e).padStart(2, "0")})`;
 }
 
@@ -1503,14 +1504,15 @@ function Remote({ setSubError }) {
       const data = await res.json();
       let firstUnwatched = null;
       if (data.success && data.seriesMap) {
-        for (const [seasonNum, episodes] of data.seriesMap) {
-          for (const [episodeNum, epiObj] of episodes) {
-            if (!epiObj.played && !epiObj.unaired) {
-              firstUnwatched = { s: seasonNum, e: episodeNum };
-              break;
-            }
+        // In tv-srvr's story order, so a special comes up where it belongs
+        // among the regular episodes rather than ahead of them all as season 0.
+        const cells = buildSeriesMap(data.seriesMap);
+        for (const [s, e] of data.storyOrder) {
+          const epiObj = cells?.[s]?.[e];
+          if (epiObj && !epiObj.played && !epiObj.unaired) {
+            firstUnwatched = { s, e };
+            break;
           }
-          if (firstUnwatched) break;
         }
       }
       setSelectedSE(firstUnwatched);

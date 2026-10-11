@@ -764,10 +764,19 @@ class ShowListView extends ScrollView {
   /** Driven straight by tv-tv, not a click -- no sort or order to touch. */
   void selectByName(String name) {
     Shows.Show show = byName.get(name);
-    if (show != null) {
+    if (show == null) return;
+    if (!visible.contains(show)) {
+      // A show the filters hide (outside the library, not ready) is pinned
+      // into the list while it is selected, as it is when its record reloads.
+      // Selected with no card, every key after would act on a show nobody can
+      // see. apply() lays the card in and scrolls to it.
+      pinned = show;
       setActive(show);
-      scrollToActive();
+      apply();
+      return;
     }
+    setActive(show);
+    scrollToActive();
   }
 
   /** Back to the top show; false when it is already selected. */

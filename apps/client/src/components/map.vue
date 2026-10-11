@@ -985,6 +985,26 @@
           <div v-if="selectedEpisodeBelongs" style="font-style: italic">
             {{ selectedEpisodeBelongs }}
           </div>
+          <table
+            v-if="specialFacts.length > 0"
+            style="border-collapse: collapse; margin: 4px 0"
+          >
+            <tbody>
+              <tr v-for="[label, value] in specialFacts" :key="label">
+                <td
+                  style="
+                    padding: 0 10px 0 0;
+                    white-space: nowrap;
+                    vertical-align: top;
+                    font-weight: bold;
+                  "
+                >
+                  {{ label }}
+                </td>
+                <td style="padding: 0; word-break: break-word">{{ value }}</td>
+              </tr>
+            </tbody>
+          </table>
           <div v-if="episodeInfo.overview">
             {{ episodeInfo.overview }}
           </div>
@@ -1213,6 +1233,9 @@ const MAP_ARROW_PAN_PX_PER_SEC = 400;
 const MAP_PAN_SMOOTH_TAU_SEC = 0.1;
 // The extras table crops a longer TVDB category to this many characters.
 const EXTRAS_CATEGORY_MAX = 20;
+// TVDB Special Category values that make a season 0 entry count as an episode
+// (tv-srvr's season0.js has the same list).
+const SPECIAL_COUNTED_CATEGORIES = new Set(["Episodic Special", "Movies", "Pilots"]);
 
 export default {
   name: "Map",
@@ -1361,6 +1384,48 @@ export default {
 
     // Where a selected season 0 episode belongs among the regular episodes,
     // from tv-srvr's computed placements, and where that came from.
+    // Everything the show record knows about a selected season 0 episode, as
+    // [label, value] rows for its episode card. Season 0 holds only the
+    // specials that count as episodes; the reason one counts comes first.
+    specialFacts() {
+      const sel = this.selectedEpisode;
+      if (!sel || sel.s !== 0) return [];
+      const ep = this.tvdbData?.episodeData?.[0]?.[sel.e - 1];
+      if (!ep) return [];
+      const why = [
+        ep.file && "it has a file",
+        ep.watched && "it is watched",
+        ep.category &&
+          SPECIAL_COUNTED_CATEGORIES.has(ep.category) &&
+          `TVDB calls it ${ep.category}`,
+        ep.critical && "TVDB calls it critical to the story",
+      ].filter(Boolean);
+      const tvdbPlace = ep.airsBeforeSeason
+        ? `before S${String(ep.airsBeforeSeason).padStart(2, "0")}` +
+          (ep.airsBeforeEpisode
+            ? `E${String(ep.airsBeforeEpisode).padStart(2, "0")}`
+            : "")
+        : ep.airsAfterSeason
+          ? `after S${String(ep.airsAfterSeason).padStart(2, "0")}`
+          : "";
+      const file = ep.file ? String(ep.file).split("//").pop() : "";
+      return [
+        ["Counts because", why.join(", ")],
+        ["Title", this.displayEpisodeTitle(ep.title)],
+        ["Aired", this.formatEpisodeAired(ep.aired) || "no date"],
+        ["Runtime", ep.runtime ? `${ep.runtime} mins` : ""],
+        ["TVDB category", ep.category || "untagged"],
+        ["Critical to story", ep.critical ? "yes" : "no"],
+        ["TVDB placement", tvdbPlace],
+        ["File", file],
+        ["Resolution", ep.res ? `${ep.res}p` : ""],
+        ["Watched", ep.watched ? "yes" : "no"],
+        ["Resume at", this.fmtPosMs(ep.pos)],
+        ["Last played", ep.lastPlayed ? String(ep.lastPlayed).slice(0, 16) : ""],
+        ["Times played", ep.playCount ? String(ep.playCount) : ""],
+        ["TVDB id", ep.tvdbId ? String(ep.tvdbId) : ""],
+      ].filter(([, value]) => value);
+    },
     selectedEpisodeBelongs() {
       const sel = this.selectedEpisode;
       if (!sel || sel.s !== 0) return "";
@@ -2272,7 +2337,8 @@ export default {
       if (this.selectedCells.size === 0) return null;
       const firstKey = Array.from(this.selectedCells)[0];
       const { season, episode } = this.parseCellKey(firstKey);
-      if (!season || !episode) return null;
+      // Season 0 is a season like any other.
+      if (season == null || Number.isNaN(season) || !episode) return null;
       return { key: firstKey, season, episode };
     },
     async toggleEpisodePane() {
@@ -2336,13 +2402,45 @@ export default {
       return targets;
     },
     async selectEpisode(season, episode) {
-      if (!this.mapShow?.name || !season || !episode) return;
+      if (!this.mapShow?.name || season == null || !episode) return;
 
       this.selectedEpisode = { s: season, e: episode };
       this.mapImageExpanded = false;
       this.episodeInfo = null;
 
       const reqId = ++this.episodeInfoRequestId;
+
+      // A season 0 episode's overview and image come from TVDB, whose
+      // numbering they share; the rest of its card is the show record's
+      // (specialFacts).
+      if (season === 0) {
+        const ep = this.tvdbData?.episodeData?.[0]?.[episode - 1];
+        try {
+          const data = await srvr.getSpecialInfo({
+            showName: this.mapShow.name,
+            episode,
+          });
+          if (reqId !== this.episodeInfoRequestId) return;
+          this.episodeInfo = {
+            image: data?.image ?? null,
+            overview: data?.overview ?? null,
+            name: ep?.title ?? null,
+            aired: ep?.aired ?? null,
+            runtime: ep?.runtime ?? null,
+          };
+        } catch (err) {
+          if (reqId !== this.episodeInfoRequestId) return;
+          unilog(2856, `getSpecialInfo failed for ${this.mapShow?.name} S00E${episode}: ${err?.message ?? err}`);
+          this.episodeInfo = {
+            image: null,
+            overview: null,
+            name: ep?.title ?? null,
+            aired: ep?.aired ?? null,
+            runtime: ep?.runtime ?? null,
+          };
+        }
+        return;
+      }
 
       try {
         const data = await srvr.getTmdb({
@@ -2376,7 +2474,7 @@ export default {
       }
     },
     selectSingleEpisode(season, episode) {
-      if (!this.mapShow?.name || !season || !episode) return;
+      if (!this.mapShow?.name || season == null || !episode) return;
       if (!this.seriesMap?.[season]?.[episode]) return;
 
       const key = this.cellKey(season, episode);

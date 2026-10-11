@@ -946,6 +946,11 @@ export function getTmdb(params) {
   return httpCall("/api/getTmdb", params, "POST");
 }
 
+// A season 0 entry's overview and image, from TVDB.
+export function getSpecialInfo(params) {
+  return httpCall("/api/getSpecialInfo", params, "POST");
+}
+
 // An All Shows query asks jev about every show, about 5 s; Claude can take
 // minutes over a long show list.
 export function getJevMonthCost() {

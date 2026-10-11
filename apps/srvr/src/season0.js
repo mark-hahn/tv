@@ -39,23 +39,45 @@ export const isCountedSpecial = (ep) =>
     COUNTED_CATEGORIES.has(ep.category)
   );
 
-// TVDB's tags on one episode: its Special Category and whether it is critical
-// to the story. The tags are not in a show's episode list; each entry takes a
-// request of its own.
-async function fetchTags(tvdbId, retried = false) {
-  const res = await fetch(`${TVDB_EPISODE_URL}/${tvdbId}/extended`, {
+// One of TVDB's episode records (`path` under the episode), or null when TVDB
+// has none.
+async function fetchEpisode(path, retried = false) {
+  const res = await fetch(`${TVDB_EPISODE_URL}/${path}`, {
     headers: { Authorization: `Bearer ${await getToken()}` },
   });
   if (res.status === 401 && !retried) {
     clearToken();
-    return fetchTags(tvdbId, true);
+    return fetchEpisode(path, true);
   }
+  if (res.status === 404) return null;
   if (!res.ok) throw new Error(`TVDB status ${res.status}`);
-  const tags = (await res.json())?.data?.tagOptions || [];
+  return (await res.json())?.data ?? null;
+}
+
+// TVDB's tags on one episode: its Special Category and whether it is critical
+// to the story. The tags are not in a show's episode list; each entry takes a
+// request of its own.
+async function fetchTags(tvdbId) {
+  const tags = (await fetchEpisode(`${tvdbId}/extended`))?.tagOptions || [];
   const tag = (name) => tags.find((t) => t.tagName === name)?.name ?? null;
   return {
     category: tag("Special Category"),
     critical: tag("Special is Critical to Show's Story") === "Yes",
+  };
+}
+
+// What TVDB has on one season 0 entry beyond the show's episode list -- its
+// English overview and its image -- for the map pane's episode card. TMDB
+// numbers specials its own way, so the card cannot ask it as it does for the
+// regular seasons.
+export async function tvdbEpisodeDetails(tvdbId) {
+  const [extended, english] = await Promise.all([
+    fetchEpisode(`${tvdbId}/extended`),
+    fetchEpisode(`${tvdbId}/translations/eng`),
+  ]);
+  return {
+    overview: english?.overview ?? extended?.overview ?? null,
+    image: extended?.image ?? null,
   };
 }
 

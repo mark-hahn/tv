@@ -1502,6 +1502,18 @@ app.post(
     }
   }),
 );
+// What TVDB has on a season 0 entry beyond the show's episode list, for the
+// map pane's episode card: TMDB numbers specials its own way.
+app.post(
+  "/api/getSpecialInfo",
+  apiWrapper(async (params) => {
+    const rec = tvdb.getAllTvdbSync()?.[params?.showName];
+    const tvdbId = epd.getEp(rec?.episodeData, 0, Number(params?.episode))
+      ?.tvdbId;
+    if (!tvdbId) return { overview: null, image: null };
+    return season0.tvdbEpisodeDetails(tvdbId);
+  }),
+);
 app.post(
   "/api/clearEpisodePositions",
   apiWrapper(async (params) => {

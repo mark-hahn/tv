@@ -1,11 +1,15 @@
 
-right-justify epi and mins cells
+show `Outnumbered` episodes in season 0 are marked as watched in map but they have not been seen
 
 ????????????????????????
 my phone ip is .172
 .opnXXXXX naming
 back up pause based on pause length
 =================
+
+when season 0 cell(s) are selected the episode button should show everything known about the episode
+
+right-justify epi and mins cells
 
 # extras table changes
 - all extras table font and dividers should be black, not gray

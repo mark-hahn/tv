@@ -147,6 +147,9 @@ const getShowState = (showName, showMeta) => {
   let seasonWatchedThenNofileEpisode = null;
   let firstNoFileSeason = null;
   let firstNoFileEpisode = null;
+  // The first unwatched episode after a watched one, where readiness is decided.
+  let readySeason = null;
+  let readyEpisode = null;
   let anyUnaired = false;
   let sawAnyEpisode = false;
   let anyAiredEpisode = false;
@@ -315,6 +318,8 @@ const getShowState = (showName, showMeta) => {
         if (!checkedReady && lastWatched && !watched && !unaired) {
           checkedReady = true;
           ready = haveFile;
+          readySeason = seasonNumber;
+          readyEpisode = episodeNumber;
         }
         if (watched) {
           watchedShow = true;
@@ -486,7 +491,8 @@ const getShowState = (showName, showMeta) => {
       sawAnyEpisode &&
       !haveFileShow &&
       !anyWatched &&
-      !anyUnaired
+      !anyUnaired &&
+      !ignoreSet.has(ignoreStrayKey(firstNoFileSeason, firstNoFileEpisode))
     ) {
       if (fileGapSeason === null && firstNoFileSeason !== null) {
         fileGapSeason = firstNoFileSeason;
@@ -505,12 +511,11 @@ const getShowState = (showName, showMeta) => {
       !watchGap &&
       !fileGap &&
       !fileEndError &&
-      !seasonWatchedThenNofile
+      !seasonWatchedThenNofile &&
+      !ignoreSet.has(ignoreStrayKey(readySeason, readyEpisode))
     ) {
-      if (fileGapSeason === null && firstNoFileSeason !== null) {
-        fileGapSeason = firstNoFileSeason;
-        fileGapEpisode = firstNoFileEpisode;
-      }
+      fileGapSeason = readySeason;
+      fileGapEpisode = readyEpisode;
       fileGap = true;
     }
 

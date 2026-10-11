@@ -71,6 +71,7 @@ import {
 } from "./src/flexgetScore.js";
 import {
   wss,
+  startWss,
   connectedClients,
   activeServerMessages,
   handleChannelFrame,
@@ -3251,6 +3252,8 @@ wss.on("connection", (ws) => {
     socketName = "unknown websocket";
   });
 });
+// Only now, with the handler above in place, does the socket take connections.
+startWss();
 
 /**
  * Background library sweep. The disk says what is in the library: a record
@@ -3960,7 +3963,42 @@ watcher
   })
   .on("ready", () => {
     unilog(90, "Initial scan complete. Ready for changes.");
+    replayMissedAdds().catch((e) => {
+      unilog(2860, `replaying missed adds failed: ${e.message}`);
+    });
   });
+
+// A file that lands while tv-srvr restarts -- the old process gone, this
+// watcher not yet up -- is found by the watcher's first walk and taken for one
+// that was already there, so it raises no add, and its video waits for the
+// 6-hourly sweep to reach the sub queue. A download that finishes during a
+// deploy is the usual one. Once the walk is done, every video and subtitle file
+// changed since shortly before this process started gets the add it missed.
+const RESTART_ADD_WINDOW_MS = 60 * 1000;
+async function replayMissedAdds() {
+  const since = performance.timeOrigin - RESTART_ADD_WINDOW_MS;
+  let replayed = 0;
+  for (const [dir, names] of Object.entries(watcher.getWatched())) {
+    for (const name of names) {
+      const ext = name.split(".").pop();
+      if (ext !== "srt" && !videoFileExtensions.includes(ext)) continue;
+      const filePath = path.join(dir, name);
+      let stat;
+      try {
+        stat = await fsp.stat(filePath);
+      } catch (e) {
+        // Gone again since the walk saw it.
+        unilog(2861, `no stat for ${filePath}: ${e.message}`);
+        continue;
+      }
+      if (!stat.isFile() || stat.ctimeMs < since) continue;
+      watcher.emit("add", filePath);
+      replayed++;
+    }
+  }
+  if (replayed > 0)
+    unilog(2862, `replayed the add of ${replayed} file(s) that landed during the restart`);
+}
 
 unilog(91, `Watching ${tvDir} for file changes...`);
 

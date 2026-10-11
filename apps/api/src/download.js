@@ -223,8 +223,9 @@ function validateTorrentData(torrentData) {
       const noExt = base.replace(/\.[^.]+$/, "");
       const info = parseTorrentTitle.parse(noExt);
 
-      // If basename parsing missed season/episode, try parsing the full path
-      if (!info.season || !info.episode) {
+      // If basename parsing missed season/episode, try parsing the full path.
+      // Season 0 is a season: a special named S00E01 has both.
+      if (!Number.isInteger(info.season) || !info.episode) {
         // Try parsing the full path, but be careful of directory names confusing the parser
         // We only want to look at the immediate parent directory + filename if possible,
         // or just rely on the full path if the parser handles it well.
@@ -233,7 +234,8 @@ function validateTorrentData(torrentData) {
         // The filename has "S02.E01".
         const fullInfo = parseTorrentTitle.parse(p);
 
-        if (!info.season && fullInfo.season) info.season = fullInfo.season;
+        if (!Number.isInteger(info.season) && Number.isInteger(fullInfo.season))
+          info.season = fullInfo.season;
 
         // Critically, if filename has "S02.E01", it should have been picked up.
         // If "S02.E01" is parsed as season 2, episode 1, then info.episode should be defined.
@@ -261,7 +263,7 @@ function validateTorrentData(torrentData) {
       }
 
       checkedFiles.push({ file: p, parsed: info });
-      if (info?.season && info?.episode) anyHasSE = true;
+      if (Number.isInteger(info?.season) && info?.episode) anyHasSE = true;
     }
 
     if (!anyHasSE) {

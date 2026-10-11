@@ -856,8 +856,15 @@ export default {
       }
     },
 
-    // Plays the first unwatched episode (else the first one) in the browser.
+    // Plays the show's next-up in the browser: tv-srvr's, in story order with
+    // the specials where they belong, the same episode tvapp plays. With
+    // nothing left to watch, the first episode with a file.
     playClick() {
+      const next = this.show?.nextUp;
+      if (next) {
+        srvr.playInTab(this.show, next.season, next.episode);
+        return;
+      }
       const res = epd.selectIntroFile(this.show);
       if (res.error) return;
       srvr.playInTab(this.show, res.season, res.episode);

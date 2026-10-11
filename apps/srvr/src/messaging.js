@@ -4,11 +4,33 @@
 // per-connection message handler stays in index.js (it is coupled to many
 // server features); this module owns only the socket infra and broadcast fan-out.
 
+import http from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
-import { unilog } from "@tv/share";
+import { unilog, logHere } from "@tv/share";
 
-export const wss = new WebSocketServer({ port: 8736 });
-unilog(60, "wss listening on port 8736");
+const WSS_PORT = 8736;
+
+// Not listening until startWss(), which index.js calls once its connection
+// handler is in place. A channel peer that connected before then had its
+// register frame dropped, and with its socket left open it never registered
+// again -- tv-api's qbtInfo went dark whenever a deploy restarted everything
+// at once and tv-api came up first. Refused instead, a peer retries.
+export const wss = new WebSocketServer({ noServer: true });
+
+export const startWss = () => {
+  const server = http.createServer((req, res) => {
+    res.writeHead(426);
+    res.end();
+  });
+  server.on("upgrade", (req, socket, head) => {
+    wss.handleUpgrade(req, socket, head, (ws) =>
+      wss.emit("connection", ws, req),
+    );
+  });
+  server.listen(WSS_PORT, () => {
+    unilog(2858, `wss listening on port ${WSS_PORT}`);
+  });
+};
 
 export const connectedClients = new Set();
 

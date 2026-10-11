@@ -77,14 +77,17 @@ export function parseResolutionStrict(title, quality) {
   return 0; // unknown — do not fall back
 }
 
+// Season 0 takes no part: specials are not a season in the run, and a special
+// on disk ahead of a deleted season 1 made season 1 look like the first gap,
+// which then turned away every candidate for season 2 and later.
 export function getFirstFilesOnDiskSeasonGap(diskSeasons, torrentSeason) {
   const seasons = [];
 
   if (Array.isArray(diskSeasons)) {
-    seasons.push(...diskSeasons.filter((n) => Number.isInteger(n) && n >= 0));
+    seasons.push(...diskSeasons.filter((n) => Number.isInteger(n) && n >= 1));
   }
 
-  if (Number.isInteger(torrentSeason) && torrentSeason >= 0) {
+  if (Number.isInteger(torrentSeason) && torrentSeason >= 1) {
     seasons.push(torrentSeason);
   }
 

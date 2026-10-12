@@ -27,9 +27,20 @@ import { syncSubToAudio, syncSubToAsr, sidecarVideo } from "./subSync.js";
 
 const TV_DIR = "/mnt/media/tv";
 
-// Videos whose sidecars are being dealt with here now; the watcher leaves
-// their files to that.
+// How often the watcher looks whether a video it waits for is free.
+const BUSY_WAIT_MS = 1000;
+
+// Videos whose sidecars are being dealt with here now; the watcher waits
+// until that is done.
 const busy = new Set();
+
+// Resolves once nothing here is dealing with the video.
+async function notBusy(videoPath) {
+  while (busy.has(videoPath))
+    await new Promise((resolve) => {
+      setTimeout(resolve, BUSY_WAIT_MS);
+    });
+}
 
 const fmtOfs = (ms) => `${ms > 0 ? "+" : ""}${ms} ms`;
 const suffixOf = (videoPath, file) =>
@@ -258,8 +269,11 @@ export async function prepareVideoSubs({
 
 // A sidecar came, changed or went (the file watcher). One that came is dealt
 // with like the video's others, from the clip transcripts stored for its
-// video; videos never checked, and videos being dealt with now, are left
-// alone. One changed by anything but these checks is judged as timed by hand.
+// video, once whatever is dealing with the video now is done; videos never
+// checked are left alone. Clips that disagree are told apart from a file at
+// another rate by a middle clip, heard now when there is none, as in the
+// video's own checks. One changed by anything but these checks is judged as
+// timed by hand.
 export async function subFileEvent(file, kind) {
   if (kind === "unlink") {
     subs.forgetCheck(file);
@@ -275,8 +289,9 @@ export async function subFileEvent(file, kind) {
   } catch {
     return;
   }
+  await notBusy(videoPath);
   const stored = subs.getClips(videoPath);
-  if (!stored || busy.has(videoPath) || subs.freshCheck(file)) return;
+  if (!stored || subs.freshCheck(file)) return;
   busy.add(videoPath);
   const notes = [];
   try {
@@ -288,7 +303,16 @@ export async function subFileEvent(file, kind) {
       return;
     }
     const set = storedSet(videoPath);
-    await act(videoPath, f, f.unusable ? null : sc.judgeFile(f, set), set, false, notes);
+    let r = f.unusable ? null : sc.judgeFile(f, set);
+    if (r?.needsMiddle) {
+      const timing = { cutMs: 0, asrMs: 0 };
+      set.middle = await sc.hearMiddle(videoPath, set.track, [f], set, timing);
+      if (set.middle) {
+        subs.saveClips(videoPath, set.track, sc.clipsToJson(set));
+        r = sc.judgeFile(f, set);
+      }
+    }
+    await act(videoPath, f, r, set, false, notes);
   } finally {
     busy.delete(videoPath);
     if (notes.length > 0)

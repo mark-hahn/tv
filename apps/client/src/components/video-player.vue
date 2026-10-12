@@ -1011,9 +1011,8 @@ export default {
     },
   },
   methods: {
-    _buildStreamUrl(subIndex = null, audioIndex = this.activeAudioIndex) {
+    _buildStreamUrl(audioIndex = this.activeAudioIndex) {
       let url = `${TV_SRVR_URL}/api/stream?path=${encodeURIComponent(this.path)}`;
-      if (subIndex !== null) url += `&sub=${subIndex}`;
       if (audioIndex !== null && audioIndex !== undefined)
         url += `&audio=${audioIndex}`;
       return url;
@@ -1054,7 +1053,7 @@ export default {
         unilog(1048, "fetch error:", e);
       }
     },
-    _swapStream(subIndex = null, audioIndex = this.activeAudioIndex) {
+    _swapStream(audioIndex = this.activeAudioIndex) {
       const vid = this.$refs.vid;
       if (this.windowed && this._win) {
         this._openWindow(vid?.currentTime || 0, {
@@ -1069,7 +1068,7 @@ export default {
       this._mseStop();
       this.errorRetries = 0;
       if (vid) vid.pause();
-      this.vidSrc = this._buildStreamUrl(subIndex, audioIndex);
+      this.vidSrc = this._buildStreamUrl(audioIndex);
     },
     cycleAudioTrack() {
       if (this.audioTracks.length <= 1) return;
@@ -1084,7 +1083,7 @@ export default {
       const nextAudioIndex =
         nextPos === 0 ? null : this.audioTracks[nextPos].index;
       this.activeAudioIndex = nextAudioIndex;
-      this._swapStream(null, nextAudioIndex);
+      this._swapStream(nextAudioIndex);
     },
     selectTrack(id) {
       this.activeTrackId = id;

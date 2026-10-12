@@ -250,11 +250,16 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
     others are checked by whole-file audio matching (ffsubsync), no ASR.
   - It runs after the add-to-disk steps, and from the remotes' Sync. The
     watcher judges a sidecar that arrives or changes later from the stored
-    clips, at no cost; a deleted video's checks go with it.
+    clips, at no cost unless it has to hear a middle clip, waiting while the
+    video's checks run; a deleted video's checks go with it.
   - A video counts as checked (`needsCheck`) by its path: a replacement or
     rename is checked again.
-- OpenSubtitles downloads happen in the checks above and in `getPlayUrl`
-  (`subsBeforePlay`), for tvapp and the browser player alike:
+- OpenSubtitles downloads happen in the checks above, in `getPlayUrl`
+  (`subsBeforePlay`), for tvapp and the browser player alike, and ahead of a
+  play (`prefetchNextSubs`):
+  - Ahead of a play: once a play's own downloads are done, the next unwatched
+    episode's; and whenever tv-srvr refreshes a library show played in the
+    last 30 days, its next-up episode's. Nothing waits on these.
   - At play, only when the episode has fewer than 3 downloaded: search, then
     download all it still needs at once (`fetchSubs`), then replacements
     for any that failed, until it has 3, 3 have failed, or no candidate is
@@ -267,7 +272,10 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
     subtitle file at all after the wait ("no subtitles"), it plays anyway
     and `subError` puts one pop-up, problems joined by "; ", on the phones
     and the web client. The pop-up sits over every screen and pane until
-    Close is pressed.
+    Close is pressed. When the downloads the play did not wait for land,
+    `subsLate` hands them to tvapp, which reopens a video that opened with no
+    `.srt` at its position with them; the browser player gets none until it
+    is opened again.
   - The API allows 5 requests a second. A search or download answered 429 is
     retried after its `retry-after` (1 s). One play alone sends 4.
   - There is no daily download quota check of our own; OpenSubtitles enforces
@@ -294,7 +302,11 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   nothing that fits. Automatic ASR stops for the day at $20
   (`AUTO_ASR_DAILY_USD`); a video put off is not marked processed, so the
   sweep brings it back. Manual ASR from the ASR pane is not limited by
-  this.
+  this. A request for the video being processed runs it again once that run
+  is done. A video rewritten in place under the same name (a forced
+  download, tv-down's remux) is queued as another file: what was learned
+  about the old one is forgotten, its T and H are copied out again, and its
+  other sidecars are judged against it.
 - The 6-hourly sweep queues library videos, watched or not, that have not
   been through those steps, whatever subtitle files they already have. Its
   entries come after all other batch work: none starts while a stills build,
@@ -305,10 +317,14 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   tv-down deletes the video a download replaces only after the new file has
   landed (`del-old.md`).
 - tv-down takes a `.srt` from usb when its episode's video is on disk or on
-  its way. Its scan does not exclude `.srt`. A `.srt` whose name and top
-  folder give no season and episode (the `Subs/<episode>/2_eng,English.srt`
-  layout) is skipped with a log line, never an error entry, since those
-  share one name and tv-down keys by name.
+  its way. Its scan does not exclude `.srt`. It lands `.SRT` as `.srt` and
+  cleans each file through `cleanSrt()` as it lands; the watcher renames any
+  other `.SRT` that arrives. An English file in a release's
+  `Subs/<episode>/<n>_<lang>.srt` layout is known as `<episode>/<name>`,
+  since tv-down keys by name and those share one, and lands as
+  `<episode>.<name>`. A `.srt` whose name and top folder give no season and
+  episode (the other languages in that layout) is skipped with a log line,
+  never an error entry.
 - Movies get no subtitle processing.
 - Players: tvapp; tv-srvr's browser player (`play.html` at `/api/play`),
   opened by the info and map panes' Play and by the local pane's Play for an
@@ -322,9 +338,11 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   rewriting the `.srt` on disk (`/api/applySubOffset`). No offset is stored
   anywhere; `/api/subtitle` serves the file as it is. The rewritten file is
   judged again, never moved back.
-- Sync: the remotes' panel Sync (`sy`) runs the subtitle checks on the
-  playing episode now (`/api/fixSubs`), and is off once the episode has
-  been checked (`getPlayUrl`'s `subsChecked`). The local pane's Sync shifts
+- Sync: the remotes' panel Sync (`sy`) measures how far the showing file is
+  off the video's words (`/api/measureSub`, `measureSidecar()`); the answer
+  becomes the panel's offset, and nothing shifts until Apply. A file that
+  already fits gets its ✓ at once. It is off once the episode has been
+  checked (`getPlayUrl`'s `subsChecked`). The local pane's Sync shifts
   one sidecar to fit its video, by the stored clips, else by its
   `.asr.srt`.
 - `/api/subsCountEpisodes` (the torrent pane's Chk Subs, through tv-api):
@@ -595,8 +613,11 @@ because the TV is unreachable from any wireless host here.
 **Video keys** — while a video is up, the tvapprc arrows and OK drive it:
 - OK pauses/resumes, left −10 s, right +30 s, down shows the time bar.
   Holding left or right scrubs through stills (below).
-- Up skips the intro by `skipDurMs`; repeats within 2 s are ignored. The
-  remotes' Skip key (`k,skip`) does the same, and nothing with no video up.
+- A tap of Up ends the episode as watched and closes the video; holding Up
+  jumps back to the start, past the intro (`trimPosMs`). A press with no
+  repeat or key-up within 2 s counts as a tap. The remotes' Skip key
+  (`k,skip`) skips the intro by `skipDurMs`, and does nothing with no video
+  up.
 - Any other key is swallowed. Back, `r`, or tvapp going to the background
   closes the video.
 - Held keys: the remotes send the first press as `k,<key>` and each
@@ -612,17 +633,19 @@ because the TV is unreachable from any wireless host here.
     when the remote asks with `l`.
   - A tap sends `t,<n>`; `-1` turns subtitles off.
   - The one showing when the video stops becomes the episode's chosen one.
-  - Timing: the panel's +/- buttons send `so,<sec>` (±1, ±0.5), which moves
-    tvapp's `subOfs`; nothing shifts until Apply (`sa`). Apply has tv-srvr's
-    `/api/applySubOffset` rewrite the showing `.srt` on disk, shifted by
-    what moved since the last Apply (through `cleanSrt()`, never below 0),
-    and tvapp reloads the video at its position. The shift is permanent.
-    A new video or another track resets the offset to 0.
+  - Timing: the panel's +/- buttons send `so,<sec>` (±0.5, ±0.1), which
+    moves tvapp's `subOfs`, counted from the file as it is on disk; nothing
+    shifts until Apply (`sa`). Apply has tv-srvr's `/api/applySubOffset`
+    rewrite the showing `.srt` on disk, shifted by the offset (through
+    `cleanSrt()`, never below 0); the offset goes back to 0 and tvapp
+    reloads the video at its position. The shift is permanent. A new video
+    or another track resets the offset to 0.
   - Sync, left of Close under the offset, sends `sy`: tvapp has tv-srvr's
-    `/api/fixSubs` check and fix the episode's subtitle files, then reopens
-    the video at its position with the new list, on the showing file. The
-    offset shows the shift that file got. Sync is off while it runs and
-    once the episode has been checked.
+    `/api/measureSub` measure how far the showing file is off the video's
+    words, and the answer becomes the offset, as if set with +/-; the
+    panel's caption line shows where it puts the captions, and Apply shifts
+    the file. Sync is off while it or an Apply runs and once the episode has
+    been checked.
   - Holding the Apps key in tvapprc mode sends `k,reload`, which reloads the
     playing video so an edited subtitle file is fetched again.
 - The camera overlay pauses a playing video. The video resumes when the
@@ -695,14 +718,14 @@ actor filter → filter text → top of list. At the top Back goes to the TV's h
 | `t,<n>` | turn on subtitle track n; `t,-1` turns them off |
 | `so,<sec>` | move the subtitle offset by sec; shifts nothing yet |
 | `sa` | apply the offset: shift the showing `.srt` on disk and reload |
-| `sy` | Sync: check and fix the episode's subtitle files, then reopen |
+| `sy` | Sync: measure the showing file's offset into `subOfs`; shifts nothing yet |
 | `k,reload` | reload the playing video at its position |
 
 `s` is held until the list has loaded, and `e`/`p` wait behind it.
 
 **Commands back to the remote** — `z`, `c,<count>`, `a,<name>`, `i,<0|1>`,
 `l,<json>` (subtitle tracks `{title, tracks: [{label, type}], selected,
-subOfs, syncOfs, canSync, cap}`, or `null` with no video up).
+subOfs, canSync, cap}`, or `null` with no video up).
 The bridge adds `u`/`d` (tvapp up/down). Those two, and the bridge socket
 closing, are the only things that set or clear tvapprc mode. The phone sends
 the bridge `o` to open tvapp.

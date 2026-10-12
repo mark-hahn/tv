@@ -183,13 +183,6 @@ Uploads are triggered server-side via `POST /downloads` (or `/api/download`).
 - `GET /api/space/avail`
 - `GET /api/flexget`
 
-### OpenSubtitles
-
-`GET /api/subs/search`
-
-- `imdb_id=tt1234567` or `q=...`
-- `page=1`
-
 ### TVDB proxy
 
 `GET /api/tvdb/*`

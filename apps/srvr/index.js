@@ -3806,6 +3806,44 @@ function subFileAdded(filePath) {
   doSubQueueNow();
 }
 
+// A ".SRT" file renamed to ".srt", unless that name is taken.
+async function lowerSrtExt(filePath) {
+  const to = `${filePath.slice(0, -"srt".length)}srt`;
+  const taken = await fsp.access(to).then(
+    () => true,
+    () => false,
+  );
+  if (taken) {
+    unilog(2875, `${path.basename(filePath)} left as it is: ${path.basename(to)} is there already`);
+    return;
+  }
+  await fsp.rename(filePath, to);
+}
+
+// A video rewritten in place under the same name (a forced download fetched
+// over it, or tv-down's remux of it for tvapp seeking) is another file: it
+// goes through the add-to-disk steps again, from nothing learned about the
+// old one (subsQueue.js). One the tv's player stalls on goes to the recode
+// instead, as a new one does.
+async function videoReplaced(filePath) {
+  const showName = showNameFromFilePath(filePath);
+  if (!tvdb.getAllTvdbSync?.()?.[showName]?.inLibrary) return;
+  if (await recode.enqueueRecode(filePath)) return;
+  unilog(2876, `${showName}: ${path.basename(filePath)} rewritten in place, its subtitles go through the queue again`);
+  enqueueSubQueue(
+    {
+      videoFilePath: filePath,
+      fromUI: false,
+      lowPriority: false,
+      renameS: true,
+      replaced: true,
+    },
+    false,
+  );
+  persistSubQueue();
+  doSubQueueNow();
+}
+
 // Start watching TV directory
 const watcher = chokidar.watch(tvDir, {
   ignored: /(^|[\/\\])\../, // ignore dotfiles
@@ -3822,6 +3860,14 @@ const watcher = chokidar.watch(tvDir, {
 watcher
   .on("add", async (filePath) => {
     const ext = filePath.split(".").pop();
+    // A subtitle file is known by a lower-case ".srt" only: one that comes as
+    // ".SRT" is renamed, and arrives again under its new name.
+    if (ext !== "srt" && ext.toLowerCase() === "srt") {
+      lowerSrtExt(filePath).catch((e) => {
+        unilog(2877, `could not rename ${path.basename(filePath)} to a lower-case .srt: ${e.message}`);
+      });
+      return;
+    }
     if (ext === "srt") {
       subFileChanged(filePath);
       subFileAdded(filePath);
@@ -3914,9 +3960,17 @@ watcher
     }, DISK_CHANGE_DEBOUNCE_MS);
   })
   // A subtitle file rewritten in place, most often by a remote's Apply, is
-  // judged as timed by hand (subPrepare.js).
+  // judged as timed by hand (subPrepare.js). A video rewritten in place is
+  // another file under the same name.
   .on("change", (filePath) => {
-    if (filePath.split(".").pop() !== "srt") return;
+    const ext = filePath.split(".").pop();
+    if (videoFileExtensions.includes(ext)) {
+      videoReplaced(filePath).catch((e) => {
+        unilog(2878, `${path.basename(filePath)} rewritten in place, not queued: ${e.message}`);
+      });
+      return;
+    }
+    if (ext !== "srt") return;
     subPrepare.subFileEvent(filePath, "change").catch((e) => {
       unilog(2798, `check of changed ${path.basename(filePath)} failed: ${e.message}`);
     });
@@ -3936,8 +3990,11 @@ watcher
 
     unilog(684, `video deleted: ${showName}`);
 
-    // Debounce: clear existing timeout and set new one
+    // Debounce: clear existing timeout and set new one. New files gathered
+    // for the show keep their timer, which refreshes the show when it is
+    // done; replacing it would drop them unqueued.
     const unlinkEntry = changedShows.get(showName);
+    if (unlinkEntry?.files.size > 0) return;
     if (unlinkEntry) clearTimeout(unlinkEntry.timeout);
 
     const unlinkTimeout = setTimeout(() => {
@@ -3980,7 +4037,8 @@ async function replayMissedAdds() {
   for (const [dir, names] of Object.entries(watcher.getWatched())) {
     for (const name of names) {
       const ext = name.split(".").pop();
-      if (ext !== "srt" && !videoFileExtensions.includes(ext)) continue;
+      if (ext.toLowerCase() !== "srt" && !videoFileExtensions.includes(ext))
+        continue;
       const filePath = path.join(dir, name);
       let stat;
       try {

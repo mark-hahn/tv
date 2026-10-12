@@ -138,6 +138,7 @@ const processedRow = db.prepare(`SELECT 1 FROM processed WHERE path = ?`);
 const insertProcessed = db.prepare(
   `INSERT OR IGNORE INTO processed (path) VALUES (?)`,
 );
+const deleteProcessed = db.prepare(`DELETE FROM processed WHERE path = ?`);
 const setUnfitFor = db.prepare(`UPDATE subs SET unfitFor = ? WHERE fileId = ?`);
 const setHashFor = db.prepare(
   `UPDATE subs SET hashFor = ? WHERE showId = ? AND season = ? AND episode = ? AND fileId = ?`,
@@ -177,7 +178,8 @@ export function videoStem(videoPath) {
   return path.basename(videoPath).replace(/\.[^.]+$/, "");
 }
 
-// The 5-char tag an OpenSubtitles file_id has in a ".opn<TAG>.srt" name.
+// The tag an OpenSubtitles file_id has in a ".opn<TAG>.srt" name: 5 chars,
+// more for an id of 32^5 or over.
 function fileIdTag(fileId) {
   let n = Math.floor(Number(fileId));
   let out = "";
@@ -605,6 +607,12 @@ export function isProcessed(videoPath) {
 
 export function markProcessed(videoPath) {
   insertProcessed.run(videoPath);
+}
+
+// The video is another file now, under the same name: it has not been
+// through the steps, so a run that fails leaves it for the sweep.
+export function unmarkProcessed(videoPath) {
+  deleteProcessed.run(videoPath);
 }
 
 // ---- what subPrepare.js learns ----

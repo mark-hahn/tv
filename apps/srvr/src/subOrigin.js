@@ -19,7 +19,7 @@ const FLAGS = [
 export function sidecarType(suffix) {
   if (/^(T|mb)\d+$/.test(suffix)) return "T";
   if (/^H\d+$/.test(suffix)) return "H";
-  if (/^opn[A-Z2-7]{5}$/i.test(suffix)) return "V";
+  if (/^opn[A-Za-z2-7]{5,}$/.test(suffix)) return "V";
   if (suffix === "asr") return "+";
   return "S";
 }

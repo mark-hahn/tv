@@ -11,6 +11,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import fs from "node:fs";
 import {
+  cleanSrt,
   logHere,
   setUnilogSink,
   unilog,
@@ -193,9 +194,10 @@ const parseMissingChangeDir = (stderrText) => {
 
 const locateUsbPathByTitle = async (usbHost1, title1) => {
   if (!usbHost1 || !title1) return null;
-  // Find the first exact filename match under ~/files (remote cwd assumed to be $HOME).
-  // Using -name for exact match; suppress errors for transient readdir races.
-  const cmd = `find files -ignore_readdir_race -type f -name "${escapeForDoubleQuotes(title1)}" -print -quit 2>/dev/null`;
+  // Find the first exact match under ~/files (remote cwd assumed to be $HOME),
+  // by the end of its path: a title can hold its folder too (a Subs-layout
+  // subtitle, "<episode>/<name>"). Suppress errors for transient readdir races.
+  const cmd = `find files -ignore_readdir_race -type f -path "*/${escapeForDoubleQuotes(title1)}" -print -quit 2>/dev/null`;
   const res = await sshExec(usbHost1, cmd, 20000);
   const line = String(res.stdout || "")
     .split(/\r?\n/)
@@ -203,7 +205,7 @@ const locateUsbPathByTitle = async (usbHost1, title1) => {
     .find(Boolean);
   if (!line) return null;
   if (!line.startsWith("files/")) return null;
-  const dir = path.posix.dirname(line);
+  const dir = line.slice(0, -(title1.length + 1));
   if (!dir || dir === "." || dir === "files") return null;
   const inside = dir.slice("files/".length);
   if (!inside) return null;
@@ -400,8 +402,22 @@ const main = () => {
       removePartialDir();
     }
     await fixMkvSeekIndex(dst);
+    await cleanLandedSrt(dst);
     deleteReplaced(dst);
     return true;
+  };
+
+  // A subtitle file is written through cleanSrt like every other one. It is
+  // rewritten at once, while tv-srvr's watcher still waits for it to settle.
+  const cleanLandedSrt = async (dst) => {
+    if (!/\.srt$/i.test(dst)) return;
+    try {
+      const raw = await fs.promises.readFile(dst, "utf8");
+      const clean = cleanSrt(raw);
+      if (clean !== raw) await fs.promises.writeFile(dst, clean, "utf8");
+    } catch (e) {
+      unilog(2881, `could not clean subtitle file ${path.basename(dst)}: ${e.message}`);
+    }
   };
 
   // The episode's other videos are the ones this download replaces (for a usb

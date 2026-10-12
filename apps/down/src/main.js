@@ -38,6 +38,9 @@ const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
 const RSYNC_PARTIAL_DIR_PATTERN = "^rsync .*--partial-dir=\\.rsync-tmp";
 // usb prune: only check once a day; prune only when free space is low
 const PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+// An English subtitle file's name in a release's Subs/<episode>/ folder, such
+// as "2_eng.srt" or "2_eng,English.srt".
+const SUBS_LAYOUT_ENGLISH_RE = /(^|[^a-z])(eng|english)([^a-z]|$)/i;
 const PRUNE_FREE_PCT = 20; // prune when usb free space falls below this percent
 const PRUNE_WINDOW_DAYS = 10; // delete everything within this many days of the oldest file
 const DOWNLOADS_CHANNEL_POLL_MS = 1000;
@@ -272,6 +275,7 @@ async function main() {
     processingForced,
     tvdbMap,
     destTitle,
+    subsLayoutName,
     _cycleTiming;
 
   forcedFiles = null;
@@ -2764,13 +2768,30 @@ async function main() {
       chkCount++;
       parts = usbFilePath.split("/");
       fname = parts[parts.length - 1];
+      // A release's own subtitles often sit in Subs/<episode>/<n>_<lang>.srt:
+      // the episode is named only by the folder, and every episode's file is
+      // named alike. An English one is known by "<episode>/<name>", which is
+      // unique, and lands as "<episode>.<name>", a sidecar of the video named
+      // like the folder. The rest of these have no episode and are skipped.
+      subsLayoutName = null;
+      if (
+        parts.length >= 3 &&
+        /^subs?$/i.test(parts[parts.length - 3]) &&
+        /\.srt$/i.test(fname) &&
+        /S\d{1,2}E\d{1,2}/i.test(parts[parts.length - 2]) &&
+        SUBS_LAYOUT_ENGLISH_RE.test(fname)
+      ) {
+        subsLayoutName = `${parts[parts.length - 2]}.${fname}`;
+        fname = `${parts[parts.length - 2]}/${fname}`;
+      }
+      const parseName = subsLayoutName || fname;
 
       // Parse title early so all history events can use the real show name.
       const pathParts2 = usbFilePath.split("/");
       const folderName2 = pathParts2.length >= 2 ? pathParts2[0] : "";
       try {
         var parsed =
-          parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, "")) || {};
+          parseTorrentTitle(parseName.replace(/\.[a-z0-9]{2,4}$/i, "")) || {};
         var parsedFolder = {};
         try {
           if (folderName2)
@@ -2778,13 +2799,13 @@ async function main() {
               parseTorrentTitle(folderName2.replace(/\.[a-z0-9]{2,4}$/i, "")) ||
               {};
         } catch (e) {}
-        title = parseTitleFromFilename(fname, folderName2, parsed);
+        title = parseTitleFromFilename(parseName, folderName2, parsed);
         folderTitle = folderName2
           ? parseTitleFromFilename(folderName2, "", parsedFolder)
           : null;
         if (folderTitle === title) folderTitle = null;
         const se = parseFileSeasonEpisode(
-          fname,
+          parseName,
           folderName2,
           parsed,
           parsedFolder,
@@ -2999,6 +3020,8 @@ async function main() {
           }
         }
       }
+      // A Subs-layout subtitle lands under its episode folder's name.
+      if (subsLayoutName) destTitle = subsLayoutName;
       // (logging moved to workers)
       return process.nextTick(chkTvDB);
     } else {
@@ -3348,15 +3371,15 @@ async function main() {
       const seStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
       destTitle = `${showFolderName} ${seStr}${fext}`;
     }
+    // tv-srvr knows a subtitle file only by a lower-case ".srt".
+    if (/\.srt$/i.test(destTitle || fname) && !/\.srt$/.test(destTitle || fname))
+      destTitle = `${(destTitle || fname).slice(0, -".srt".length)}.srt`;
 
     // usbPath is the folder containing the file on the USB host.
     // Example: "~/files/<torrent-folder>/"
-    var usbDir = "";
-    try {
-      usbDir = path.dirname(usbFilePath);
-    } catch (e) {
-      usbDir = "";
-    }
+    // The usb folder the file is fetched from: its path less its title, which
+    // for a Subs-layout subtitle includes its episode folder.
+    var usbDir = usbFilePath.slice(0, -(fname.length + 1));
     if (usbDir === "." || usbDir === "/") {
       usbDir = "";
     }
@@ -3793,12 +3816,7 @@ async function main() {
       usbFilePath,
     });
     try {
-      var usbDir = "";
-      try {
-        usbDir = path.dirname(usbFilePath);
-      } catch (e) {
-        usbDir = "";
-      }
+      var usbDir = usbFilePath.slice(0, -(fname.length + 1));
       if (usbDir === "." || usbDir === "/") usbDir = "";
       var usbPath = usbDir ? `~/files/${usbDir}/` : "~/files/";
       if (isErrorWorthDownloading(reason)) {

@@ -123,10 +123,6 @@ export function registerMediaRoutes(app) {
       }
 
       const startSec = parseInt(req.query.start) || 0;
-      const rawSub = req.query.sub;
-      const subIdx = rawSub !== undefined ? parseInt(rawSub, 10) : null;
-      const usePgsSub =
-        subIdx !== null && !isNaN(subIdx) && subIdx >= 0 && subIdx <= 50;
 
       // copyts: the stream keeps the file's own timestamps, for the browser
       // player's MediaSource (srvr/src/play.html), which puts each stream it
@@ -140,38 +136,7 @@ export function registerMediaRoutes(app) {
         resolved,
       ];
 
-      if (usePgsSub) {
-        // Burn PGS bitmap subtitle into video stream via filter_complex overlay
-        ffmpegArgs.push(
-          "-filter_complex",
-          `${hdr ? `[0:v]${TONEMAP}[t];[t]` : "[0:v]"}[0:${subIdx}]overlay[v]`,
-          "-map",
-          "[v]",
-        );
-        if (audioMap) {
-          ffmpegArgs.push("-map", audioMap);
-        }
-        ffmpegArgs.push(
-          "-c:v",
-          "libx264",
-          "-preset",
-          "ultrafast",
-          "-tune",
-          "zerolatency",
-          "-pix_fmt",
-          "yuv420p",
-          "-crf",
-          "23",
-          "-g",
-          "48",
-          "-c:a",
-          "aac",
-          "-b:a",
-          "128k",
-          "-ac",
-          "2",
-        );
-      } else if (vCopy) {
+      if (vCopy) {
         // h264 video in non-MP4 container: copy the stream, ffmpeg will remux into fMP4.
         // No re-encode needed; the source GOP doesn't matter because frag_keyframe
         // will still fragment at existing keyframe boundaries (typically every 2-5s for web sources).

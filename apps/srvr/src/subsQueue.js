@@ -49,7 +49,9 @@ const EMB_LOG_BUFFER_MAX = 500;
 const AUTO_ASR_DAILY_USD = 20;
 const ASR_USD_PER_HOUR = 0.38;
 // A sidecar this code names itself, as opposed to one that arrived as it is.
-export const NAMED_SIDECAR_RE = /\.(?:[THS]\d+|mb\d+|opn[A-Z2-7]{5}|asr)\.srt$/i;
+// Case-sensitive like sidecarType (subOrigin.js), so a name it calls S is not
+// taken for a named one; an opn tag grows past 5 characters with the file id.
+export const NAMED_SIDECAR_RE = /\.(?:[THS]\d+|mb\d+|opn[A-Za-z2-7]{5,}|asr)\.srt$/;
 
 // ---- shared mutable state (single authoritative reference) ----
 export const subsState = {
@@ -59,6 +61,9 @@ export const subsState = {
   chkSubQueueDelay: 10_000,
   asrQueueDelay: 10_000,
   currentlyProcessingSubPath: null,
+  // A request for the video being processed now, made during its run: the
+  // entry is queued again with it once the run is done.
+  subAgain: null,
   // What the in-flight sub entry is doing right now, for the Queues pane. Sub
   // gets no time estimate: its cost is mostly fixed overhead plus an external
   // API with retries, so there is nothing about the file to predict from.
@@ -244,14 +249,33 @@ function addToAsrQueue(entries) {
     subsState.asrQueueDelay = 500;
   }
 }
+// Two requests for one video as one: either one's naming or replacement
+// stands, with the more urgent priority.
+const mergeSubRequest = (a, b) =>
+  a
+    ? {
+        ...a,
+        renameS: !!(a.renameS || b.renameS),
+        replaced: !!(a.replaced || b.replaced),
+        lowPriority: !!(a.lowPriority && b.lowPriority),
+        fromUI: !!(a.fromUI || b.fromUI),
+      }
+    : { ...b };
 function enqueueSubQueue(entry, toFront) {
-  if (subsState.currentlyProcessingSubPath === entry.videoFilePath) return;
+  // A request for the video being processed now runs it again once this run
+  // is done, so a subtitle file that arrives, or the video changing, mid-run
+  // is not lost.
+  if (subsState.currentlyProcessingSubPath === entry.videoFilePath) {
+    subsState.subAgain = mergeSubRequest(subsState.subAgain, entry);
+    return;
+  }
   const idx = subsState.subQueue.findIndex(
     (e) => e.videoFilePath === entry.videoFilePath,
   );
   if (idx !== -1) {
     const existing = subsState.subQueue[idx];
     if (entry.renameS) existing.renameS = true;
+    if (entry.replaced) existing.replaced = true;
     if (!entry.lowPriority && existing.lowPriority) {
       subsState.subQueue.splice(idx, 1);
       subsState.subQueue.unshift({
@@ -639,6 +663,17 @@ async function processSubQueueEntry() {
     const season = parsed?.season;
     const episode = parsed?.episode;
     const isEpisode = Number.isInteger(season) && Number.isInteger(episode);
+    // The video is another file under the same name (rewritten in place):
+    // what was learned about the old one goes, and so do the copies of its
+    // embedded tracks, which are taken again from this one. Its other
+    // sidecars stay, to be judged against it like any others.
+    if (entry.replaced) {
+      subs.forgetVideo(videoFilePath);
+      subs.unmarkProcessed(videoFilePath);
+      for (const s of subs.listSidecars(videoFilePath))
+        if (s.type === "T" || s.type === "H")
+          await fs.promises.unlink(path.join(path.dirname(videoFilePath), s.file));
+    }
     await extractEmbSrts(videoFilePath, entry.fromUI);
     if (isEpisode && entry.renameS) {
       setSubStage("naming subtitle files");
@@ -692,10 +727,16 @@ async function processSubQueueEntry() {
     const idx = subsState.subQueue.findIndex(
       (e) => e.videoFilePath === videoFilePath,
     );
-    if (idx !== -1) {
-      subsState.subQueue.splice(idx, 1);
-      persistSubQueue();
+    if (idx !== -1) subsState.subQueue.splice(idx, 1);
+    // Asked for again during the run: queued once more.
+    const again = subsState.subAgain;
+    subsState.subAgain = null;
+    if (again) {
+      if (again.lowPriority) subsState.subQueue.push(again);
+      else subsState.subQueue.unshift(again);
+      syncBatchMsgs();
     }
+    if (idx !== -1 || again) persistSubQueue();
     subsState.subQueueBusy = false;
     subsState.currentlyProcessingSubPath = null;
     subsState.subStage = null;

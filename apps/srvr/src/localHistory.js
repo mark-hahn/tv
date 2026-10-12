@@ -495,7 +495,7 @@ function addSidecarEvents(add, ctx) {
     for (const name of fs.readdirSync(dir)) {
       if (
         name.startsWith(prefix) &&
-        /\.opn[A-Z2-7]{5}\.srt$/i.test(name.slice(prefix.length))
+        /\.opn[A-Za-z2-7]{5,}\.srt$/.test(name.slice(prefix.length))
       ) {
         candidates.push({
           file: path.join(dir, name),

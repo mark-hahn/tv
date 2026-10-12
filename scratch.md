@@ -1,4 +1,17 @@
 
+# new .asr processing
+
+## problem
+- .asr.srt has pefect timing and bad wer and other .srt sources have good wording but bad timing.
+- as an example the show `Anger Management` s02e88 has 2 .srt files. one `+ ✓` and one `V CTAPH`. the `V CTAPH` has bad timing because the timing wasn't adjusted.  The `+ ✓` has bad text because the asr wer isn't good enough. 
+
+## goal
+- Having only a .asr.srt checked is not good enough -- when possible there needs to be another .srt checked. 
+
+## action
+- update all-sub.md logic so that at least one .srt file that isn't .asr.srt should always have timing adjusted when possible. highlight in all-sub.md what changed for this.  
+- also update all-sub.md with a plan to backfill
+- make no changes other than to all-sub.md.
 
 The Bear should automatically be on the pickups list and you say it isn't
 

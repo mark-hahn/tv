@@ -2840,22 +2840,19 @@ async function checkMissingEpisodes(playing) {
     const ed = tvdbRecord?.episodeData;
     if (!Array.isArray(ed)) continue;
 
-    let missingSeason = null;
-    let missingEpisode = null;
-    epd.forEachEpisode(ed, (s, e) => {
-      if (missingSeason !== null) return;
-      if (s > season || (s === season && e >= episode)) return;
-      if (!epd.isWatched(ed, s, e)) {
-        missingSeason = s;
-        missingEpisode = e;
-      }
-    });
+    const order = storyOrder(ed);
+    const at = order.findIndex(
+      (o) => o.season === season && o.episode === episode,
+    );
+    const missing = order
+      .slice(0, Math.max(at, 0))
+      .find((o) => !epd.isWatched(ed, o.season, o.episode));
 
-    if (missingSeason !== null) {
+    if (missing) {
       const warningData = {
         showName,
-        missingSeason,
-        missingEpisode,
+        missingSeason: missing.season,
+        missingEpisode: missing.episode,
         currentSeason: season,
         currentEpisode: episode,
         device,

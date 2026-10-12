@@ -1,4 +1,13 @@
 
+
+The Bear should automatically be on the pickups list and you say it isn't
+
+????????????????????????
+my phone ip is .172
+.opnXXXXX naming
+back up pause based on pause length
+=================
+
 # new .srt processing
 
 ## problem
@@ -12,16 +21,6 @@
 - update all-sub.md logic so that at least one .srt file that isn't .asr.srt always has timing adjusted when possible. highlight in all-sub.md what you changed for this.  
 - also update all-sub.md with a plan to backfill
 - make no changes other than to all-sub.md.
-
-The Bear should automatically be on the pickups list and you say it isn't
-
-The season-gap rule is a check on flexget downloads only. It stops flexget from downloading a season further ahead than the seasons you already have, so episodes arrive in order. Nothing else uses it: tor pane sends, tv-down and the gap flags are separate.
-
-????????????????????????
-my phone ip is .172
-.opnXXXXX naming
-back up pause based on pause length
-=================
 
 in the web map pane, when a map cell for a season 0 counted episode is selected then put a red border line on the bottom of the story order cell before that episode and a red border line on the top of the cell after that 
 

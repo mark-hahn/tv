@@ -743,6 +743,7 @@ import * as tvdb from "../tvdb.js";
 import * as util from "../util.js";
 import * as srvr from "../srvr.js";
 import { unilog, logHere } from "../log.js";
+import { normPersonName } from "@tv/share";
 
 const theMan = atob("bXJza2lu");
 
@@ -1035,7 +1036,7 @@ export default {
      * counting every show they are in.
      */
     async buildRelatedRows(actorName) {
-      const target = this.normPersonName(actorName);
+      const target = normPersonName(actorName);
       const allTvdb = await tvdb.getAllTvdb();
       const related = new Map();
       const ownShows = [];
@@ -1047,10 +1048,10 @@ export default {
         const inShow =
           characters.some(
             (char) =>
-              this.normPersonName(char?.personName || char?.actor) === target,
+              normPersonName(char?.personName || char?.actor) === target,
           ) ||
           (Array.isArray(crew) &&
-            crew.some((member) => this.normPersonName(member?.name) === target));
+            crew.some((member) => normPersonName(member?.name) === target));
         if (!inShow) continue;
         ownShows.push(showName);
         // One entry per show, however many roles the actor has in it.
@@ -1059,7 +1060,7 @@ export default {
           const personName = String(
             char?.personName || char?.actor || "",
           ).trim();
-          const key = this.normPersonName(personName);
+          const key = normPersonName(personName);
           if (!key || key === target || counted.has(key)) continue;
           counted.add(key);
           const entry = related.get(key);
@@ -1264,7 +1265,7 @@ export default {
     dedupeByPersonName(list) {
       const seen = new Set();
       return list.filter((item) => {
-        const name = this.normPersonName(item.personName || item.name);
+        const name = normPersonName(item.personName || item.name);
         if (!name || seen.has(name)) return false;
         seen.add(name);
         return true;
@@ -1291,12 +1292,6 @@ export default {
       }
     },
 
-    normPersonName(name) {
-      return String(name || "")
-        .trim()
-        .toLowerCase();
-    },
-
     mergeTmdbTvdbActors(tmdbIn, tvdbIn) {
       const tmdb = Array.isArray(tmdbIn) ? [...tmdbIn] : [];
       const tvdb = Array.isArray(tvdbIn) ? [...tvdbIn] : [];
@@ -1309,7 +1304,7 @@ export default {
       const deduplicateByActor = (list) => {
         const seen = new Set();
         return list.filter((actor) => {
-          const name = this.normPersonName(actor?.personName || actor?.name);
+          const name = normPersonName(actor?.personName || actor?.name);
           if (seen.has(name)) return false;
           seen.add(name);
           return true;
@@ -1321,13 +1316,13 @@ export default {
 
       // Sort both lists by normalized person name so duplicates align
       tmdbUnique.sort((a, b) => {
-        const nameA = this.normPersonName(a?.personName || a?.name);
-        const nameB = this.normPersonName(b?.personName || b?.name);
+        const nameA = normPersonName(a?.personName || a?.name);
+        const nameB = normPersonName(b?.personName || b?.name);
         return nameA.localeCompare(nameB);
       });
       tvdbUnique.sort((a, b) => {
-        const nameA = this.normPersonName(a?.personName || a?.name);
-        const nameB = this.normPersonName(b?.personName || b?.name);
+        const nameA = normPersonName(a?.personName || a?.name);
+        const nameB = normPersonName(b?.personName || b?.name);
         return nameA.localeCompare(nameB);
       });
 
@@ -1350,8 +1345,8 @@ export default {
 
         const t0 = tmdbUnique[0];
         const v0 = tvdbUnique[0];
-        const tName = this.normPersonName(t0?.personName || t0?.name);
-        const vName = this.normPersonName(v0?.personName || v0?.name);
+        const tName = normPersonName(t0?.personName || t0?.name);
+        const vName = normPersonName(v0?.personName || v0?.name);
 
         const duplicate = tName && vName && tName === vName;
         if (duplicate) {
@@ -1576,19 +1571,19 @@ export default {
       if (this.seriesActors && this.seriesActors.length > 0) {
         const regularNames = new Set(
           this.seriesActors.map((actor) =>
-            this.normPersonName(actor?.personName || actor?.name),
+            normPersonName(actor?.personName || actor?.name),
           ),
         );
 
         tmdbList = tmdbList.filter((actor) => {
-          const actorName = this.normPersonName(
+          const actorName = normPersonName(
             actor?.personName || actor?.name,
           );
           return !regularNames.has(actorName);
         });
 
         tvdbList = tvdbList.filter((actor) => {
-          const actorName = this.normPersonName(
+          const actorName = normPersonName(
             actor?.personName || actor?.name,
           );
           return !regularNames.has(actorName);
@@ -2049,11 +2044,11 @@ export default {
       if (showKey && tmdbList.length > 0) {
         const existingChars = Array.isArray(characters) ? characters : [];
         const existingNames = new Set(
-          existingChars.map((c) => this.normPersonName(c.actor)),
+          existingChars.map((c) => normPersonName(c.actor)),
         );
         const newChars = tmdbList
           .filter((a) => {
-            const n = this.normPersonName(a.personName || a.name);
+            const n = normPersonName(a.personName || a.name);
             return n && !existingNames.has(n);
           })
           .map((a) => ({

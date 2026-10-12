@@ -328,6 +328,7 @@ import {
   getSortKey,
   sortShowList,
   filterShowList,
+  normPersonName,
 } from "@tv/share";
 import { unilog, logHere } from "../log.js";
 import { config } from "../config.js";
@@ -2985,11 +2986,6 @@ export default {
 
     async buildActorsList() {
       if (!allTvdb) allTvdb = await tvdb.getAllTvdb();
-      const normName = (n) =>
-        String(n || "")
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, " ");
       const actorMap = new Map(); // normKey -> { name, displayName, actorCount }
       for (const show of allShows) {
         const tvdbData = allTvdb?.[show.name];
@@ -3001,7 +2997,7 @@ export default {
         for (const char of characters) {
           const name = String(char?.personName || char?.actor || "").trim();
           if (!name) continue;
-          const key = normName(name);
+          const key = normPersonName(name);
           if (seenInShow.has(key)) continue;
           seenInShow.add(key);
           if (actorMap.has(key)) {
@@ -3054,13 +3050,8 @@ export default {
       this.actorsList = [];
       await this.filterShowsByActor(actorName);
       // Sort matched actor to beginning in actors pane on next show selection
-      const normName = (n) =>
-        String(n || "")
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, " ");
-      const targetNorm = normName(actorName);
-      const matchesSearchTerm = (n) => normName(n) === targetNorm;
+      const targetNorm = normPersonName(actorName);
+      const matchesSearchTerm = (n) => normPersonName(n) === targetNorm;
       this.actorSearchParams = { searchWords: [], matchesSearchTerm };
       evtBus.emit("actorSearchActive", { searchWords: [], matchesSearchTerm });
       if (this.shows.length > 0) this.saveVisShow(this.shows[0], true);
@@ -3069,14 +3060,7 @@ export default {
     async filterShowsByActor(actorName) {
       if (!actorName) return;
 
-      // Normalize actor name for comparison
-      const normName = (name) =>
-        String(name || "")
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, " ");
-
-      const targetActorName = normName(actorName);
+      const targetActorName = normPersonName(actorName);
       unilog(
         988,
         "Filtering by actor:",
@@ -3099,14 +3083,14 @@ export default {
         if (!Array.isArray(characters)) return false;
 
         const inCharacters = characters.some((char) => {
-          const charActorName = normName(char?.personName || char?.actor);
+          const charActorName = normPersonName(char?.personName || char?.actor);
           return charActorName === targetActorName;
         });
         if (inCharacters) return true;
 
         const crew = actualData?.crew;
         if (!Array.isArray(crew)) return false;
-        return crew.some((c) => normName(c?.name) === targetActorName);
+        return crew.some((c) => normPersonName(c?.name) === targetActorName);
       });
 
       unilog(
@@ -3696,13 +3680,8 @@ export default {
     on("filterByActor", async ({ actorName }) => {
       await this.filterShowsByActor(actorName);
       // Sort matched actor to top of actors pane on each show selection
-      const normName = (n) =>
-        String(n || "")
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, " ");
-      const targetNorm = normName(actorName);
-      const matchesSearchTerm = (n) => normName(n) === targetNorm;
+      const targetNorm = normPersonName(actorName);
+      const matchesSearchTerm = (n) => normPersonName(n) === targetNorm;
       this.actorSearchParams = { searchWords: [], matchesSearchTerm };
       evtBus.emit("actorSearchActive", { searchWords: [], matchesSearchTerm });
     });

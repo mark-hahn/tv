@@ -8,6 +8,7 @@ import * as util from "./util.js";
 import {
   smartTitleMatch,
   getSeasonIntro as getSeasonIntroShared,
+  normPersonName,
 } from "@tv/share";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "@tv/share";
@@ -1538,15 +1539,6 @@ async function getTmdbAggregateCast(remoteIds) {
   return Array.isArray(credits?.cast) ? credits.cast : [];
 }
 
-// Actor names as they compare across the two sources: case, punctuation and
-// runs of whitespace all differ between TVDB and TMDB spellings.
-function normActorName(name) {
-  return String(name ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
 /**
  * TVDB knows who acted in a show but often not who they played -- a series
  * like Bob and Rose comes back with a full character list whose every `name`
@@ -1561,13 +1553,13 @@ async function fillMissingCharacterNames(characters, remoteIds, name) {
     if (!cast.length) return characters;
     const rolesByActor = new Map(
       cast.map((actor) => [
-        normActorName(actor.name),
+        normPersonName(actor.name),
         actor.roles?.[0]?.character ?? "",
       ]),
     );
     for (const char of characters) {
       if (char.character) continue;
-      const role = rolesByActor.get(normActorName(char.actor));
+      const role = rolesByActor.get(normPersonName(char.actor));
       if (role) char.character = role;
     }
   } catch (e) {
@@ -1586,10 +1578,10 @@ async function fillMissingCharacterNames(characters, remoteIds, name) {
  */
 function keepTmdbCharacters(characters, existingCharacters) {
   if (!Array.isArray(existingCharacters)) return characters;
-  const tvdbActors = new Set(characters.map((char) => normActorName(char.actor)));
+  const tvdbActors = new Set(characters.map((char) => normPersonName(char.actor)));
   const kept = existingCharacters.filter(
     (char) =>
-      char?.source === "tmdb" && !tvdbActors.has(normActorName(char.actor)),
+      char?.source === "tmdb" && !tvdbActors.has(normPersonName(char.actor)),
   );
   return kept.length ? [...characters, ...kept] : characters;
 }
@@ -2867,7 +2859,7 @@ export const getActorPage = async (params) => {
     }
 
     const exactMatch = allMatches.find(
-      (m) => m.name.toLowerCase() === actorName.toLowerCase(),
+      (m) => normPersonName(m.name) === normPersonName(actorName),
     );
 
     if (exactMatch) {

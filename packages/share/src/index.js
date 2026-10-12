@@ -779,3 +779,18 @@ export function getSeasonIntro(seasonIntros, season) {
   }
   return { ...EMPTY_SEASON_INTRO };
 }
+
+// Person names as they compare across TVDB, TMDB and IMDb, which spell them
+// differently: case, punctuation, spacing and Latin accents are all ignored,
+// so "Helen J. Shen" matches "Helen J Shen" and "Zoë" matches "Zoe". Other
+// scripts keep their marks (й stays apart from и). Mirrored in tvapp's
+// Shows.normalizeName -- change the two together.
+const UNDECOMPOSED_LATIN = { ø: "o", æ: "ae", œ: "oe", ß: "ss", ł: "l", đ: "d", ð: "d", þ: "th", ı: "i" };
+export function normPersonName(name) {
+  return String(name ?? "")
+    .normalize("NFKD")
+    .replace(/([A-Za-zÀ-ɏ])\p{M}+/gu, "$1")
+    .toLowerCase()
+    .replace(/[øæœßłđðþı]/g, (c) => UNDECOMPOSED_LATIN[c])
+    .replace(/[^\p{L}\p{M}\p{N}]/gu, "");
+}

@@ -6,7 +6,7 @@
 // dataset. TMDB's person credits are the same filmography over an ordinary
 // JSON API, so no browser is involved at all now.
 
-import { logHere, unilog} from "@tv/share"
+import { logHere, unilog, normPersonName } from "@tv/share"
 
 const TMDB_API_KEY = "327192a334da700f65b882c7a69cb927";
 const TMDB_URL = "https://api.themoviedb.org/3";
@@ -29,12 +29,6 @@ const FILTER_WORDS = [
   "self",
 ];
 
-const normalizeName = (str) =>
-  String(str ?? "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]/g, "");
-
 async function tmdbGet(path, params = {}) {
   const query = new URLSearchParams({ ...params, api_key: TMDB_API_KEY });
   const resp = await fetch(`${TMDB_URL}${path}?${query}`, {
@@ -47,9 +41,9 @@ async function tmdbGet(path, params = {}) {
 // The person TMDB's search means by this name: an exact name match first, then
 // whoever TMDB ranked highest among actors, then whoever it ranked highest.
 function pickPerson(results, actorName) {
-  const wanted = normalizeName(actorName);
+  const wanted = normPersonName(actorName);
   return (
-    results.find((p) => normalizeName(p.name) === wanted) ||
+    results.find((p) => normPersonName(p.name) === wanted) ||
     results.find((p) => p.known_for_department === "Acting") ||
     results[0] ||
     null

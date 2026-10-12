@@ -1,11 +1,13 @@
 package com.hahnca.tvapp;
 
 import android.util.Log;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -377,8 +379,22 @@ class Shows {
     return key.startsWith("the ") ? key.substring(4) : key;
   }
 
-  /** So the same actor typed or read two different ways still compares equal. */
+  private static final String[][] UNDECOMPOSED_LATIN = {
+    {"ø", "o"}, {"æ", "ae"}, {"œ", "oe"}, {"ß", "ss"}, {"ł", "l"},
+    {"đ", "d"}, {"ð", "d"}, {"þ", "th"}, {"ı", "i"},
+  };
+
+  /**
+   * So the same actor typed or read two different ways still compares equal:
+   * case, punctuation, spacing and Latin accents are ignored. Mirrors
+   * normPersonName in packages/share -- change the two together.
+   */
   static String normalizeName(String name) {
-    return name == null ? "" : name.trim().toLowerCase().replaceAll("\\s+", " ");
+    if (name == null) return "";
+    String key = Normalizer.normalize(name, Normalizer.Form.NFKD)
+        .replaceAll("([A-Za-z\\u00C0-\\u024F])\\p{M}+", "$1")
+        .toLowerCase(Locale.ROOT);
+    for (String[] pair : UNDECOMPOSED_LATIN) key = key.replace(pair[0], pair[1]);
+    return key.replaceAll("[^\\p{L}\\p{M}\\p{N}]", "");
   }
 }

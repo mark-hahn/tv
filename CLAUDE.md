@@ -325,6 +325,20 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   `<episode>.<name>`. A `.srt` whose name and top folder give no season and
   episode (the other languages in that layout) is skipped with a log line,
   never an error entry.
+- Retime (`retimePass()` in `subPrepare.js`): a video with an `.asr.srt` and
+  no other file checked good gets one other file shifted by one offset to
+  fit the `.asr.srt`, so one file has a real subtitle's wording and the
+  video's timing. The offset is the median of the start-time differences of
+  the phrases the two share (`asrOffset()` in `subSync.js`, the local pane's
+  Sync), with at least 10 matches and 80% of them within 250 ms of it, else
+  the file is from another cut. Files on disk are tried in order T, H, V, S,
+  then OpenSubtitles downloads, up to 5. The retimed file is checked good,
+  method "retime". It runs in a sub queue entry after the checks, alone from
+  an entry with the `retime` mark (an `.asr.srt` landing, the backfill
+  `scripts/retime-backfill.js`), and from the watcher for a file arriving
+  beside such a video. `subs.db`'s `retimes` table records each pass, and the
+  queue does not repeat one by itself. A good `+` file is the start pick
+  only when no good file of another type is there.
 - Movies get no subtitle processing.
 - Players: tvapp; tv-srvr's browser player (`play.html` at `/api/play`),
   opened by the info and map panes' Play and by the local pane's Play for an

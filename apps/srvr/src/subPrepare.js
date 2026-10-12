@@ -23,7 +23,7 @@ import * as path from "node:path";
 import { logHere, unilog} from "@tv/share"
 import * as subs from "./subs.js";
 import * as sc from "./subSpotCheck.js";
-import { syncSubToAudio, syncSubToAsr, sidecarVideo } from "./subSync.js";
+import { syncSubToAudio, asrOffset, shiftedSrt, sidecarVideo } from "./subSync.js";
 
 const TV_DIR = "/mnt/media/tv";
 
@@ -54,6 +54,130 @@ function storedSet(videoPath) {
   if (!stored || stored.track < 0) return null;
   return { track: stored.track, ...sc.clipsFromJson(stored) };
 }
+
+// ---- retiming against the .asr.srt ----
+//
+// An .asr.srt has the video's timing but ASR's wording; the other files have
+// a real subtitle's wording but often another release's timing. A video whose
+// only good file is its .asr.srt gets one other file shifted by one offset to
+// fit it (asrOffset), so one file is right on both counts.
+
+// The video's .asr.srt, as a path, or null.
+function asrFileOf(videoPath) {
+  const s = subs.listSidecars(videoPath).find((x) => x.type === "+");
+  return s ? path.join(path.dirname(videoPath), s.file) : null;
+}
+
+// Whether a sidecar of the video other than its .asr.srt is checked good.
+function otherGood(videoPath) {
+  const dir = path.dirname(videoPath);
+  return subs
+    .listSidecars(videoPath)
+    .some((s) => s.type !== "+" && subs.freshCheck(path.join(dir, s.file))?.verdict === "good");
+}
+
+// Whether the video needs a retime: it has an .asr.srt and nothing else good.
+export const needsRetime = (videoPath) => !!asrFileOf(videoPath) && !otherGood(videoPath);
+
+// The sidecar f shifted to fit the video's .asr.srt, its verdict stored as
+// good. Returns true when it fits, else false, with why in notes. dryRun
+// writes nothing.
+async function retimeFile(videoPath, f, dryRun, notes) {
+  const asrFile = asrFileOf(videoPath);
+  if (!asrFile || f.type === "+") return false;
+  const file = path.join(path.dirname(videoPath), f.file);
+  const suffix = suffixOf(videoPath, f.file);
+  const text = await fsp.readFile(file, "utf8");
+  let r;
+  try {
+    r = asrOffset(text, await fsp.readFile(asrFile, "utf8"), path.basename(asrFile));
+  } catch (e) {
+    notes.push(`${suffix} not retimed: ${e.message}`);
+    return false;
+  }
+  const how = `retimed ${fmtOfs(r.offsetMs)} (${r.matches} phrases)`;
+  if (dryRun) {
+    notes.push(`${suffix} would be ${how}`);
+    return true;
+  }
+  if (r.offsetMs !== 0) await fsp.writeFile(file, shiftedSrt(text, r.offsetMs), "utf8");
+  subs.saveCheck({
+    file,
+    video: videoPath,
+    verdict: "good",
+    offsetMs: r.offsetMs,
+    method: "retime",
+    detail: `${r.matches} phrases`,
+  });
+  notes.push(`${suffix} ${how}`);
+  return true;
+}
+
+// The retime pass: one sidecar of the video other than its .asr.srt fitted
+// to it, when it has an .asr.srt and nothing else good. The files on disk are
+// tried in order (T, H, V, S), then, with canDownload, OpenSubtitles
+// candidates one at a time, each as it lands, up to MAX_FIT_DOWNLOADS. The
+// pass is skipped for a video that has had one unless force; its outcome is
+// stored (subs.saveRetime). Returns the file fitted, or null.
+export async function retimePass({
+  videoPath,
+  rec,
+  season,
+  episode,
+  canDownload = false,
+  force = false,
+  dryRun = false,
+  notes = [],
+}) {
+  if (!asrFileOf(videoPath)) return null;
+  if (!force && !dryRun && subs.getRetime(videoPath)) return null;
+  if (otherGood(videoPath)) {
+    if (!dryRun) subs.saveRetime(videoPath, null);
+    return null;
+  }
+  if (busy.has(videoPath))
+    throw new Error(`${path.basename(videoPath)} is being prepared already`);
+  busy.add(videoPath);
+  try {
+    const { durS } = await sc.videoInfo(videoPath);
+    const dir = path.dirname(videoPath);
+    const files = await sc.readSidecars(videoPath, durS);
+    let fitted = null;
+    for (const f of files) {
+      if (f.type === "+" || f.unusable) continue;
+      if (subs.freshCheck(path.join(dir, f.file))?.verdict === "good") continue;
+      if (await retimeFile(videoPath, f, dryRun, notes)) {
+        fitted = f.file;
+        break;
+      }
+    }
+    const download =
+      !fitted && canDownload && !!rec?.imdbId && Number.isInteger(season) && Number.isInteger(episode);
+    if (download && dryRun) notes.push("would download from OpenSubtitles to retime");
+    if (download && !dryRun) {
+      const got = await subs.downloadUntilFit(rec, season, episode, videoPath, async (file) => {
+        const f = sidecarOf(videoPath, await sc.readSidecars(videoPath, durS), file);
+        if (!f) return "gone";
+        if (f.unusable) {
+          await dropOrHide(videoPath, f, "unusable", f.why, "retime", false, notes);
+          return "unusable";
+        }
+        if (await retimeFile(videoPath, f, false, notes)) return "good";
+        await dropOrHide(videoPath, f, "wrong cut", "no one shift fits the .asr.srt", "retime", false, notes);
+        return "wrong cut";
+      });
+      if (got) fitted = path.basename(got);
+    }
+    if (!dryRun) subs.saveRetime(videoPath, fitted);
+    unilog(2883, `${showNameOf(videoPath)}: retime of ${path.basename(videoPath)}${dryRun ? " (dry)" : ""}: ${fitted ? `${fitted} fits its .asr.srt` : "nothing fits its .asr.srt"}; ${notes.join(", ") || "no files"}`);
+    return fitted;
+  } finally {
+    busy.delete(videoPath);
+  }
+}
+
+// The show folder's name, for the log.
+const showNameOf = (videoPath) => path.basename(path.dirname(path.dirname(videoPath)));
 
 // An opn file that cannot be used is deleted and marked so it is not
 // downloaded for the video again; any other is kept, never offered.
@@ -104,8 +228,12 @@ async function act(videoPath, f, r, set, dryRun, notes) {
     const again = sc.judge(sc.cuesOf(text), set);
     notes.push(`${suffix} ${how}, now ${again.verdict}`);
     save(again.verdict, again.offsetMs ?? null, how);
+    if (again.verdict !== "good" && (await retimeFile(videoPath, f, false, notes))) return "good";
     return again.verdict;
   }
+  // Beside an .asr.srt, a file the clips do not find good is first fitted to
+  // it; only when that fails is it dealt with by its verdict.
+  if (await retimeFile(videoPath, f, dryRun, notes)) return "good";
   if (r.verdict === "wrong cut") {
     await dropOrHide(videoPath, f, "wrong cut", r.why ?? `another cut: ${pairs}`, "asr", dryRun, notes);
     return "wrong cut";
@@ -291,13 +419,20 @@ export async function subFileEvent(file, kind) {
   }
   await notBusy(videoPath);
   const stored = subs.getClips(videoPath);
-  if (!stored || subs.freshCheck(file)) return;
+  if (subs.freshCheck(file)) return;
+  // A video never checked: the arrival is only fitted to the .asr.srt, when
+  // the video has one and needs that.
+  if (!stored && !needsRetime(videoPath)) return;
   busy.add(videoPath);
   const notes = [];
   try {
     const { durS } = await sc.videoInfo(videoPath);
     const f = sidecarOf(videoPath, await sc.readSidecars(videoPath, durS), file);
     if (!f) return;
+    if (!stored) {
+      if (!f.unusable) await retimeFile(videoPath, f, false, notes);
+      return;
+    }
     if (stored.track < 0) {
       await actByAudio(videoPath, f, false, notes);
       return;
@@ -461,15 +596,30 @@ async function measureByAudio(videoPath, name) {
 
 // The Sync of the local pane and the remotes' subtitle panel: the file moved
 // to fit the words of its video, by the clip transcripts stored for the video
-// when it has them, else by its .asr.srt (syncSubToAsr). Returns {offsetMs,
-// matches}.
-export async function syncSidecar({ path: relPath, asrPath }) {
+// when it has them, else by its .asr.srt (the retime, by hand). Returns
+// {offsetMs, matches}.
+export async function syncSidecar({ path: relPath }) {
   const file = path.resolve(TV_DIR, String(relPath || ""));
   if (!file.startsWith(TV_DIR + "/") || !file.endsWith(".srt"))
     throw new Error(`not a tv .srt: ${relPath}`);
   const videoPath = await sidecarVideo(file);
   const set = storedSet(videoPath);
-  if (!set) return syncSubToAsr({ path: relPath, asrPath });
+  if (!set) {
+    await notBusy(videoPath);
+    const { durS } = await sc.videoInfo(videoPath);
+    const f = sidecarOf(videoPath, await sc.readSidecars(videoPath, durS), file);
+    if (!f) throw new Error(`${path.basename(file)} is not a sidecar of ${path.basename(videoPath)}`);
+    if (f.unusable) throw new Error(`${path.basename(file)} is unusable: ${f.why}`);
+    const notes = [];
+    busy.add(videoPath);
+    try {
+      if (!(await retimeFile(videoPath, f, false, notes))) throw new Error(notes[0]);
+    } finally {
+      busy.delete(videoPath);
+    }
+    const check = subs.freshCheck(file);
+    return { offsetMs: check.offsetMs, matches: Number(/(\d+) phrases/.exec(check.detail)?.[1]) };
+  }
   const text = await fsp.readFile(file, "utf8");
   const r = sc.judge(sc.cuesOf(text), set);
   const matches = r.clips.reduce((n, c) => n + c.pairs, 0);

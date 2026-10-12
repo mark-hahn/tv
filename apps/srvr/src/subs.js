@@ -83,6 +83,14 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS checksVideo ON checks (video);
   CREATE TABLE IF NOT EXISTS asrSpend (day TEXT PRIMARY KEY, usd REAL NOT NULL);
 `);
+// retimes: when a video's retime pass (subPrepare.js) last ran and the file
+// it fitted to the .asr.srt, null when none did; the queue does not run a
+// pass again by itself for a video that has a row.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS retimes (
+    video TEXT PRIMARY KEY, file TEXT, ts INTEGER NOT NULL
+  );
+`);
 // subs.unfitFor: the video this file was found not to fit (another cut or
 // rate); it is never downloaded for that video again. subs.hashFor: the video
 // whose OpenSubtitles hash a search said this file was made for.
@@ -163,6 +171,12 @@ const upsertCheck = db.prepare(`
 `);
 const deleteCheckRow = db.prepare(`DELETE FROM checks WHERE file = ?`);
 const deleteVideoChecks = db.prepare(`DELETE FROM checks WHERE video = ?`);
+const retimeRow = db.prepare(`SELECT * FROM retimes WHERE video = ?`);
+const upsertRetime = db.prepare(`
+  INSERT INTO retimes (video, file, ts) VALUES (?, ?, ?)
+  ON CONFLICT(video) DO UPDATE SET file = excluded.file, ts = excluded.ts
+`);
+const deleteRetime = db.prepare(`DELETE FROM retimes WHERE video = ?`);
 const spendRow = db.prepare(`SELECT usd FROM asrSpend WHERE day = ?`);
 const addSpend = db.prepare(`
   INSERT INTO asrSpend (day, usd) VALUES (?, ?)
@@ -258,15 +272,28 @@ export function clearDownloadedWithout(episodes) {
 // The index in sidecars to start on, -1 with none: the one this episode last
 // showed, else one of the type the show last showed (for a download, the one
 // from the same origin as a chosen one), else the first.
-export function pickSidecar(showId, season, episode, sidecars) {
+export function pickSidecar(showId, season, episode, sidecars, dir = null) {
   if (sidecars.length === 0) return -1;
+  // A good ASR file is the start only when nothing of another type is good:
+  // the others have a real subtitle's wording. So the episode's own last pick
+  // is passed over when it is the ASR file and another file has been checked
+  // good since, and the show's last type is passed over when it is ASR.
+  const others = sidecars.some((s) => s.type !== "+");
   const own = episodePick.get(showId, season, episode);
   if (own) {
     const i = sidecars.findIndex((s) => s.suffix === own.suffix);
-    if (i !== -1) return i;
+    const otherGoodSince =
+      own.type === "+" &&
+      dir &&
+      sidecars.some(
+        (s) =>
+          s.type !== "+" &&
+          (freshCheck(path.join(dir, s.file))?.ts ?? 0) > own.ts,
+      );
+    if (i !== -1 && !otherGoodSince) return i;
   }
   const last = lastShowPick.get(showId);
-  if (!last) return 0;
+  if (!last || (last.type === "+" && others)) return 0;
   if (last.type === "V") {
     const chosen = chosenSubs.all(showId);
     const rows = episodeSubs.all(showId, season, episode);
@@ -305,7 +332,7 @@ export function playList(showId, season, episode, videoPath) {
   let before = 0;
   for (const group of groups) {
     if (group.length > 0) {
-      pick = before + pickSidecar(showId, season, episode, group);
+      pick = before + pickSidecar(showId, season, episode, group, dir);
       break;
     }
     before += group.length;
@@ -428,6 +455,11 @@ function nextCandidate(showId, season, episode, failed, videoPath) {
 }
 
 // Returns how long the API took to hand out the link, in ms.
+// The downloads OpenSubtitles said were left for the day, with the last
+// download's answer; null before any.
+let quota = null;
+export const downloadsRemaining = () => quota;
+
 async function downloadSub(row, videoPath) {
   const login = loadSubsLogin();
   const startedAt = Date.now();
@@ -440,6 +472,8 @@ async function downloadSub(row, videoPath) {
   if (!dl.resp.ok)
     throw new Error(`OpenSubtitles download HTTP ${dl.resp.status}`);
   const link = typeof dl.body?.link === "string" ? dl.body.link.trim() : "";
+  if (Number.isInteger(dl.body?.remaining))
+    quota = { remaining: dl.body.remaining, ts: Date.now() };
   if (!link) throw new Error("OpenSubtitles download gave no link");
   const resp = await fetch(link, { headers: { Accept: "*/*" } });
   if (!resp.ok) throw new Error(`subtitle file HTTP ${resp.status}`);
@@ -664,6 +698,17 @@ export function forgetCheck(file) {
 export function forgetVideo(video) {
   deleteVideoChecks.run(video);
   deleteClipsRow.run(video);
+  deleteRetime.run(video);
+}
+
+// ---- the retime pass (subPrepare.js) ----
+
+export function getRetime(video) {
+  return retimeRow.get(video) ?? null;
+}
+
+export function saveRetime(video, file) {
+  upsertRetime.run(video, file, Date.now());
 }
 
 // The opn file with this suffix does not fit this video.

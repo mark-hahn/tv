@@ -54,6 +54,7 @@ import {
 import {
   videoFileExtensions,
   resFindEpisodeVideos,
+  resIsVideoName,
   vidDeleteWithSidecars,
 } from "./src/videoFiles.js";
 import {
@@ -2230,11 +2231,24 @@ app.post(
       episode: se?.episode,
       dryRun: dryRun !== false,
     });
+    // What the retime pass would do, when the video needs one.
+    const retime = [];
+    if (subPrepare.needsRetime(videoPath))
+      await subPrepare.retimePass({
+        videoPath,
+        rec,
+        season: se?.season,
+        episode: se?.episode,
+        canDownload: true,
+        dryRun: dryRun !== false,
+        notes: retime,
+      });
     const play = rec
       ? subs.playList(String(rec.id), se?.season, se?.episode, videoPath)
       : null;
     return {
       ...prep,
+      retime,
       play: play && {
         labels: play.sidecars.map((x) => x.label),
         pick: play.pick,
@@ -2317,8 +2331,10 @@ app.post("/api/applySubOffset", async (req, res) => {
 // ASR subtitle queue endpoints
 // lowPriority queues them at the back, after all other batch work, as the
 // sweep does (a backfill).
+// retime queues only the retime pass (subPrepare.js) for them, as the
+// backfill does.
 app.post("/api/asr/subs/enqueue", (req, res) => {
-  const { videoPaths, fromUI, lowPriority } = req.body || {};
+  const { videoPaths, fromUI, lowPriority, retime } = req.body || {};
   if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
     res.status(400).json({ error: "videoPaths required" });
     return;
@@ -2326,19 +2342,26 @@ app.post("/api/asr/subs/enqueue", (req, res) => {
   if (lowPriority)
     for (const vp of videoPaths)
       enqueueSubQueue(
-        { videoFilePath: vp, fromUI: false, lowPriority: true },
+        { videoFilePath: vp, fromUI: false, lowPriority: true, retime: !!retime },
         false,
       );
   else
     for (const vp of [...videoPaths].reverse()) {
       enqueueSubQueue(
-        { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false },
+        { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false, retime: !!retime },
         true,
       );
     }
   persistSubQueue();
   doSubQueueNow();
   res.json({ ok: true, queued: videoPaths.length });
+});
+
+// The downloads OpenSubtitles said were left for the day, from the last
+// download's answer: {remaining, ts}, or null before any. The backfill
+// paces itself by it.
+app.get("/api/subsQuota", (req, res) => {
+  res.json(subs.downloadsRemaining());
 });
 
 app.post("/api/asr/gensrt/enqueue", (req, res) => {
@@ -3806,6 +3829,29 @@ function subFileAdded(filePath) {
   doSubQueueNow();
 }
 
+// An .asr.srt landed (an ASR job): its video gets the retime pass, so one
+// other file is fitted to it (subPrepare.js).
+function asrLanded(asrFile) {
+  const dir = path.dirname(asrFile);
+  const stem = path.basename(asrFile).slice(0, -".asr.srt".length);
+  const video = fs
+    .readdirSync(dir)
+    .find((f) => resIsVideoName(f) && f.replace(/\.[^.]+$/, "") === stem);
+  if (!video) return;
+  enqueueSubQueue(
+    {
+      videoFilePath: path.join(dir, video),
+      fromUI: false,
+      lowPriority: false,
+      renameS: false,
+      retime: true,
+    },
+    false,
+  );
+  persistSubQueue();
+  doSubQueueNow();
+}
+
 // A ".SRT" file renamed to ".srt", unless that name is taken.
 async function lowerSrtExt(filePath) {
   const to = `${filePath.slice(0, -"srt".length)}srt`;
@@ -3871,9 +3917,14 @@ watcher
     if (ext === "srt") {
       subFileChanged(filePath);
       subFileAdded(filePath);
-      subPrepare.subFileEvent(filePath, "add").catch((e) => {
-        unilog(2797, `check of added ${path.basename(filePath)} failed: ${e.message}`);
-      });
+      subPrepare
+        .subFileEvent(filePath, "add")
+        .then(() => {
+          if (filePath.endsWith(".asr.srt")) asrLanded(filePath);
+        })
+        .catch((e) => {
+          unilog(2797, `check of added ${path.basename(filePath)} failed: ${e.message}`);
+        });
       return;
     }
     if (!videoFileExtensions.includes(ext)) return;

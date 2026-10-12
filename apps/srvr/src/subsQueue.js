@@ -32,7 +32,7 @@ import * as tvdb from "./tvdb.js";
 import * as subs from "./subs.js";
 import { stillsBusy } from "./stills.js";
 import { getRecodePending } from "./recode.js";
-import { prepareVideoSubs } from "./subPrepare.js";
+import { prepareVideoSubs, retimePass, needsRetime } from "./subPrepare.js";
 
 // ---- hard-wired constants (no env vars per repo convention) ----
 const moviesDir = "/mnt/media/movies";
@@ -257,6 +257,7 @@ const mergeSubRequest = (a, b) =>
         ...a,
         renameS: !!(a.renameS || b.renameS),
         replaced: !!(a.replaced || b.replaced),
+        retime: !!(a.retime || b.retime),
         lowPriority: !!(a.lowPriority && b.lowPriority),
         fromUI: !!(a.fromUI || b.fromUI),
       }
@@ -276,6 +277,7 @@ function enqueueSubQueue(entry, toFront) {
     const existing = subsState.subQueue[idx];
     if (entry.renameS) existing.renameS = true;
     if (entry.replaced) existing.replaced = true;
+    if (entry.retime) existing.retime = true;
     if (!entry.lowPriority && existing.lowPriority) {
       subsState.subQueue.splice(idx, 1);
       subsState.subQueue.unshift({
@@ -663,6 +665,20 @@ async function processSubQueueEntry() {
     const season = parsed?.season;
     const episode = parsed?.episode;
     const isEpisode = Number.isInteger(season) && Number.isInteger(episode);
+    // The retime mark (an .asr.srt landing, the backfill): only the retime
+    // pass, with downloads, nothing else.
+    if (entry.retime) {
+      setSubStage("retiming subtitles");
+      await retimePass({
+        videoPath: videoFilePath,
+        rec,
+        season,
+        episode,
+        canDownload: true,
+        force: true,
+      });
+      return;
+    }
     // The video is another file under the same name (rewritten in place):
     // what was learned about the old one goes, and so do the copies of its
     // embedded tracks, which are taken again from this one. Its other
@@ -688,6 +704,19 @@ async function processSubQueueEntry() {
       episode,
       setStage: setSubStage,
     });
+    // A video whose only good file is its .asr.srt gets one other file fitted
+    // to it, once; a video only now going to ASR has no .asr.srt yet, and
+    // gets its pass when that lands.
+    if (needsRetime(videoFilePath) && !subs.getRetime(videoFilePath)) {
+      setSubStage("retiming subtitles");
+      await retimePass({
+        videoPath: videoFilePath,
+        rec,
+        season,
+        episode,
+        canDownload: true,
+      });
+    }
     setSubStage("choosing next queue");
     if (prep.needsAsr) {
       const usd = (prep.durS / 3600) * ASR_USD_PER_HOUR;

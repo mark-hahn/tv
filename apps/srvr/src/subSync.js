@@ -27,6 +27,10 @@ import { SRVR_ROOT_DIR } from "./srvrPaths.js";
 const TV_DIR = "/mnt/media/tv";
 const MAX_PHRASE_WORDS = 4;
 const MIN_MATCHES = 10;
+// This share of the matched phrases must agree with the median offset within
+// AGREE_MS, or the file is from another cut and no one shift fits it.
+const AGREE_SHARE = 0.8;
+const AGREE_MS = 250;
 // ffsubsync, in its own venv (python3 -m venv /opt/ffsubsync, then
 // /opt/ffsubsync/bin/pip install ffsubsync).
 const FFSUBSYNC = "/opt/ffsubsync/bin/ffsubsync";
@@ -71,36 +75,30 @@ function phraseStarts(srtText) {
   return starts;
 }
 
-export async function syncSubToAsr({ path: relPath, asrPath }) {
-  const subFile = srtFullPath(relPath);
-  const asrFile = srtFullPath(asrPath);
-  if (
-    subFile.endsWith(".asr.srt") ||
-    !asrFile.endsWith(".asr.srt") ||
-    path.dirname(subFile) !== path.dirname(asrFile)
-  )
-    throw new Error(`not a sidecar and its asr: ${relPath}, ${asrPath}`);
-
-  const subText = await fsp.readFile(subFile, "utf8");
-  const asrStarts = phraseStarts(await fsp.readFile(asrFile, "utf8"));
+// How far the subtitle text subText is off the ASR transcript asrText, as
+// the one shift that fits it: the median of the start-time differences of
+// the phrases the two share, positive when the captions come early. Throws
+// when too few phrases match, or too few agree with the median (another cut).
+// asrName names the transcript in the error.
+export function asrOffset(subText, asrText, asrName = "the ASR transcript") {
+  const asrStarts = phraseStarts(asrText);
   const offsets = [];
   for (const [key, startMs] of phraseStarts(subText))
     if (asrStarts.has(key)) offsets.push(asrStarts.get(key) - startMs);
   if (offsets.length < MIN_MATCHES)
-    throw new Error(
-      `only ${offsets.length} phrases match ${path.basename(asrFile)}`,
-    );
+    throw new Error(`only ${offsets.length} phrases match ${asrName}`);
   offsets.sort((a, b) => a - b);
   const offsetMs = offsets[Math.floor(offsets.length / 2)];
-
-  if (offsetMs !== 0)
-    await fsp.writeFile(subFile, shiftedSrt(subText, offsetMs), "utf8");
-  unilog(2778, `${path.basename(subFile)} synced to asr: ${offsetMs} ms from ${offsets.length} phrases`);
+  const agree = offsets.filter((o) => Math.abs(o - offsetMs) <= AGREE_MS).length;
+  if (agree < AGREE_SHARE * offsets.length)
+    throw new Error(
+      `from another cut: only ${agree} of ${offsets.length} phrases agree with ${offsetMs} ms`,
+    );
   return { offsetMs, matches: offsets.length };
 }
 
 // srtText with every cue moved by offsetMs, never below 0, through cleanSrt.
-function shiftedSrt(srtText, offsetMs) {
+export function shiftedSrt(srtText, offsetMs) {
   const timeLineRe =
     /^([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(\s*-->\s*)([0-9]{2}:[0-9]{2}:[0-9]{2},[0-9]{3})(.*)$/;
   const lines = srtText.split(/\r?\n/).map((line) => {

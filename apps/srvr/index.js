@@ -2806,7 +2806,6 @@ function publishNowPlaying() {
     showName: lastNowPlayingShowName,
     playing: lastNowPlayingList,
   });
-  view.recordNowPlaying(lastNowPlayingShowName);
 
   checkMissingEpisodes(lastNowPlayingList).catch((e) => {
     unilog(1371, `checkMissingEpisodes failed: ${e.message}`);
@@ -3041,16 +3040,20 @@ async function playProgress({ showName, season, episode, posMs, durMs, state, su
     if (file) subs.subStopped(String(rec.id), season, episode, file, sub);
   }
   if (started || stopped) {
-    rec.fakeLastPlayed = null;
-    rec.hiddenFromRow = false;
-    // The episode keeps its own record of being played: when last, and how
-    // many times through to the end. The show's lastPlayedDate and
-    // lastPlayedEpisode are computed from these.
-    const playCount = epd.getEp(ed, season, episode)?.playCount || 0;
-    epd.setEpisode(ed, season, episode, {
-      lastPlayed: util.toPstDateTimeMs(new Date()),
-      ...(ended ? { playCount: playCount + 1 } : {}),
-    });
+    // Only a play run to the end counts as a viewing; a partial play changes
+    // no last-played time.
+    if (ended) {
+      rec.fakeLastPlayed = null;
+      rec.hiddenFromRow = false;
+      // The episode keeps its own record of being played through to the end:
+      // when last, and how many times. The show's lastPlayedDate and
+      // lastPlayedEpisode are computed from these.
+      const playCount = epd.getEp(ed, season, episode)?.playCount || 0;
+      epd.setEpisode(ed, season, episode, {
+        lastPlayed: util.toPstDateTimeMs(new Date()),
+        playCount: playCount + 1,
+      });
+    }
     unilog(2497, `${showName} ${code} ${state} at ${Math.round(posMs / 1000)}s`);
   }
   // Watched, the resume point and the last play all feed computed values.
@@ -3059,6 +3062,7 @@ async function playProgress({ showName, season, episode, posMs, durMs, state, su
   // Only when the list would show it: a push on every progress report would
   // have tvapp rebuild the show's card every few seconds while a video plays.
   if (started || stopped) debouncedTvdbPush(showName);
+  if (ended) await view.recordViewed(showName);
   tvappNowPlaying = stopped
     ? null
     : {
@@ -3614,7 +3618,7 @@ function fmtSeasonEpisode(season, episode) {
 // the bottom of the watched sort; "unhiding" bumps it to now. The stamp is
 // fakeLastPlayed, which the sort reads ahead of lastPlayedDate and a real play
 // clears. hiddenFromRow tracks the hidden state; it is set on hide and cleared
-// on unhide, when a wait ends, and when the show is played. The automatic
+// on unhide, when a wait ends, and when an episode is played to the end. The automatic
 // paths ignore shows with no episodes on disk; the button also takes any show
 // with a last viewing, real or fake.
 

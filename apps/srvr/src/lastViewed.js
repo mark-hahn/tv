@@ -47,10 +47,8 @@ const notifyLastViewedChange = () => {
   for (const listener of lastViewedChangeListeners) listener(lastViewed);
 };
 
-let lastRecordedShowName = null;
-export const recordNowPlaying = async (showName) => {
-  if (!showName || showName === lastRecordedShowName) return;
-  lastRecordedShowName = showName;
+// Stamped when an episode of the show is played to the end.
+export const recordViewed = async (showName) => {
   lastViewed[showName] = Date.now();
   await fsp.mkdir(path.dirname(LAST_VIEWED_PATH), { recursive: true });
   await fsp.writeFile(LAST_VIEWED_PATH, JSON.stringify(lastViewed));

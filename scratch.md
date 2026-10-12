@@ -1,4 +1,5 @@
 
+change second `Watched: 2026/03/20, S02E01` to `Last: 2026/03/20, S02E01`
 
 The Bear should automatically be on the pickups list and you say it isn't
 

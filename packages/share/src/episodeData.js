@@ -10,8 +10,8 @@
 //     pos         resume position in ms
 //     tvdbId      the episode's TVDB id
 //     title       its English title
-//     lastPlayed  PST "YYYY/MM/DD HH:mm:ss.mmm" a player last started or
-//                 stopped it
+//     lastPlayed  PST "YYYY/MM/DD HH:mm:ss.mmm" a play of it last ran to
+//                 the end
 //     playCount   plays watched through to the end
 //     airsBeforeSeason, airsBeforeEpisode, airsAfterSeason
 //                 TVDB's placement of a season 0 special

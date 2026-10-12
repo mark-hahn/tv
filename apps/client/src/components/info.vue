@@ -432,7 +432,7 @@
               v-if="!previewMode && lastWatchedTxt && lastWatchedCount !== 0"
               style="min-height: 20px; white-space: nowrap"
             >
-              Watched: {{ lastWatchedTxt }}
+              Last: {{ lastWatchedTxt }}
             </div>
             <div
               id="cntrylang"

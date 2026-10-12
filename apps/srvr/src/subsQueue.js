@@ -383,6 +383,11 @@ async function extractEmbSrts(videoFilePath, fromUI) {
       if (fromUI) publishEmbLog(`exists: ${path.basename(outPath)}`);
       continue;
     }
+    // A copy deleted as unusable or from another cut is not made again.
+    if (subs.misfitRemembered(outPath)) {
+      if (fromUI) publishEmbLog(`skipped, a misfit: ${path.basename(outPath)}`);
+      continue;
+    }
     // subExtractQueue is shared, so this can sit behind an unrelated file's
     // extraction — say so rather than looking stalled.
     setSubStage(

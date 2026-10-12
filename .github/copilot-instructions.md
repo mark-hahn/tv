@@ -241,9 +241,10 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
     at another rate (stretched). wrong cut: they disagree, or a file that
     can't be told ends over 5 s past the video. can't tell: a clip has too
     few pairs. unusable: under 3 dialogue cues a minute, or not English.
-  - A fixed file is judged again. A wrong-cut or unusable opn file is
-    deleted and marked unfit; a wrong-cut asr file is deleted. Other
-    misfits stay on disk but are never offered.
+  - A fixed file is judged again. A file that is unusable or from another
+    cut is deleted, an opn file also marked unfit; its verdict is kept as
+    the memory of why, so the track is not copied out again. Only an
+    unusable asr file stays, so ASR does not run again for the video.
   - With nothing good, OpenSubtitles candidates are downloaded one at a time
     and judged, up to 5; with none fitting, a complete ASR is queued.
   - A video with no English audio track: T and H are presumed good, the

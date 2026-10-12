@@ -27,7 +27,7 @@ const POLL_MS = 2000;
 const RETRY_MS = 10000;
 // Downloads to leave OpenSubtitles' day for plays; checked every hour while
 // under it.
-const QUOTA_FLOOR = 200;
+const QUOTA_FLOOR = 20;
 const QUOTA_WAIT_MS = 60 * 60 * 1000;
 const FAIL_STOP_SHARE = 0.1;
 const VIDEO_EXTS = new Set(["mkv", "mp4", "avi", "m4v", "ts", "webm", "mov", "wmv", "mpg", "mpeg", "m2ts", "divx"]);

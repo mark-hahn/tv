@@ -170,6 +170,9 @@ const upsertCheck = db.prepare(`
     detail = excluded.detail, ts = excluded.ts
 `);
 const deleteCheckRow = db.prepare(`DELETE FROM checks WHERE file = ?`);
+const deleteMisfitlessCheck = db.prepare(
+  `DELETE FROM checks WHERE file = ? AND verdict NOT IN ('unusable', 'wrong cut')`,
+);
 const deleteVideoChecks = db.prepare(`DELETE FROM checks WHERE video = ?`);
 const retimeRow = db.prepare(`SELECT * FROM retimes WHERE video = ?`);
 const upsertRetime = db.prepare(`
@@ -469,8 +472,15 @@ async function downloadSub(row, videoPath) {
     fileId: row.fileId,
   });
   const apiMs = Date.now() - startedAt;
-  if (!dl.resp.ok)
-    throw new Error(`OpenSubtitles download HTTP ${dl.resp.status}`);
+  if (!dl.resp.ok) {
+    // 406: the day's downloads are used up, so nothing more lands today.
+    const e = new Error(`OpenSubtitles download HTTP ${dl.resp.status}`);
+    if (dl.resp.status === 406) {
+      quota = { remaining: 0, ts: Date.now() };
+      e.quota = true;
+    }
+    throw e;
+  }
   const link = typeof dl.body?.link === "string" ? dl.body.link.trim() : "";
   if (Number.isInteger(dl.body?.remaining))
     quota = { remaining: dl.body.remaining, ts: Date.now() };
@@ -579,6 +589,9 @@ export async function downloadUntilFit(rec, season, episode, videoPath, judge) {
     try {
       await downloadSub(row, videoPath);
     } catch (e) {
+      // With the day's downloads used up, no verdict on the video is
+      // possible: the caller's run fails and is tried again another day.
+      if (e.quota) throw e;
       unilog(2794, `${rec.name} ${code} download of opn${fileIdTag(row.fileId)} failed: ${e.message}`);
       continue;
     }
@@ -692,6 +705,19 @@ export function saveCheck({ file, video, verdict, offsetMs = null, method = null
 
 export function forgetCheck(file) {
   deleteCheckRow.run(file);
+}
+
+// A deleted file's check goes, unless it says the file was unusable or from
+// another cut: that is kept, as the memory of why the file is gone.
+export function forgetCheckUnlessMisfit(file) {
+  deleteMisfitlessCheck.run(file);
+}
+
+// Whether the file is remembered as unusable or from another cut, on disk or
+// not: one deleted for that is not made again.
+export function misfitRemembered(file) {
+  const verdict = fileCheck.get(file)?.verdict;
+  return verdict === "unusable" || verdict === "wrong cut";
 }
 
 // The video is gone: so is what was learned about it.

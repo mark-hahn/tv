@@ -179,20 +179,21 @@ export async function retimePass({
 // The show folder's name, for the log.
 const showNameOf = (videoPath) => path.basename(path.dirname(path.dirname(videoPath)));
 
-// An opn file that cannot be used is deleted and marked so it is not
-// downloaded for the video again; any other is kept, never offered.
+// A file that is unusable or from another cut is deleted: its verdict is
+// kept as the memory of why, so it is not made again (the queue's copying
+// out of embedded tracks), and an opn file is marked unfit so it is not
+// downloaded for the video again. An unusable .asr.srt stays, so ASR does
+// not run again for the video.
 async function dropOrHide(videoPath, f, verdict, why, method, dryRun, notes) {
   const file = path.join(path.dirname(videoPath), f.file);
   const suffix = suffixOf(videoPath, f.file);
-  const gone = f.type === "V" || (f.type === "+" && verdict === "wrong cut");
+  const gone = f.type !== "+" || verdict === "wrong cut";
   notes.push(`${suffix} ${gone ? "deleted" : verdict} (${why})`);
   if (dryRun) return;
-  if (gone) {
-    if (f.type === "V") subs.markUnfit(videoPath, suffix);
-    await fsp.unlink(file);
-    subs.forgetCheck(file);
-  } else
-    subs.saveCheck({ file, video: videoPath, verdict, method, detail: why });
+  subs.saveCheck({ file, video: videoPath, verdict, method, detail: why });
+  if (!gone) return;
+  if (f.type === "V") subs.markUnfit(videoPath, suffix);
+  await fsp.unlink(file);
 }
 
 // Deals with one sidecar by its verdict r (sc.judge; none for an unusable
@@ -227,8 +228,12 @@ async function act(videoPath, f, r, set, dryRun, notes) {
     await fsp.writeFile(file, text, "utf8");
     const again = sc.judge(sc.cuesOf(text), set);
     notes.push(`${suffix} ${how}, now ${again.verdict}`);
-    save(again.verdict, again.offsetMs ?? null, how);
     if (again.verdict !== "good" && (await retimeFile(videoPath, f, false, notes))) return "good";
+    if (again.verdict === "wrong cut") {
+      await dropOrHide(videoPath, f, "wrong cut", `another cut once ${how}`, "asr", false, notes);
+      return "wrong cut";
+    }
+    save(again.verdict, again.offsetMs ?? null, how);
     return again.verdict;
   }
   // Beside an .asr.srt, a file the clips do not find good is first fitted to
@@ -404,7 +409,7 @@ export async function prepareVideoSubs({
 // timed by hand.
 export async function subFileEvent(file, kind) {
   if (kind === "unlink") {
-    subs.forgetCheck(file);
+    subs.forgetCheckUnlessMisfit(file);
     return;
   }
   if (kind === "change") {

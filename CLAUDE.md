@@ -261,7 +261,8 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   - Ahead of a play: once a play's own downloads are done, the next unwatched
     episode's; and whenever tv-srvr refreshes a library show played in the
     last 30 days, its next-up episode's. Nothing waits on these.
-  - At play, only when the episode has fewer than 3 downloaded: search, then
+  - At play and ahead of one, only when the episode has fewer than 3
+    downloaded and no file but its `.asr.srt` checked good: search, then
     download all it still needs at once (`fetchSubs`), then replacements
     for any that failed, until it has 3, 3 have failed, or no candidate is
     left. The watcher checks each one that lands.

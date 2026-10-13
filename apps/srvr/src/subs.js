@@ -562,12 +562,22 @@ function fetchJob(rec, season, episode, videoPath) {
   return job;
 }
 
+// Whether the video has a file other than ASR's checked good: then it needs
+// no more downloads.
+function hasGoodSub(videoPath) {
+  const dir = path.dirname(videoPath);
+  return listSidecars(videoPath).some(
+    (s) => s.type !== "+" && freshCheck(path.join(dir, s.file))?.verdict === "good",
+  );
+}
+
 // The downloads for an episode about to be played, made ahead of its play so
 // it has them at once. Nothing waits on them.
 export function prefetchSubs(rec, season, episode, videoPath) {
   if (!rec.imdbId) return;
   if (countDownloaded.get(String(rec.id), season, episode).n >= SUBS_PER_EPISODE)
     return;
+  if (hasGoodSub(videoPath)) return;
   unilog(2727, `${rec.name} ${fmtCode(season, episode)} subtitles fetched ahead of its play`);
   fetchJob(rec, season, episode, videoPath);
 }
@@ -619,13 +629,14 @@ export async function subsBeforePlay(rec, season, episode, videoPath) {
   return { late: fetching.get(`${rec.id} ${fmtCode(season, episode)}`) ?? null };
 }
 
-// Bring the episode up to SUBS_PER_EPISODE downloads, waiting at most
-// PLAY_WAIT_MS. Returns what went wrong, or null.
+// Bring the episode up to SUBS_PER_EPISODE downloads, unless it has a file
+// checked good, waiting at most PLAY_WAIT_MS. Returns what went wrong, or null.
 async function downloadBeforePlay(rec, season, episode, videoPath) {
   const showId = String(rec.id);
   const code = fmtCode(season, episode);
   if (countDownloaded.get(showId, season, episode).n >= SUBS_PER_EPISODE)
     return null;
+  if (hasGoodSub(videoPath)) return null;
   if (!rec.imdbId) {
     unilog(2677, `${rec.name} has no imdb id, ${code} was not searched`);
     return null;

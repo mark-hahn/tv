@@ -30,6 +30,7 @@ const insertJob = db.prepare(
   `INSERT OR IGNORE INTO jobs (id, created, durSec) VALUES (?, ?, ?)`,
 );
 const firstJob = db.prepare(`SELECT MIN(created) created FROM jobs`);
+const lastJob = db.prepare(`SELECT MAX(created) created FROM jobs`);
 const jobsBetween = db.prepare(
   `SELECT created, durSec FROM jobs WHERE created >= ? AND created < ?`,
 );
@@ -43,8 +44,12 @@ const smKey = async () => (await fsp.readFile(SM_KEY_PATH, "utf8")).trim();
 
 // Every job Speechmatics still lists, newest first, a page at a time.
 // created_before is inclusive, so a page repeats the last one's oldest job.
+// Paging stops a day before the newest job kept: older ones are kept already
+// and no job runs that long. Walking all 7 days each time drew 429s.
 async function syncJobs() {
   const headers = { Authorization: `Bearer ${await smKey()}` };
+  const last = lastJob.get().created;
+  const stop = last && new Date(Date.parse(last) - DAY_MS).toISOString();
   let before = null;
   for (;;) {
     const r = await fetch(
@@ -58,6 +63,7 @@ async function syncJobs() {
       if (j.status === "done") insertJob.run(j.id, j.created_at, j.duration);
     if (jobs.length < SM_JOBS_PAGE) return;
     before = jobs.at(-1).created_at;
+    if (stop && before < stop) return;
   }
 }
 

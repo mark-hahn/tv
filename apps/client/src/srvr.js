@@ -886,6 +886,12 @@ export function playPathInTab(path) {
   window.open(`${HTTP_URL}/api/play?${new URLSearchParams({ path })}`, "_blank");
 }
 
+// The local pane's Subs State: {title, labels, pick} of the show's next-up
+// episode, as the remotes' subtitle panel would list them.
+export function getSubsState(showName) {
+  return httpCall("/api/subsState", { showName });
+}
+
 export function syncSubToAsr(path, asrPath) {
   return httpCall("/api/syncSubToAsr", { path, asrPath }, "POST");
 }

@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/mark-hahn/tv#readme",
   "dependencies": {
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^12.11.1",
     "chokidar": "^3.6.0",
     "@tv/share": "workspace:*",
     "mkdirp": "^0.5.1",

@@ -22,7 +22,8 @@
           showFix ||
           showInfo ||
           showText ||
-          showHist
+          showHist ||
+          showSubsState
             ? '0 0 50%'
             : '1 1 auto',
         borderBottom:
@@ -31,7 +32,8 @@
           showFix ||
           showInfo ||
           showText ||
-          showHist
+          showHist ||
+          showSubsState
             ? '1px solid #ddd'
             : 'none',
       }"
@@ -69,6 +71,26 @@
               "
               >Loading</span
             >
+            <button
+              @click="clickSubsState"
+              :disabled="!show"
+              title="The subtitle list the remote would show if the selected show played"
+              :style="{
+                cursor: show ? 'pointer' : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg': !show
+                  ? '#e8e8e8'
+                  : showSubsState
+                    ? '#ddd'
+                    : 'whitesmoke',
+                color: show ? 'inherit' : '#aaa',
+              }"
+            >
+              Subs State
+            </button>
+
             <button
               @click="clickSubs()"
               :style="{
@@ -1052,6 +1074,40 @@
       </div>
     </div>
 
+    <!-- Subs State Pane: the remote's subtitle panel list, the pick in bold -->
+    <div
+      id="subsStatePane"
+      v-show="showSubsState"
+      :style="{
+        flex: '1 1 50%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: '#fafafa',
+        color: '#000',
+        padding: '10px',
+        borderLeft: '1px solid #ddd',
+      }"
+    >
+      <div style="font-weight: bold; margin-bottom: 5px">
+        {{ subsState?.title ?? "Loading..." }}
+      </div>
+      <div style="overflow: auto">
+        <div
+          v-for="(label, i) in ['None', ...(subsState?.labels ?? [])]"
+          :key="i"
+          :style="{
+            padding: '4px 10px',
+            borderBottom: '1px solid #eee',
+            fontWeight: subsState?.pick === i - 1 ? 'bold' : 'normal',
+            backgroundColor: subsState?.pick === i - 1 ? '#d0e8ff' : '#fff',
+          }"
+        >
+          {{ label }}
+        </div>
+      </div>
+    </div>
+
     <!-- Info Pane -->
     <div
       id="infoPane"
@@ -1265,6 +1321,7 @@ import {
   syncSubToAsr,
   toggleBadGroup,
   playPathInTab,
+  getSubsState,
 } from "../srvr.js";
 import evtBus from "../evtBus.js";
 import * as util from "../util.js";
@@ -1335,6 +1392,10 @@ export default {
 
       // Open (OpenSubtitles search)
 
+      // Subs State
+      showSubsState: false,
+      subsState: null,
+
       // Fix (ffmpeg)
       showFix: false,
       fixLogs: "",
@@ -1382,7 +1443,9 @@ export default {
     this.nodeRefs.clear();
   },
   watch: {
-    show(val) {},
+    show(val) {
+      if (this.showSubsState && val) this.loadSubsState();
+    },
     // The chart element only exists in cost mode, so the chart lives with it.
     asrCostMode(on) {
       if (!on) {
@@ -2223,9 +2286,29 @@ export default {
       this.subsProgressChannel?.close();
       this.subsProgressChannel = null;
     },
+    clickSubsState() {
+      this.showSubsState = !this.showSubsState;
+      if (!this.showSubsState) return;
+      this.showAsr = false;
+      this.showEmb = false;
+      this.showFix = false;
+      this.showInfo = false;
+      this.showText = false;
+      this.showHist = false;
+      this.loadSubsState();
+    },
+    async loadSubsState() {
+      this.subsState = null;
+      try {
+        this.subsState = await getSubsState(this.show.name);
+      } catch (e) {
+        this.subsState = { title: e.message, labels: [], pick: -2 };
+      }
+    },
     clickAsr() {
       this.showAsr = !this.showAsr;
       if (this.showAsr) {
+        this.showSubsState = false;
         this.showEmb = false;
         this.showFix = false;
         this.showInfo = false;
@@ -2440,6 +2523,7 @@ export default {
     clickFix() {
       this.showFix = !this.showFix;
       if (this.showFix) {
+        this.showSubsState = false;
         this.showAsr = false;
         this.showEmb = false;
         this.showInfo = false;
@@ -2662,6 +2746,7 @@ export default {
     clickEmb() {
       this.showEmb = !this.showEmb;
       if (this.showEmb) {
+        this.showSubsState = false;
         this.showAsr = false;
         this.showFix = false;
         this.showInfo = false;
@@ -2779,6 +2864,7 @@ export default {
         return;
       }
       this.showInfo = true;
+      this.showSubsState = false;
       this.showAsr = false;
       this.showEmb = false;
       this.showFix = false;
@@ -2793,6 +2879,7 @@ export default {
       }
       if (!this.historyReady) return;
       this.showHist = true;
+      this.showSubsState = false;
       this.showAsr = false;
       this.showEmb = false;
       this.showFix = false;
@@ -2807,6 +2894,7 @@ export default {
       }
       if (!this.viewReady) return;
       this.showText = true;
+      this.showSubsState = false;
       this.showAsr = false;
       this.showEmb = false;
       this.showFix = false;

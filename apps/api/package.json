@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@tv/share": "workspace:*",
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "^12.11.1",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
     "franc-min": "^6.2.0",

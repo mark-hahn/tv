@@ -2257,6 +2257,31 @@ app.post(
   }),
 );
 
+// The local pane's Subs State: the subtitle list the remotes' panel would show
+// if the show's next-up episode played now (getPlayUrl's labels and pick,
+// before any downloads its play would make).
+app.get(
+  "/api/subsState",
+  apiWrapper(async ({ showName }) => {
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec) throw new Error(`subsState: no show ${showName}`);
+    const target = nextUpEpisode(rec.episodeData);
+    if (!target) return { title: `${showName}: nothing to play`, labels: [], pick: -1 };
+    const { season, episode } = target;
+    const title = `${showName} ${fmtSeasonEpisode(season, episode)}`;
+    const file = epd.getFullPath(
+      rec.episodeData,
+      showPaths.showFolderFor(showName, rec),
+      season,
+      episode,
+      tvDir,
+    );
+    if (!file) return { title: `${title}: no video`, labels: [], pick: -1 };
+    const { sidecars, pick } = subs.playList(String(rec.id), season, episode, file);
+    return { title, labels: sidecars.map((s) => s.label), pick };
+  }),
+);
+
 app.post("/api/applySubOffset", async (req, res) => {
   const { videoPath, srtFile, offsetMs } = req.body || {};
   if (typeof videoPath !== "string" || !videoPath) {
@@ -2889,7 +2914,7 @@ const EARLY_STOP_MS = 10000;
 // A show played this recently has its next-up's subtitles downloaded in its
 // tvdb refresh.
 const PREFETCH_PLAYED_MS = 30 * 24 * 60 * 60 * 1000;
-const NEAR_END_MS = 4 * 60 * 1000;
+const NEAR_END_MS = 6 * 60 * 1000;
 
 // Next-up: the first unwatched episode with a file in story order, after the
 // episode `after` ({season, episode}) when it is given (see derived.js).

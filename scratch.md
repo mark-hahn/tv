@@ -1,13 +1,12 @@
 
 
-add ratings to tvapp
-
 
 ????????????????????????
 my phone ip is .172
-.opnXXXXX naming
 back up pause based on pause length
 =================
+
+add ratings to tvapp info in show card
 
 change second `Watched: 2026/03/20, S02E01` to `Last: 2026/03/20, S02E01`
 

@@ -1292,8 +1292,8 @@ class ShowListView extends ScrollView {
   /**
    * The card's one-line header, which fits itself to the width it is given:
    * the name, then the time bar's parts -- country, years, episode, seasons,
-   * watched, status and resolution, the episode and resolution being those of
-   * the show's next-up. When they are wider than the row, parts are dropped
+   * watched, status, resolution and IMDB rating, the episode and resolution
+   * being those of the show's next-up. When they are wider than the row, parts are dropped
    * a step at a time in INFO_DROP_ORDER until what is left fits; with all of
    * them gone, the name's end is trimmed.
    */
@@ -1330,7 +1330,8 @@ class ShowListView extends ScrollView {
         seasonsText(show),
         watchedText(show),
         show.status,
-        up == null || up[3] <= 0 ? "" : String.valueOf(up[3])
+        up == null || up[3] <= 0 ? "" : String.valueOf(up[3]),
+        show.imdbRatings
       };
       for (int i = 0; i < step; i++) parts[INFO_DROP_ORDER[i]] = "";
       return joinSpaced(parts);

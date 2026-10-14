@@ -414,6 +414,12 @@ export function getRecodePending() {
   return queue;
 }
 
+// Queues pane's Clear: drop every waiting file. scanPass shifts the head off
+// when its encode ends, so the head stays while a pass runs.
+export function clearRecodeQueue() {
+  queue.splice(busy ? 1 : 0);
+}
+
 // Queue contents for the Queues pane, same shape as the mp4 queue: every
 // pending file in encode order with the wall-clock time it should finish, plus
 // live detail on the one running.

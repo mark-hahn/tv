@@ -869,6 +869,10 @@ export function getQueues() {
   return httpCall("/api/queues");
 }
 
+export function clearQueue(queue) {
+  return httpCall("/api/queues/clear", { queue }, "POST");
+}
+
 // Play button of the info and map panes: the episode in a tab of its own, in
 // tv-srvr's browser player (apps/srvr/src/play.html), which resumes, skips the
 // intro, has subtitles and reports progress like tvapp.

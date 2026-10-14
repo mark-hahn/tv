@@ -2422,6 +2422,21 @@ app.get("/api/queues", async (req, res) => {
   }
 });
 
+// Queues pane's Clear: empty one queue, leaving its running entry to finish.
+app.post("/api/queues/clear", (req, res) => {
+  const clear = {
+    sub: subsQueue.clearSubQueue,
+    asr: subsQueue.clearAsrQueue,
+    recode: recode.clearRecodeQueue,
+  }[req.body?.queue];
+  if (!clear) {
+    res.status(400).json({ error: "queue must be sub, asr or recode" });
+    return;
+  }
+  clear();
+  res.json({ ok: true });
+});
+
 // Intro: get first available video file for a show
 app.get("/api/introFirstFile", async (req, res) => {
   const showName = req.query.showName;

@@ -60,6 +60,21 @@
       >
         Sel
       </button>
+      <button
+        @click="clearClick"
+        :disabled="!selected"
+        :style="{
+          padding: '2px 10px',
+          fontFamily: 'sans-serif',
+          cursor: selected ? 'pointer' : 'default',
+          opacity: selected ? 1 : 0.4,
+          border: '1px solid #999',
+          borderRadius: '4px',
+          backgroundColor: 'whitesmoke',
+        }"
+      >
+        Clear
+      </button>
       <span
         style="
           margin-left: auto;
@@ -295,6 +310,18 @@ export default {
       }, FLASH_MS);
       const name = this.showNameOfPath(this.selectedPath);
       if (name) evtBus.emit("selectShowFromCardTitle", name);
+    },
+    // Empties the selected queue; tv-srvr lets a running entry finish.
+    async clearClick() {
+      if (!this.selected) return;
+      const label = this.queueDefs.find((q) => q.key === this.selected).label;
+      if (!window.confirm(`Clear the ${label} queue?`)) return;
+      try {
+        await srvr.clearQueue(this.selected);
+        await this.fetchOnce();
+      } catch (e) {
+        this.error = e?.message || "clear failed";
+      }
     },
     // tv-srvr owns the intro pick because it alone knows which mp4 mirrors are
     // finished, and that answer moves on the timescale of an encode — so this

@@ -598,6 +598,22 @@ function abortAsr() {
   return { ok: true };
 }
 
+// Queues pane's Clear: drop every waiting entry; a running one finishes.
+function clearSubQueue() {
+  subsState.subQueue = subsState.subQueue.filter(
+    (e) => e.videoFilePath === subsState.currentlyProcessingSubPath,
+  );
+  subsState.subAgain = null;
+  persistSubQueue();
+  syncBatchMsgs();
+}
+function clearAsrQueue() {
+  subsState.asrQueue.splice(subsState.genSrtRunning ? 1 : 0);
+  persistAsrQueue();
+  publishAsrQueueUpdate();
+  syncBatchMsgs();
+}
+
 function doSubQueueNow() {
   subsState.chkSubQueueDelay = 500;
   if (!subsState.subQueueBusy) {
@@ -920,6 +936,8 @@ export {
   extractEmbSrts,
   generateSrtWithAsr,
   abortAsr,
+  clearSubQueue,
+  clearAsrQueue,
   doSubQueueNow,
   processSubQueueEntry,
   startSubQueueLoop,

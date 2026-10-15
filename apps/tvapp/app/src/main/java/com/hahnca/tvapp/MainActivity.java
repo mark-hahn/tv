@@ -681,17 +681,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     // buttons, the typed text, an actor -- stays exactly as it was: leaving
     // Custom is a sort choice and nothing more.
     if (customOn) setCustomOn(false);
-    applySort(sortForLabel(next));
+    applySort(sortForLabel(next), true);
   }
 
   private static Shows.Sort sortForLabel(String label) {
     if (SORT_WATCHED.equals(label)) return Shows.Sort.WATCHING;
     if (SORT_ADDED.equals(label)) return Shows.Sort.ADDED;
     return Shows.Sort.ALPHA;
-  }
-
-  private void applySort(Shows.Sort newSort) {
-    applySort(newSort, false);
   }
 
   private void applySort(Shows.Sort newSort, boolean keepSelection) {

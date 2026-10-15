@@ -2163,6 +2163,7 @@ function Remote({ setSubError }) {
           );
       return (
         <FlatList
+          key={sortOrder}
           ref={showsFlatListRef}
           data={filtered}
           keyExtractor={(item) => item.name}
@@ -2940,7 +2941,6 @@ function Remote({ setSubError }) {
                 const orders = ["alpha", "viewed", "added"];
                 const currentIdx = orders.indexOf(sortOrder);
                 const nextIdx = (currentIdx + 1) % orders.length;
-                setScrollToTopOnOpen(true);
                 setSortOrder(orders[nextIdx]);
               }}
               style={[

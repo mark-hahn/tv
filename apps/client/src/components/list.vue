@@ -2261,7 +2261,8 @@ export default {
       this.reversed = false;
       this.sortShows();
       setTimeout(() => {
-        this.saveVisShow(this.shows[0], true);
+        const cur = this.shows.find((s) => s.name === this.highlightName);
+        this.saveVisShow(cur ?? this.shows[0], true);
       }, 0);
     },
 

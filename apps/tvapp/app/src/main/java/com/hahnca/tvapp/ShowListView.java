@@ -460,7 +460,8 @@ class ShowListView extends ScrollView {
   }
 
   /**
-   * keepSelection is for the callers that are re-sorting only as a side effect
+   * keepSelection is for the sort buttons, which keep the selected show and
+   * scroll to it, and for the callers that are re-sorting only as a side effect
    * of narrowing the list some other way, and are narrowing it around the show
    * that is selected -- the actor filter. The selection is theirs to keep.
    */

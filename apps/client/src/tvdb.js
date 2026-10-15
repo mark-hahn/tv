@@ -302,7 +302,10 @@ export const srchTvdbData = async (searchStr) => {
     query = query.replace(/\s*\(\d{4}\)$/, "").trim();
   }
 
-  let srchUrl = "search?type=series&query=" + encodeURIComponent(query);
+  // TVDB pages 50 at a time and ranks loosely ("smiley" puts Smiley's People
+  // 86th), so take every result and rank them by how the name matches.
+  let srchUrl =
+    "search?type=series&limit=500&query=" + encodeURIComponent(query);
   if (year) {
     srchUrl += "&year=" + encodeURIComponent(year);
   }
@@ -311,7 +314,39 @@ export const srchTvdbData = async (searchStr) => {
   const srchResObj = await srchRes.json();
   const data = srchResObj.data;
   if (!data || data.length == 0) return null;
-  return data;
+  const q = srchNorm(query);
+  return data
+    .map((d, i) => ({
+      d,
+      i,
+      tier: Math.min(
+        srchTier(d.name, q),
+        srchTier(d.translations?.eng, q) + 1,
+      ),
+    }))
+    .sort((a, b) => a.tier - b.tier || a.i - b.i)
+    .map((x) => x.d);
+};
+
+// "The Smiley's People!" -> "smiley people"; non-latin letters are kept
+const srchNorm = (s) =>
+  String(s || "")
+    .toLowerCase()
+    .replace(/['’]s\b/g, "")
+    .replace(/['’]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/^(the|a|an) /, "");
+
+// 0 exact, 1 starts with, 2 whole words, 3 inside a word, 4 no match
+const srchTier = (name, q) => {
+  const n = srchNorm(name);
+  if (!n) return 4;
+  if (n === q) return 0;
+  if (n.startsWith(q + " ")) return 1;
+  if ((" " + n + " ").includes(" " + q + " ")) return 2;
+  if (n.includes(q)) return 3;
+  return 4;
 };
 
 export const getGenresByTvdbId = async (tvdbId) => {

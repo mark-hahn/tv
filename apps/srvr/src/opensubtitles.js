@@ -141,6 +141,7 @@ async function openSubtitlesSubtitles({
   apiKey,
   token,
   imdbDigits,
+  tmdbId,
   query,
   year,
   page,
@@ -158,7 +159,8 @@ async function openSubtitlesSubtitles({
     params.type = "movie";
     if (year) params.year = String(year);
   } else {
-    params.parent_imdb_id = imdbDigits;
+    if (tmdbId) params.parent_tmdb_id = String(tmdbId);
+    else params.parent_imdb_id = imdbDigits;
     if (season !== undefined && season !== null) {
       params.season_number = String(season);
     }
@@ -275,6 +277,7 @@ export async function openSubtitlesDownloadWithRetry({
 
 export const subsSearch = async (params) => {
   const imdbDigits = normalizeImdbId(params?.imdb_id);
+  const tmdbId = params?.tmdb_id || null;
   const query = params?.query || null;
   const year = params?.year || null;
   let page = params?.page;
@@ -282,8 +285,8 @@ export const subsSearch = async (params) => {
   const episode = params?.episode;
   const moviehash = params?.moviehash || null;
 
-  if (!imdbDigits && !query) {
-    throw new Error("subsSearch: missing imdb_id or query");
+  if (!imdbDigits && !tmdbId && !query) {
+    throw new Error("subsSearch: missing imdb_id, tmdb_id or query");
   }
 
   if (page === undefined || page === null || page === "") page = 1;
@@ -298,6 +301,7 @@ export const subsSearch = async (params) => {
       apiKey: login.apiKey,
       token: subsTokenCache,
       imdbDigits,
+      tmdbId,
       query,
       year,
       page,
@@ -319,6 +323,7 @@ export const subsSearch = async (params) => {
         apiKey: login.apiKey,
         token: subsTokenCache,
         imdbDigits,
+        tmdbId,
         query,
         year,
         page,
@@ -346,6 +351,46 @@ export const subsSearch = async (params) => {
     throw new Error(`subsSearch: ${e.message}`);
   }
 };
+
+// Every IMDb id OpenSubtitles keeps a show named name under: it can split one
+// show over several (Interview with the Vampire: seasons 1-2 under one, 3
+// under another). Its shows titled like name, from year when both have one.
+export async function subsShowImdbIds(name, year) {
+  const norm = (s) =>
+    String(s ?? "")
+      .replace(/\s*\(\d{4}\)$/, "")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const want = norm(name);
+  const url = new URL("https://api.opensubtitles.com/api/v1/features");
+  url.search = new URLSearchParams({ query: want, type: "tvshow" }).toString();
+  const headers = {
+    "Api-Key": loadSubsLogin().apiKey,
+    "User-Agent": openSubtitlesUserAgent,
+    Accept: "application/json",
+  };
+  let resp;
+  for (let attempt = 1; ; attempt++) {
+    resp = await fetch(url.toString(), { headers });
+    if (resp.status !== 429 || attempt >= 3) break;
+    await sleep(1000 * (Number(resp.headers.get("retry-after")) || 1));
+  }
+  if (!resp.ok)
+    throw new Error(`subsSearch: OpenSubtitles features HTTP ${resp.status}`);
+  const body = await resp.json();
+  return (body?.data ?? [])
+    .map((f) => f.attributes)
+    .filter(
+      (a) =>
+        a?.imdb_id &&
+        norm(a.title) === want &&
+        (!year || !a.year || String(a.year) === String(year)),
+    )
+    .map((a) => String(a.imdb_id));
+}
 
 // The torrent pane's Chk Subs (tv-api's /api/tor/chk-subs): for each request
 // {key, season, episode, imdb_id | query[, year]}, how many distinct releases

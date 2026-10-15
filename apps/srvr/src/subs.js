@@ -19,8 +19,10 @@ import { notifyClients } from "./messaging.js";
 import {
   getSubsToken,
   loadSubsLogin,
+  normalizeImdbId,
   openSubtitlesDownloadWithRetry,
   subsSearch,
+  subsShowImdbIds,
 } from "./opensubtitles.js";
 import { sameOrigin, sidecarLabel, sidecarType } from "./subOrigin.js";
 import { resFindEpisodeVideos, resIsSampleName } from "./videoFiles.js";
@@ -376,15 +378,35 @@ export function subStopped(showId, season, episode, videoPath, file) {
 // ---- OpenSubtitles search results ----
 
 // Search the episode and keep every result. A result counts as downloaded
-// when its file sits beside the video.
+// when its file sits beside the video. OpenSubtitles can keep a show under
+// another IMDb id than ours, so a search that finds nothing is tried again
+// under the show's TMDB id, then under each IMDb id OpenSubtitles has for a
+// show of its name.
 export async function searchEpisode(rec, season, episode, videoPath) {
   const showId = String(rec.id);
-  const data = await subsSearch({
-    imdb_id: rec.imdbId,
-    season,
-    episode,
-    moviehash: await videoHash(videoPath),
-  });
+  const code = fmtCode(season, episode);
+  const moviehash = await videoHash(videoPath);
+  const search = async (ids) => {
+    const found = await subsSearch({ ...ids, season, episode, moviehash });
+    return found?.data?.length ? found : null;
+  };
+  let data = await search({ imdb_id: rec.imdbId });
+  const tmdbId = rec.remote_ids?.find((r) => r.type === 12)?.id;
+  if (!data && tmdbId) {
+    data = await search({ tmdb_id: tmdbId });
+    if (data)
+      unilog(2963, `${rec.name} ${code}: no subtitles under imdb ${rec.imdbId}, found under tmdb ${tmdbId}`);
+  }
+  if (!data) {
+    const ids = await subsShowImdbIds(rec.name, rec.firstAired?.slice(0, 4));
+    for (const imdbId of ids) {
+      if (imdbId === normalizeImdbId(rec.imdbId)) continue;
+      data = await search({ imdb_id: imdbId });
+      if (!data) continue;
+      unilog(2964, `${rec.name} ${code}: no subtitles under imdb ${rec.imdbId} or tmdb ${tmdbId}, found under imdb ${imdbId} by name`);
+      break;
+    }
+  }
   for (const item of Array.isArray(data?.data) ? data.data : []) {
     const a = item.attributes;
     const fileId = a?.files?.[0]?.file_id;

@@ -1933,6 +1933,7 @@ app.post(
     await tvdb.saveTvdbSync();
     debouncedTvdbPush(name);
     unilog(2846, `${name}: watched marks set on ${changed} episode(s)`);
+    if (episodes.some((e) => e.watched)) queueNextUpCheck(name, rec);
     return { ok: true, changed };
   }),
 );
@@ -1961,6 +1962,7 @@ app.post(
     await tvdb.saveTvdbSync();
     debouncedTvdbPush(name);
     unilog(2518, `${name} S${season}E${episode} watched=${!!watched}`);
+    if (watched) queueNextUpCheck(name, rec);
     return { ok: true, watched: !!watched };
   }),
 );
@@ -2935,6 +2937,31 @@ function prefetchNextSubs(showName, rec, after = null) {
   if (file) subs.prefetchSubs(rec, next.season, next.episode, file);
 }
 
+// An episode marked watched: the show's next-up video goes through the
+// subtitle steps ahead of its play when its files are not all checked, as
+// with one marked processed before the checks existed, which the sweep passes
+// over.
+function queueNextUpCheck(showName, rec) {
+  if (!rec.inLibrary) return;
+  const next = nextUpEpisode(rec.episodeData);
+  if (!next) return;
+  const file = epd.getFullPath(
+    rec.episodeData,
+    showPaths.showFolderFor(showName, rec),
+    next.season,
+    next.episode,
+    tvDir,
+  );
+  if (!file || !subPrepare.needsCheck(file)) return;
+  unilog(2960, `${showName} ${fmtSeasonEpisode(next.season, next.episode)} queued for subtitle checks: next up`);
+  enqueueSubQueue(
+    { videoFilePath: file, fromUI: false, lowPriority: false },
+    false,
+  );
+  persistSubQueue();
+  doSubQueueNow();
+}
+
 // The file's subtitles: its sidecar .srt files as urls (tv-srvr hands them out
 // as vtt), each with the subtitle panel's label, and subPick, the index of the
 // one to start on, -1 with none. Embedded tracks are never offered, nor files
@@ -3065,7 +3092,7 @@ async function playProgress({ showName, season, episode, posMs, durMs, state, su
       ed,
       season,
       episode,
-      ended ? { watched: true, pos } : earlyStop ? { watched: false, pos } : { pos },
+      ended ? { watched: true, pos } : { pos },
     );
   // The subtitle showing when the video stops is the one chosen for the
   // episode. A stop that counts as never played chooses nothing.
@@ -3102,7 +3129,10 @@ async function playProgress({ showName, season, episode, posMs, durMs, state, su
   // Only when the list would show it: a push on every progress report would
   // have tvapp rebuild the show's card every few seconds while a video plays.
   if (started || stopped) debouncedTvdbPush(showName);
-  if (ended) await view.recordViewed(showName);
+  if (ended) {
+    await view.recordViewed(showName);
+    queueNextUpCheck(showName, rec);
+  }
   tvappNowPlaying = stopped
     ? null
     : {

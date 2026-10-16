@@ -16,8 +16,9 @@ import {
 
 const tvDir = "/mnt/media/tv";
 const tvRoot = path.resolve(tvDir);
+const MOVIES_ROOT = "/mnt/media/movies";
 
-function resolveUnderTvDir(pathParam, label = "path") {
+function resolveUnderTvDir(pathParam, label = "path", roots = [tvRoot]) {
   if (typeof pathParam !== "string") {
     throw new Error(`${label}: path must be string`);
   }
@@ -31,7 +32,9 @@ function resolveUnderTvDir(pathParam, label = "path") {
   const targetPath = path.isAbsolute(rawPath)
     ? path.resolve(rawPath)
     : path.resolve(tvRoot, rawPath);
-  if (!(targetPath === tvRoot || targetPath.startsWith(tvRoot + path.sep))) {
+  if (
+    !roots.some((r) => targetPath === r || targetPath.startsWith(r + path.sep))
+  ) {
     throw new Error(`${label}: path not allowed: ${rawPath}`);
   }
   return targetPath;
@@ -111,9 +114,12 @@ export const getFile = async (params) => {
 };
 
 const deleteOnePath = async (pathParam) => {
-  let fullPath = resolveUnderTvDir(pathParam, "deletePath");
-  if (fullPath === tvRoot) {
-    throw new Error("deletePath: refusing to delete tv root");
+  let fullPath = resolveUnderTvDir(pathParam, "deletePath", [
+    tvRoot,
+    MOVIES_ROOT,
+  ]);
+  if (fullPath === tvRoot || fullPath === MOVIES_ROOT) {
+    throw new Error("deletePath: refusing to delete media root");
   }
 
   try {

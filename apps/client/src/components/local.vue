@@ -2120,8 +2120,8 @@ export default {
         await this.refresh();
       } catch (e) {
         unilog(1003, "Error deleting files:", e);
-        alert(`Error deleting files: ${e.message}`);
-        this.error = e.message;
+        alert(`Error deleting files: ${e.message ?? e.error}`);
+        this.error = e.message ?? e.error;
       } finally {
         this.loading = false;
       }

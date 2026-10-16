@@ -1973,7 +1973,7 @@ export default {
 
       try {
         const res = await fetch(
-          `${config.torrentsApiUrl}/api/usb/deleteFiles`,
+          `${config.torrentsApiUrl}/api/usb/${this.movieMode ? "deleteMovies" : "deleteFiles"}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

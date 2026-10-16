@@ -118,6 +118,7 @@ const CMD_SELECT_SHOW = "s"; // select a show by name
 const CMD_PLAY_EPISODE = "p"; // play one specific episode of the selected show: p,<season>,<episode>
 const CMD_CLEAR_STATE = "r"; // back to a bare show list
 const CMD_CUSTOM_CHANGED = "c"; // the shared filter settings changed
+const CMD_PLAY_MOVIE = "m"; // play a movie file full screen: m,<url>
 // A live camera over the whole screen, hand-mirrored in CtrlServer.java. The
 // argument is a page url that plays it, or CAM_OFF to take it back off; what
 // the page does is no business of this file's.
@@ -125,6 +126,9 @@ const CMD_SHOW_CAM = "v";
 const CAM_OFF = "off";
 const TVAPP_PROBE_TIMEOUT_MS = 800;
 const TVAPP_SELECT_DIAL_TIMEOUT_MS = 8000;
+// The local pane's movies, and where nginx serves them.
+const MOVIES_DIR = "/mnt/media/movies";
+const MOVIES_URL = "https://hahnca.com/movies";
 
 const PIC_TARGETS = [
   "pictureMode",
@@ -1472,6 +1476,33 @@ app.get("/tv/showintvapp", async (req, res) => {
       ? { ok: true, action: "opened" }
       : { ok: false, error: "tvapp did not come up" },
   );
+});
+
+// The local pane's TV button in movie mode: tvapp plays the movie full screen
+// at once, launching first if it is down. Back closes it to tvapp's show list.
+app.get("/tv/movieintvapp", async (req, res) => {
+  const file = req.query.path;
+  if (!file?.startsWith(MOVIES_DIR + "/")) {
+    res.json({ ok: false, error: `not a movie: ${file}` });
+    return;
+  }
+  const url = `${MOVIES_URL}/${file
+    .slice(MOVIES_DIR.length + 1)
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`;
+  let sock = await probeTvappOpen();
+  if (!sock) {
+    await launchTvapp();
+    sock = await dialTvappUntilOpen(TVAPP_SELECT_DIAL_TIMEOUT_MS);
+  }
+  if (!sock) {
+    res.json({ ok: false, error: "tvapp did not come up" });
+    return;
+  }
+  sock.send(`${CMD_PLAY_MOVIE},${url}`);
+  sock.close();
+  res.json({ ok: true });
 });
 
 app.post("/tv/tvapprc/back", async (req, res) => {

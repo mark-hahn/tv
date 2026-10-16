@@ -275,15 +275,17 @@ class VideoPlayer extends FrameLayout {
     playing = p;
     ready = false;
     int res = p.optInt("res");
-    title.setParts(
-        p.optString("showName"),
-        show.originalCountry.toUpperCase(Locale.US),
-        ShowListView.years(show),
-        ShowListView.episodeText(p.optInt("season"), p.optInt("episode"), p.optInt("seasonEps")),
-        ShowListView.seasonsText(show),
-        ShowListView.watchedText(show),
-        show.status,
-        res > 0 ? String.valueOf(res) : "");
+    if (show == null) title.setParts(p.optString("showName"), "", "", "", "", "", "", "");
+    else
+      title.setParts(
+          p.optString("showName"),
+          show.originalCountry.toUpperCase(Locale.US),
+          ShowListView.years(show),
+          ShowListView.episodeText(p.optInt("season"), p.optInt("episode"), p.optInt("seasonEps")),
+          ShowListView.seasonsText(show),
+          ShowListView.watchedText(show),
+          show.status,
+          res > 0 ? String.valueOf(res) : "");
     subsPicked = false;
     subOfs = 0;
     clearCues();
@@ -374,6 +376,25 @@ class VideoPlayer extends FrameLayout {
     exo.prepare();
     exo.play();
     setVisibility(VISIBLE);
+  }
+
+  /**
+   * A movie file (the local pane's TV button), from the start: no show, so no
+   * play state reported, no subtitles and no scrub stills. Its title is its
+   * file name.
+   */
+  void playMovie(String url) {
+    JSONObject p = new JSONObject();
+    try {
+      String name = Uri.parse(url).getLastPathSegment();
+      p.put("url", url);
+      p.put("showName", name.replaceFirst("\\.[^.]+$", ""));
+      p.put("movie", true);
+    } catch (JSONException e) {
+      Log.e(TAG, "movie play failed for " + url + ": " + e);
+      return;
+    }
+    play(p, null);
   }
 
   // getPlayUrl's video with its .srt files sideloaded, each with the id SUBS_ID
@@ -703,9 +724,11 @@ class VideoPlayer extends FrameLayout {
       }
       out.put(
           "title",
-          String.format(
-              "%s S%02dE%02d",
-              playing.optString("showName"), playing.optInt("season"), playing.optInt("episode")));
+          playing.optBoolean("movie")
+              ? playing.optString("showName")
+              : String.format(
+                  "%s S%02dE%02d",
+                  playing.optString("showName"), playing.optInt("season"), playing.optInt("episode")));
       out.put("tracks", tracks);
       out.put("selected", selected);
       out.put("subOfs", subOfs);
@@ -1050,7 +1073,7 @@ class VideoPlayer extends FrameLayout {
   }
 
   private void report(String state) {
-    if (exo == null || playing == null) return;
+    if (exo == null || playing == null || playing.optBoolean("movie")) return;
     JSONObject body = new JSONObject();
     try {
       body.put("showName", playing.getString("showName"));

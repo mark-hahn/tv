@@ -348,7 +348,8 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   file as its episode). The browser player uses the same `getPlayUrl` and
   `playProgress` subtitle logic as tvapp, switching through the browser's
   captions menu. The client's in-app overlay (`video-player.vue`) shows no
-  subtitles for the intro check, and plays the local pane's movies.
+  subtitles for the intro check, and plays the local pane's movies. tvapp
+  plays a movie from the local pane's TV button with no subtitles at all.
 - Timing offset: set from the remotes' subtitle panel (`so`/`sa`, see Video
   keys) and from the browser player's Subs bar, and applied only by
   rewriting the `.srt` on disk (`/api/applySubOffset`). No offset is stored
@@ -547,7 +548,7 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-10-10**. tvapp (`apps/tvapp`, native Java, package
+Current as of **2026-10-15**. tvapp (`apps/tvapp`, native Java, package
 `com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
 (`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
@@ -603,7 +604,7 @@ because the TV is unreachable from any wireless host here.
 - A sort takes effect when the cursor lands on it; a filter takes effect on
   OK. The filter cursor is remembered. Right returns to the list.
 - Turning Trash on puts up a "Waiting for trash" view and drops list keys
-  until the rebuild has drawn.
+  until the rebuild has drawn. While a video is up the keys still reach it.
 
 **Playing** (`playClick`, reached by `e` and by OK on the list)
 - Which one plays:
@@ -625,6 +626,12 @@ because the TV is unreachable from any wireless host here.
   - takes the subtitle file showing at a stop (`sub`) as the episode's
     chosen one;
   - feeds now-playing.
+- A movie: the local pane's TV button in movie mode has tv-tv send
+  `m,<url>`, and `VideoPlayer.playMovie` plays it at once over whatever is
+  up, without the list, from the start. nginx serves `/mnt/media/movies` at
+  `/movies`. Its title is its file name; there is no `getPlayUrl`, no
+  `playProgress`, no subtitles and no stills (a hold seeks instead). The
+  video keys below work as for an episode, and Back closes it to the list.
 
 **Video keys** — while a video is up, the tvapprc arrows and OK drive it:
 - OK pauses/resumes, left −10 s, right +30 s, down shows the time bar.
@@ -727,6 +734,7 @@ actor filter → filter text → top of list. At the top Back goes to the TV's h
 | `f,<text>` | filter text |
 | `s,<name>` | select that show |
 | `p,<season>,<episode>` | play that episode; sent after an `s` |
+| `m,<url>` | play that movie file at once (the local pane's TV button) |
 | `c` | the Custom list changed |
 | `h` | hide key: the watched mark on the Map episode, else hide/unhide the show |
 | `v,<url>` / `v,off` | camera on / off |
@@ -767,6 +775,8 @@ the bridge `o` to open tvapp.
 **tv-tv**
 - `/tv/showintvapp?showName[&season&episode]` sends `r`, `s`, then
   `p,<season>,<episode>` or `e`, launching tvapp first if it is down.
+- `/tv/movieintvapp?path=<file under /mnt/media/movies>` sends `m,<url>`,
+  launching tvapp first if it is down.
 - `/tv/opentvapp` (like the bridge's `o`) opens tvapp on `lastRelevantShow`,
   the web client's selected show from `/tv/clientShow`.
 - The power key puts the set on the Google TV input, then opens tvapp.

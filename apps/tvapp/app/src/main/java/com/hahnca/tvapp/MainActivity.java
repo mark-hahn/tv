@@ -838,15 +838,18 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
 
   /**
    * Whether this key is one the show list answers, and so one there is no
-   * answering while the list is being rebuilt. Back and the rest still work.
+   * answering while the list is being rebuilt. Back and the rest still work,
+   * and so does every key while a video is up over the list (a movie plays at
+   * once, list or no list).
    */
-  private static boolean blockedWhileLoading(String key) {
-    return "ok".equals(key)
-        || "info".equals(key)
-        || "up".equals(key)
-        || "down".equals(key)
-        || "left".equals(key)
-        || "right".equals(key);
+  private boolean blockedWhileLoading(String key) {
+    return !video.isOpen()
+        && ("ok".equals(key)
+            || "info".equals(key)
+            || "up".equals(key)
+            || "down".equals(key)
+            || "left".equals(key)
+            || "right".equals(key));
   }
 
   /**
@@ -1436,6 +1439,20 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
             return;
           }
           playSelectedEpisode(season, episode);
+        });
+  }
+
+  /**
+   * The local pane's TV button on a movie: it plays at once over whatever is
+   * up, without waiting on the list, and Back closes it to the list.
+   */
+  @Override
+  public void onPlayMovie(String url) {
+    ui.post(
+        () -> {
+          bumpKeepAwake();
+          if (player.isPlaying()) player.close();
+          video.playMovie(url);
         });
   }
 

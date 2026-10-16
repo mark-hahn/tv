@@ -27,6 +27,8 @@ import org.java_websocket.server.WebSocketServer;
  *   s,&lt;name&gt;    select this show, exact name match -- sent by tv-tv itself
  *   p,&lt;season&gt;,&lt;episode&gt; play this specific episode of the selected
  *                  show -- sent by tv-tv itself, right after an s,&lt;name&gt;
+ *   m,&lt;url&gt;     play this movie file full screen at once -- sent by tv-tv
+ *                  itself, for the local pane's TV button
  *   c              the shared filter settings changed: re-fetch the Custom
  *                  list -- sent by tv-tv itself, on tv-srvr's behalf
  *   h              the hide key: the watched mark on the focused episode when
@@ -73,6 +75,7 @@ class CtrlServer extends WebSocketServer {
   private static final String CMD_FILTER = "f";
   private static final String CMD_SELECT = "s";
   private static final String CMD_PLAY_EPISODE = "p";
+  private static final String CMD_PLAY_MOVIE = "m";
   private static final String CMD_CUSTOM_CHANGED = "c";
   // The hide key was pressed on the remote. What it acts on is this app's to
   // say -- it is the only one that knows whether the map has an episode under
@@ -122,6 +125,8 @@ class CtrlServer extends WebSocketServer {
     void onSelectShow(String name);
 
     void onPlayEpisode(int season, int episode);
+
+    void onPlayMovie(String url);
 
     void onCustomChanged();
 
@@ -224,6 +229,10 @@ class CtrlServer extends WebSocketServer {
       } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
         Log.w(TAG, "bad play-episode command: " + message);
       }
+      return;
+    }
+    if (message.startsWith(CMD_PLAY_MOVIE + ",")) {
+      listener.onPlayMovie(message.substring(CMD_PLAY_MOVIE.length() + 1));
       return;
     }
     if (message.startsWith(CMD_CAM + ",")) {

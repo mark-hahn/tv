@@ -482,6 +482,28 @@
             </button>
 
             <button
+              @click="clickTv"
+              :disabled="selectedFiles.size === 0 && !selectedName"
+              :style="{
+                cursor:
+                  selectedFiles.size > 0 || selectedName
+                    ? 'pointer'
+                    : 'default',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                border: '1px solid #bbb',
+                '--btn-bg':
+                  selectedFiles.size > 0 || selectedName
+                    ? 'whitesmoke'
+                    : '#e8e8e8',
+                color:
+                  selectedFiles.size > 0 || selectedName ? 'inherit' : '#aaa',
+              }"
+            >
+              TV
+            </button>
+
+            <button
               @click="clickHist"
               :disabled="!historyReady"
               title="Show activity history"
@@ -2250,6 +2272,18 @@ export default {
       // logic; a movie, which has none, in the in-app player.
       if (this.movieMode) evtBus.emit("playEpisodePath", videoPath);
       else playPathInTab(videoPath);
+    },
+    // Movie mode's TV button: tvapp plays the movie full screen at once.
+    async clickTv() {
+      const videoPath = this.collectFilePaths()
+        .filter((p) => /\.(mkv|mp4|avi|m4v|mov|webm)$/i.test(p))
+        .map((p) => `/mnt/media/movies/${p}`)[0];
+      if (!videoPath) return;
+      const res = await fetch(
+        `${config.tvTvUrl}/tv/movieintvapp?path=${encodeURIComponent(videoPath)}`,
+      );
+      const body = await res.json();
+      if (!body.ok) alert(`TV play failed: ${body.error}`);
     },
     clickSubs() {
       const mediaRoot = this.movieMode ? "/mnt/media/movies" : "/mnt/media/tv";

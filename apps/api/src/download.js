@@ -285,6 +285,17 @@ function validateTorrentData(torrentData) {
   }
 }
 
+// Fetching only checks that the bytes are a torrent. The season/episode check
+// is the download handler's (validateTorrentBytes), which skips it for movies.
+function checkTorrentParses(torrentData) {
+  try {
+    parseTorrent(torrentData);
+    return ok();
+  } catch (e) {
+    return fail("parse-torrent", e?.message || String(e));
+  }
+}
+
 export function validateTorrentBytes(torrentData) {
   return validateTorrentData(torrentData);
 }
@@ -507,7 +518,7 @@ async function fetchTorrentFileFromInfoHash(torrent, provider) {
       if (!response.ok) continue;
 
       const torrentData = Buffer.from(await response.arrayBuffer());
-      const valid = validateTorrentData(torrentData);
+      const valid = checkTorrentParses(torrentData);
       if (!valid.success) continue;
 
       return ok({
@@ -604,7 +615,7 @@ export async function fetchTorrentFileFromSearchResult(torrent) {
     );
   }
 
-  const valid = validateTorrentData(r.stdout);
+  const valid = checkTorrentParses(r.stdout);
   if (!valid.success) {
     return fail(
       "validate",
@@ -667,7 +678,7 @@ export async function fetchTorrentFile(torrent) {
         unilog(137, "directLink fetch ok:", dlResp.ok);
         if (dlResp.ok) {
           const torrentData = Buffer.from(await dlResp.arrayBuffer());
-          const valid = validateTorrentData(torrentData);
+          const valid = checkTorrentParses(torrentData);
           unilog(
             138,
             "directLink valid:",
@@ -758,7 +769,7 @@ export async function fetchTorrentFile(torrent) {
       );
     }
     const torrentData = Buffer.from(await torResp.arrayBuffer());
-    const valid = validateTorrentData(torrentData);
+    const valid = checkTorrentParses(torrentData);
     if (!valid.success) {
       return fail(
         "validate",
@@ -923,7 +934,7 @@ export async function fetchTorrentFile(torrent) {
     });
   }
 
-  const valid = validateTorrentData(torrentData);
+  const valid = checkTorrentParses(torrentData);
   if (!valid.success) {
     return fail(
       "validate",

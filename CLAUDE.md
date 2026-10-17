@@ -355,7 +355,11 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   episode (`/api/play?path=<video>`; `getPlayUrl` takes `path` and plays that
   file as its episode). The browser player uses the same `getPlayUrl` and
   `playProgress` subtitle logic as tvapp, switching through the browser's
-  captions menu. The client's in-app overlay (`video-player.vue`) shows no
+  captions menu. Its Audio button, left of Subs, shows with more than one
+  audio track and reopens the stream at its position on the next one
+  (`/api/stream`'s `audio`); it starts on English (`/api/audio-list`'s
+  `language`) when the file has it. An mp4 played straight off nginx has no
+  Audio. The client's in-app overlay (`video-player.vue`) shows no
   subtitles for the intro check, and plays the local pane's movies. tvapp
   plays a movie from the local pane's TV button with no subtitles at all.
 - Timing offset: set from the remotes' subtitle panel (`so`/`sa`, see Video
@@ -556,7 +560,7 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-10-15**. tvapp (`apps/tvapp`, native Java, package
+Current as of **2026-10-16**. tvapp (`apps/tvapp`, native Java, package
 `com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
 (`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
@@ -627,6 +631,9 @@ because the TV is unreachable from any wireless host here.
 - Subtitles: the video's sidecar `.srt` files are sideloaded (served as
   vtt). Embedded tracks are never shown. It starts on the one `getPlayUrl`
   picked (`subPick`); with none, subtitles are off. See Subtitles.
+- Audio: English when the file has an English track, else the file's
+  default (Media3's preferred audio language). The subtitle panel's Audio
+  steps through the tracks.
 - It POSTs `/api/playProgress` on start, every 10 s, on pause/resume, on stop
   and at the end. tv-srvr then:
   - stores `pos` and sets watched at the end;
@@ -663,6 +670,8 @@ because the TV is unreachable from any wireless host here.
   - tvapp sends the video's text tracks as `l,<json>` on every change, and
     when the remote asks with `l`.
   - A tap sends `t,<n>`; `-1` turns subtitles off.
+  - With more than one audio track (`audios`), an Audio cell sits before
+    None. It sends `au`, and tvapp plays the next audio track, wrapping.
   - The one showing when the video stops becomes the episode's chosen one.
   - Timing: the panel's +/- buttons send `so,<sec>` (±0.5, ±0.1), which
     moves tvapp's `subOfs`, counted from the file as it is on disk; nothing
@@ -751,13 +760,15 @@ actor filter → filter text → top of list. At the top Back goes to the TV's h
 | `so,<sec>` | move the subtitle offset by sec; shifts nothing yet |
 | `sa` | apply the offset: shift the showing `.srt` on disk and reload |
 | `sy` | Sync: measure the showing file's offset into `subOfs`; shifts nothing yet |
+| `au` | the next audio track, wrapping |
 | `k,reload` | reload the playing video at its position |
 
 `s` is held until the list has loaded, and `e`/`p` wait behind it.
 
 **Commands back to the remote** — `z`, `c,<count>`, `a,<name>`, `i,<0|1>`,
 `l,<json>` (subtitle tracks `{title, tracks: [{label, type}], selected,
-subOfs, canSync, cap}`, or `null` with no video up).
+subOfs, canSync, cap, audios}`, `audios` the number of audio tracks, or
+`null` with no video up).
 The bridge adds `u`/`d` (tvapp up/down). Those two, and the bridge socket
 closing, are the only things that set or clear tvapprc mode. The phone sends
 the bridge `o` to open tvapp.
@@ -769,7 +780,8 @@ the bridge `o` to open tvapp.
 - Row 3's left cell is Search: the phone-only filter input screen, which
   sends `f,<text>`. Its right cell is Skip (`k,skip`). Back sends `b`.
 - Holding Vol+ opens the subtitle panel, whose bottom row is Sync (`sy`)
-  and Close. Holding Apps sends `k,reload`; a short press still opens the
+  and Close, with an Audio cell (`au`) before None when the video has more
+  than one audio track. Holding Apps sends `k,reload`; a short press still opens the
   streaming list.
 - No phone key sends `e`.
 - Outside tvapprc mode row 3's left cell is Emby, which launches the Emby

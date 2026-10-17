@@ -261,6 +261,7 @@ export function registerMediaRoutes(app) {
           return {
             index: s.index,
             label: parts.join(" | "),
+            language: lang,
             isDefault: s.disposition?.default === 1,
           };
         });

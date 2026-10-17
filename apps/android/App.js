@@ -69,13 +69,15 @@ const MSG_ACTIVE_SHOW = "a";
 // Whether that show is hidden, which is what the hide key reads Unhide for.
 const MSG_ACTIVE_HIDDEN = "i";
 // The subtitle tracks of the video tvapp is playing, as JSON {title, tracks:
-// [{label, type}], selected, subOfs, canSync, cap}, or null when
+// [{label, type}], selected, subOfs, canSync, cap, audios}, or null when
 // none is up; cap is the caption tvapp shows, moved by subOfs, sent on every
 // change. Asked for with CMD_SUBTITLES; CMD_SUBTITLE,<n> turns track n on, -1
-// turns them off.
+// turns them off. With more than one audio track (audios), an Audio cell
+// before None sends CMD_AUDIO, which steps to the next one.
 const MSG_SUBTITLES = "l";
 const CMD_SUBTITLES = "l";
 const CMD_SUBTITLE = "t";
+const CMD_AUDIO = "au";
 // The subtitle panel's timing offset: CMD_SUB_OFFSET,<sec> moves it (the
 // list's subOfs), CMD_SUB_APPLY shifts the playing .srt by it, reloads, and
 // puts it back to 0; the file, timed by hand, keeps its check mark only when
@@ -1336,6 +1338,7 @@ function Remote({ setSubError }) {
   };
 
   const subSelectTrack = (index) => {
+    if (index === "audio") return sendTvapprc(CMD_AUDIO);
     setSubList((l) => l && { ...l, selected: index });
     sendTvapprc(`${CMD_SUBTITLE},${index}`);
   };
@@ -1915,7 +1918,8 @@ function Remote({ setSubError }) {
           {!subList ? (
             <Text style={subCtrlStyles.noVideo}>No video playing</Text>
           ) : (
-            [{ label: "None", index: -1 }]
+            (subList.audios > 1 ? [{ label: "Audio", index: "audio" }] : [])
+              .concat({ label: "None", index: -1 })
               .concat(
                 subList.tracks.map((sub, index) => ({
                   label: sub.label,

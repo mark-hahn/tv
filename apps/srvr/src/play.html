@@ -4,10 +4,11 @@
   playInTab), served by tv-srvr at /api/play?showName&season&episode, and for
   the local pane's (playPathInTab) at /api/play?path=<video file>. Like
   tvapp's VideoPlayer it plays getPlayUrl's answer: it starts at the resume
-  point, else past the intro, has Skip for the intro and the episode's
-  subtitles in the browser's own subtitle menu, with a Subs bar for their
-  timing like the remotes' subtitle panel, and reports to playProgress, which
-  keeps the resume point (partial) and the watched mark.
+  point, else past the intro, plays English audio when the file has it, with
+  Audio to step through its audio tracks, has Skip for the intro and the
+  episode's subtitles in the browser's own subtitle menu, with a Subs bar for
+  their timing like the remotes' subtitle panel, and reports to playProgress,
+  which keeps the resume point (partial) and the watched mark.
 
   The video comes through /api/stream, a live remux/transcode that starts at
   its start param and can't seek, fed into a MediaSource (see load()).
@@ -124,13 +125,26 @@
         let sb = null;
         let loader = null;
         let direct = false;
+        // The file's audio tracks (/api/audio-list) and the one the stream
+        // plays, English when there is one; Audio steps through them.
+        const audiosP = fetch(
+          `audio-list?path=${encodeURIComponent(p.path)}`,
+        ).then((r) => r.json());
+        let audios = [];
+        let audioAt = 0;
         vid.src = URL.createObjectURL(ms);
         ms.addEventListener(
           "sourceopen",
-          () => {
+          async () => {
             URL.revokeObjectURL(vid.src);
             ms.duration = p.durMs / 1000;
             sb = ms.addSourceBuffer(MIME);
+            audios = await audiosP;
+            audioAt = Math.max(
+              0,
+              audios.findIndex((a) => /^en/i.test(a.language)),
+            );
+            audioBtn.hidden = audios.length < 2;
             load(startSec, true);
           },
           { once: true },
@@ -163,7 +177,8 @@
           const gone = () => loader !== me;
           try {
             const res = await fetch(
-              `stream?path=${encodeURIComponent(p.path)}&start=${from}&copyts=1`,
+              `stream?path=${encodeURIComponent(p.path)}&start=${from}&copyts=1` +
+                (audios.length ? `&audio=${audios[audioAt].index}` : ""),
               { signal: me.abort.signal },
             );
             if (res.redirected) {
@@ -171,6 +186,7 @@
               // player seeks in by itself.
               me.abort.abort();
               direct = true;
+              audioBtn.hidden = true;
               vid.src = res.url;
               await once(vid, "loadedmetadata");
               vid.currentTime = sec;
@@ -277,8 +293,8 @@
         });
 
         // The buttons over the video, at the top right after the show name
-        // and episode: Subs, which toggles the subtitle timing bar at the top
-        // middle, and Skip for the intro.
+        // and episode: Audio, Subs, which toggles the subtitle timing bar at
+        // the top middle, and Skip for the intro.
         // They are in popovers so they can be put above a fullscreen video in
         // the top layer. btns pairs each one with what a click on it does.
         const btns = [];
@@ -301,6 +317,14 @@
         };
         const corner = pop("corner");
         button(corner, document.title, () => {}).style.cursor = "default";
+
+        // Audio, with more than one audio track: reopens the stream where it
+        // is on the next one. Not for a file played straight off nginx.
+        const audioBtn = button(corner, "Audio", () => {
+          audioAt = (audioAt + 1) % audios.length;
+          load(vid.currentTime, false);
+        });
+        audioBtn.hidden = true;
 
         if (p.subs.length) {
           // The timing bar, like the remotes' subtitle panel. ofs is how far

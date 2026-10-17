@@ -206,6 +206,9 @@ class VideoPlayer extends FrameLayout {
   // The video's sideloaded text tracks, in the order the remote's subtitle
   // panel lists them.
   private final List<Tracks.Group> textGroups = new ArrayList<>();
+  // The video's audio tracks this device can play, which the panel's Audio
+  // steps through.
+  private final List<Tracks.Group> audioGroups = new ArrayList<>();
   // The text track that was on when reload reopened the video, turned back on
   // once the reopened video has its tracks.
   private String reloadSubId;
@@ -303,6 +306,9 @@ class VideoPlayer extends FrameLayout {
     stills.open(p.optJSONObject("stills"));
     String url = p.optString("url");
     exo = new ExoPlayer.Builder(getContext()).build();
+    // English audio when the file has it, over the track it marks default.
+    exo.setTrackSelectionParameters(
+        exo.getTrackSelectionParameters().buildUpon().setPreferredAudioLanguage("en").build());
     exo.addListener(
         new Player.Listener() {
           @Override
@@ -359,7 +365,9 @@ class VideoPlayer extends FrameLayout {
               reloadSubId = null;
             }
             textGroups.clear();
+            audioGroups.clear();
             for (Tracks.Group g : tracks.getGroups()) {
+              if (g.getType() == C.TRACK_TYPE_AUDIO && g.isSupported()) audioGroups.add(g);
               if (g.getType() != C.TRACK_TYPE_TEXT) continue;
               Format f = g.getTrackFormat(0);
               if (isSideloaded(f)) textGroups.add(g);
@@ -723,13 +731,15 @@ class VideoPlayer extends FrameLayout {
     exo = null;
     playing = null;
     textGroups.clear();
+    audioGroups.clear();
     setVisibility(GONE);
     events.onSubtitles(null);
   }
 
   /**
    * For the remote's subtitle panel: {title, tracks: [{label, type}], selected,
-   * subOfs, canSync, cap}, selected -1 when subtitles are off. canSync with a
+   * subOfs, canSync, cap, audios}, selected -1 when subtitles are off, audios
+   * the number of audio tracks (Audio shows with more than one). canSync with a
    * subtitle on, until the episode's subtitles have all been checked
    * (subsChecked), and not while a measure or a shift is on its way. Null when
    * no video is up.
@@ -761,6 +771,7 @@ class VideoPlayer extends FrameLayout {
       out.put("subOfs", subOfs);
       out.put("canSync", selected >= 0 && !shifting && !playing.optBoolean("subsChecked"));
       out.put("cap", capText);
+      out.put("audios", audioGroups.size());
     } catch (JSONException e) {
       Log.e(TAG, "subtitle list failed: " + e);
       return null;
@@ -781,6 +792,22 @@ class VideoPlayer extends FrameLayout {
               new TrackSelectionOverride(textGroups.get(index).getMediaTrackGroup(), 0));
     }
     exo.setTrackSelectionParameters(b.build());
+  }
+
+  /** The panel's Audio: the next audio track, wrapping. */
+  void nextAudio() {
+    if (exo == null || audioGroups.size() < 2) return;
+    int on = 0;
+    for (int i = 0; i < audioGroups.size(); i++) if (audioGroups.get(i).isSelected()) on = i;
+    Tracks.Group g = audioGroups.get((on + 1) % audioGroups.size());
+    exo.setTrackSelectionParameters(
+        exo.getTrackSelectionParameters()
+            .buildUpon()
+            .setOverrideForType(new TrackSelectionOverride(g.getMediaTrackGroup(), 0))
+            .build());
+    // A seek where it is puts sound and picture back in step: switching back
+    // to a track played before left its sound off from the picture.
+    exo.seekTo(exo.getCurrentPosition());
   }
 
   // The index in textGroups of the track that is on, -1 for none.

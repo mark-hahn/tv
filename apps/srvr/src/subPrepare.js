@@ -540,7 +540,7 @@ export async function measureSidecar({ videoPath, srtFile }) {
     unilog(2803, `${name} measured for Sync: ${out.verdict}, ${out.offsetMs == null ? out.why : fmtOfs(out.offsetMs)}`);
     return {
       ...out,
-      label: subs.playLabel(video, name),
+      label: await subs.playLabel(video, name),
       subsChecked: !needsCheck(video),
     };
   } finally {

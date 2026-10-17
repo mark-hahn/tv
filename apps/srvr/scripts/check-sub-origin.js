@@ -1,7 +1,7 @@
 // Self-check for src/subOrigin.js against real OpenSubtitles results.
 // Run: node apps/srvr/scripts/check-sub-origin.js (silent when it passes)
 import assert from "node:assert";
-import { sameOrigin, releaseKey, sidecarType, sidecarLabel } from "../src/subOrigin.js";
+import { sameOrigin, releaseKey, sidecarType, sidecarLabel, srtContent } from "../src/subOrigin.js";
 
 const row = (o) => ({
   hearingImpaired: 0,
@@ -47,9 +47,26 @@ assert.equal(sidecarType("opnCYR4Q"), "V");
 assert.equal(sidecarType("asr"), "+");
 assert.equal(sidecarType("en"), "S");
 assert.equal(sidecarType(""), "S");
-assert.equal(sidecarLabel("opnCYR4Q"), "V CYR4Q");
-assert.equal(sidecarLabel("S2"), "S 2");
-assert.equal(sidecarLabel("mb4"), "T 4");
-assert.equal(sidecarLabel("en"), "S en");
-assert.equal(sidecarLabel(""), "S");
+assert.equal(sidecarLabel("opnCYR4Q"), "v CYR4Q");
+assert.equal(sidecarLabel("opnCYR4Q", "L"), "vL CYR4Q");
+assert.equal(sidecarLabel("T3", "LS"), "tLS3");
+assert.equal(sidecarLabel("H10", "S"), "hS10");
+assert.equal(sidecarLabel("S2"), "s2");
+assert.equal(sidecarLabel("mb4"), "t4");
+assert.equal(sidecarLabel("en"), "s en");
+assert.equal(sidecarLabel("en", "S"), "sS en");
+assert.equal(sidecarLabel(""), "s");
 assert.equal(sidecarLabel("asr"), "+");
+
+const cue = (n, text) => `${n}\n00:00:0${n},000 --> 00:00:0${n},900\n${text}\n`;
+const srt = (lines) => lines.map((t, i) => cue(i + 1, t)).join("\n");
+const dialogue = ["Hello.", "Where were you?", "Out."];
+const sounds = ["[door slams]", "(sighs)", "ROSE: Come in.", "[phone buzzing]", "- [laughs]"];
+const lyrics = ["♪ Yeah, I'm right here ♪", "<i>♪ But I guess you didn't know ♪</i>", "♪ When there's no one left ♪"];
+const tunes = ["♪ tense music ♪", "♪ ♪", "♪ [upbeat music playing] ♪"];
+assert.equal(srtContent(srt(dialogue)), "");
+assert.equal(srtContent(srt([...dialogue, ...sounds])), "S");
+assert.equal(srtContent(srt([...dialogue, ...lyrics])), "L");
+assert.equal(srtContent(srt([...sounds, ...lyrics])), "LS");
+assert.equal(srtContent(srt([...dialogue, ...tunes, ...tunes])), "");
+assert.equal(srtContent(srt([...dialogue, ...sounds.slice(0, 4)])), "");

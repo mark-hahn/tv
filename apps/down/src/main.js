@@ -32,10 +32,6 @@ const __filename = urlNode.fileURLToPath(import.meta.url);
 const __dirname = pathNode.dirname(__filename);
 
 const SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
-// Matches the rsync command line the download workers spawn (both the old
-// shared partial dir and the per-transfer ".rsync-tmp-<procId>" ones). Anchored
-// on "rsync " so a shell that merely mentions the pattern is never matched.
-const RSYNC_PARTIAL_DIR_PATTERN = "^rsync .*--partial-dir=\\.rsync-tmp";
 // usb prune: only check once a day; prune only when free space is low
 const PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 // An English subtitle file's name in a release's Subs/<episode>/ folder, such
@@ -543,22 +539,6 @@ async function main() {
   exec = childProcess.execSync;
   var execAsync = utilNode.promisify(childProcess.exec);
 
-  // pm2 does not take the workers' rsync children down with tv-down, so they
-  // survive a restart reparented to init and then write the same destination
-  // file as the transfer this instance restarts. Kill them before any worker
-  // starts. pkill exits 1 when nothing matched, which is the normal case.
-  // execFileSync, not execSync: a shell command line containing the pattern
-  // would match itself and pkill would kill its own shell.
-  try {
-    childProcess.execFileSync(
-      "pkill",
-      ["-f", "--", RSYNC_PARTIAL_DIR_PATTERN],
-      { stdio: "ignore" },
-    );
-    unilog(2035, `killed rsyncs orphaned by a previous tv-down`);
-  } catch (e) {
-    // nothing orphaned
-  }
   mkdirp = mkdirpPkg;
   request = requestPkg;
   rimraf = rimrafPkg;
@@ -2678,11 +2658,14 @@ async function main() {
 
     // Same episode twice in one usb list: only the best file goes on to
     // checkFile, the larger one when neither is better. Forced and tor files
-    // are explicit picks and are never dropped.
+    // are explicit picks and are never dropped. A file whose download failed
+    // is never the best: checkFile skips it, and it would hide the others.
     var bestByEp = {};
     for (var bi = 0; bi < usbFiles.length; bi++) {
       var bf = usbFiles[bi];
       if (!bf.epKey) continue;
+      if (tvJsonTitles && tvJsonTitles[bf.base] && tvJsonTitles[bf.base].error)
+        continue;
       var cur = bestByEp[bf.epKey];
       if (
         !cur ||

@@ -8,7 +8,7 @@ import * as cp from "child_process";
 import * as path from "node:path";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { unilog, logHere } from "@tv/share";
-import { listSidecars } from "../subs.js";
+import { labelSidecars } from "../subs.js";
 import { showFolderFor } from "../showPaths.js";
 import { HDR_TRANSFERS, TONEMAP } from "../stills.js";
 
@@ -295,7 +295,7 @@ export function registerMediaRoutes(app) {
       return;
     }
     res.json(
-      listSidecars(resolved).map((s) => ({
+      (await labelSidecars(resolved)).map((s) => ({
         id: `srt-${s.file}`,
         label: s.label,
         type: "srt",

@@ -8,7 +8,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import Database from "better-sqlite3";
 import chokidar from "chokidar";
 import { unilog, logHere } from "@tv/share";
@@ -58,6 +58,11 @@ const SRVR_INTERNAL_PORT = 8739;
 const WORKER_URL = new URL("./worker.js", import.meta.url);
 
 const MAX_WORKERS = 8;
+
+// Matches the rsync command line the download workers spawn (both the old
+// shared partial dir and the per-transfer ".rsync-tmp-<procId>" ones). Anchored
+// on "rsync " so a shell that merely mentions the pattern is never matched.
+const RSYNC_PARTIAL_DIR_PATTERN = "^rsync .*--partial-dir=\\.rsync-tmp";
 const usbHost = "xobtlu@xobtlu.baron.usbx.me";
 
 const forcedTitles = new Set();
@@ -1107,6 +1112,23 @@ const removeInProgress = (title) => {
 };
 
 const loadOnStart = () => {
+  // pm2 does not take the workers' rsync children down with tv-down, so they
+  // survive a restart reparented to init and then write the same destination
+  // file as the transfer this instance restarts. Kill them here, before this
+  // instance starts its own workers: run any later, the pattern also matches
+  // their fresh rsyncs, which then fail with code 20 and are marked errors.
+  // pkill exits 1 when nothing matched, which is the normal case.
+  // execFileSync, not execSync: a shell command line containing the pattern
+  // would match itself and pkill would kill its own shell.
+  try {
+    execFileSync("pkill", ["-f", "--", RSYNC_PARTIAL_DIR_PATTERN], {
+      stdio: "ignore",
+    });
+    unilog(2970, `killed rsyncs orphaned by a previous tv-down`);
+  } catch (e) {
+    // nothing orphaned
+  }
+
   ensureMapFileExists(TV_INPROGRESS_PATH, {});
 
   openDb();

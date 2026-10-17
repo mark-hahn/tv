@@ -375,7 +375,7 @@ async function extractEmbSrts(videoFilePath, fromUI) {
   for (const s of textStreams) {
     const sdh =
       s.disposition?.hearing_impaired === 1 ||
-      /\bsdh\b/i.test(s.tags?.title || "");
+      /\b(sdh|cc)\b/i.test(s.tags?.title || "");
     const outPath = `${base}.${sdh ? "H" : "T"}${s.index}.srt`;
     extracted++;
     // mb<n> is the name this copy went by before.

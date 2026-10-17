@@ -2246,7 +2246,7 @@ app.post(
         notes: retime,
       });
     const play = rec
-      ? subs.playList(String(rec.id), se?.season, se?.episode, videoPath)
+      ? await subs.playList(String(rec.id), se?.season, se?.episode, videoPath)
       : null;
     return {
       ...prep,
@@ -2279,7 +2279,7 @@ app.get(
       tvDir,
     );
     if (!file) return { title: `${title}: no video`, labels: [], pick: -1 };
-    const { sidecars, pick } = subs.playList(String(rec.id), season, episode, file);
+    const { sidecars, pick } = await subs.playList(String(rec.id), season, episode, file);
     return { title, labels: sidecars.map((s) => s.label), pick };
   }),
 );
@@ -2350,7 +2350,7 @@ app.post("/api/applySubOffset", async (req, res) => {
   await subPrepare.judgeHandTimed(resolvedSrt);
   res.json({
     ok: true,
-    label: subs.playLabel(resolvedVideo, path.basename(resolvedSrt)),
+    label: await subs.playLabel(resolvedVideo, path.basename(resolvedSrt)),
     subsChecked: !subPrepare.needsCheck(resolvedVideo),
   });
 });
@@ -2966,8 +2966,8 @@ function queueNextUpCheck(showName, rec) {
 // as vtt), each with the subtitle panel's label, and subPick, the index of the
 // one to start on, -1 with none. Embedded tracks are never offered, nor files
 // checked as not fitting the video (subs.playList).
-function subsForFile(showId, file, season, episode) {
-  const { sidecars, pick } = subs.playList(showId, season, episode, file);
+async function subsForFile(showId, file, season, episode) {
+  const { sidecars, pick } = await subs.playList(showId, season, episode, file);
   return {
     subs: sidecars.map((s) => ({
       url:
@@ -3027,12 +3027,12 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
     });
   // Downloads the play could not wait for: once they land, a player that
   // opened this episode with no .srt takes them up.
-  lateSubs?.then(() =>
+  lateSubs?.then(async () =>
     notifyClients("subsLate", {
       showName,
       season,
       episode,
-      ...subsForFile(String(rec.id), file, season, episode),
+      ...(await subsForFile(String(rec.id), file, season, episode)),
     }),
   );
   return {
@@ -3045,7 +3045,7 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
     seasonEps: ed[season]?.length ?? 0,
     trimPosMs,
     skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),
-    ...subsForFile(String(rec.id), file, season, episode),
+    ...(await subsForFile(String(rec.id), file, season, episode)),
     // Whether the episode's subtitle files have all been checked and fixed;
     // the remotes' Sync is for one that has not (measureSub).
     subsChecked: !subPrepare.needsCheck(file),

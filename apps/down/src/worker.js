@@ -691,6 +691,15 @@ const main = () => {
           return;
         }
 
+        // 20: rsync was killed by a signal, not failed by the transfer. Put the
+        // entry back in line with its partial kept, so it resumes instead of
+        // being marked an error that is never tried again.
+        if (code === 20) {
+          unilog(2972, `rsync for ${title} was killed by a signal; queued again to resume`);
+          finish("waiting");
+          return;
+        }
+
         const msg = stderrSummary
           ? `rsync exit code ${code}: ${stderrSummary}`
           : `rsync exit code ${code}`;

@@ -24,7 +24,12 @@ import {
   subsSearch,
   subsShowImdbIds,
 } from "./opensubtitles.js";
-import { sameOrigin, sidecarLabel, sidecarType } from "./subOrigin.js";
+import {
+  sameOrigin,
+  sidecarLabel,
+  sidecarType,
+  srtContent,
+} from "./subOrigin.js";
 import { resFindEpisodeVideos, resIsSampleName } from "./videoFiles.js";
 
 const SUBS_DB_PATH = path.join(SRVR_DATA_DIR, "subs.db");
@@ -223,7 +228,7 @@ function opnPath(videoPath, fileId) {
   );
 }
 
-// The video's subtitle files, [{file, suffix, type, label}], in TYPE_ORDER.
+// The video's subtitle files, [{file, suffix, type}], in TYPE_ORDER.
 // suffix is what sits between the video's name and ".srt".
 export function listSidecars(videoPath) {
   const stem = videoStem(videoPath);
@@ -239,7 +244,6 @@ export function listSidecars(videoPath) {
         file,
         suffix,
         type: sidecarType(suffix),
-        label: sidecarLabel(suffix),
       };
     })
     .sort(
@@ -247,6 +251,22 @@ export function listSidecars(videoPath) {
         TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) ||
         a.file.localeCompare(b.file, undefined, { numeric: true }),
     );
+}
+
+// The sidecar with its content letters (srtContent), read from the file, and
+// its label. ASR's files are not read: they hold neither.
+async function labelled(dir, s) {
+  const content =
+    s.type === "+"
+      ? ""
+      : srtContent(await fs.promises.readFile(path.join(dir, s.file), "utf8"));
+  return { ...s, content, label: sidecarLabel(s.suffix, content) };
+}
+
+// listSidecars, each one labelled.
+export function labelSidecars(videoPath) {
+  const dir = path.dirname(videoPath);
+  return Promise.all(listSidecars(videoPath).map((s) => labelled(dir, s)));
 }
 
 // The episode's downloaded marks, from the opn files beside its videos in dir:
@@ -274,9 +294,11 @@ export function clearDownloadedWithout(episodes) {
 
 // ---- which one a video starts on, and which one it stopped on ----
 
-// The index in sidecars to start on, -1 with none: the one this episode last
-// showed, else one of the type the show last showed (for a download, the one
-// from the same origin as a chosen one), else the first.
+// The index in labelled sidecars to start on, -1 with none: the one this
+// episode last showed, else one of the type the show last showed (for a
+// download, the one from the same origin as a chosen one), else the first.
+// Past the episode's own pick, files without sound descriptions win: with any
+// that are not ASR's, the choice is among them.
 export function pickSidecar(showId, season, episode, sidecars, dir = null) {
   if (sidecars.length === 0) return -1;
   // A good ASR file is the start only when nothing of another type is good:
@@ -297,22 +319,25 @@ export function pickSidecar(showId, season, episode, sidecars, dir = null) {
       );
     if (i !== -1 && !otherGoodSince) return i;
   }
+  const quiet = sidecars.some((s) => s.type !== "+" && !s.content.includes("S"));
+  const first = (want) =>
+    sidecars.findIndex(
+      (s) => (!quiet || (s.type !== "+" && !s.content.includes("S"))) && want(s),
+    );
   const last = lastShowPick.get(showId);
-  if (!last || (last.type === "+" && others)) return 0;
+  if (!last || (last.type === "+" && others)) return first(() => true);
   if (last.type === "V") {
     const chosen = chosenSubs.all(showId);
     const rows = episodeSubs.all(showId, season, episode);
-    const i = sidecars.findIndex((s) => {
+    const i = first((s) => {
       if (s.type !== "V") return false;
       const row = rows.find((r) => r.fileId === tagFileId(s.suffix));
       return !!row && chosen.some((c) => sameOrigin(row, c));
     });
     if (i !== -1) return i;
   }
-  return Math.max(
-    0,
-    sidecars.findIndex((s) => s.type === last.type),
-  );
+  const i = first((s) => s.type === last.type);
+  return i !== -1 ? i : first(() => true);
 }
 
 // What a play offers: the video's sidecars and the index of the one to start
@@ -321,11 +346,11 @@ export function pickSidecar(showId, season, episode, sidecars, dir = null) {
 // which came out of the video, then everything unchecked; files from another
 // cut and signs tracks are left out. The start is pickSidecar's choice among
 // the first of those groups that has any. With no checks this is just
-// listSidecars and pickSidecar.
-export function playList(showId, season, episode, videoPath) {
+// labelSidecars and pickSidecar.
+export async function playList(showId, season, episode, videoPath) {
   const dir = path.dirname(videoPath);
   const groups = [[], [], []];
-  for (const s of listSidecars(videoPath)) {
+  for (const s of await labelSidecars(videoPath)) {
     const verdict = freshCheck(path.join(dir, s.file))?.verdict;
     if (verdict === "wrong cut" || verdict === "unusable") continue;
     if (verdict === "good")
@@ -347,10 +372,12 @@ export function playList(showId, season, episode, videoPath) {
 
 // The label a play's list gives the video's sidecar file (see playList), or
 // null when there is no such file.
-export function playLabel(videoPath, file) {
-  const s = listSidecars(videoPath).find((x) => x.file === file);
-  if (!s) return null;
-  const verdict = freshCheck(path.join(path.dirname(videoPath), file))?.verdict;
+export async function playLabel(videoPath, file) {
+  const dir = path.dirname(videoPath);
+  const found = listSidecars(videoPath).find((x) => x.file === file);
+  if (!found) return null;
+  const s = await labelled(dir, found);
+  const verdict = freshCheck(path.join(dir, file))?.verdict;
   return verdict === "good" ? `${s.label} ${VERIFIED_MARK}` : s.label;
 }
 

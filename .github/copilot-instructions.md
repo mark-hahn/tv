@@ -206,8 +206,10 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   `cleanSrt()` (`packages/share/src/srt.js`) first.
 - Types, from the suffix between the video's name and `.srt`
   (`sidecarType()` in `apps/srvr/src/subOrigin.js`):
-  - `T<n>` / `H<n>` (T, H): a copy of embedded text track n, H when it is
-    flagged as describing music and sound. A legacy `mb<n>` counts as T.
+  - `T<n>` / `H<n>` (T, H): a copy of embedded text track n (its ffprobe
+    stream index, counting every stream), H when it is flagged as describing
+    music and sound or its title says SDH or CC. A legacy `mb<n>` counts as
+    T.
   - `opn<TAG>` (V): an OpenSubtitles download; TAG is its file_id in base32.
   - `asr` (+): ASR's.
   - `S<n>` and anything else (S): a file that arrived beside the video.
@@ -285,10 +287,16 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 - What a play offers (`playList`): files checked good first, labelled with
   a ✓, then T and H files that could not be judged, then unchecked files.
   Files from another cut and unusable ones are left out.
+- Labels (`sidecarLabel()`) are made from the files each time a list is
+  handed out, and nothing is stored: the type in lower case, then L when
+  the file has ♪ lyrics and S when it has sound descriptions
+  (`srtContent()`), then the number: `tLS3`, `t2 ✓`, `vL CYR4Q`. A `+`
+  file is not read and is just `+`.
 - The start pick (`pickSidecar`, within the first of those groups that has
-  any): the file the episode last showed, else the type the show last
-  showed (for V, the one from the same origin as a chosen one), else the
-  first in the order T, H, V, S, +.
+  any): the file the episode last showed, else, among the files without S
+  when there are any besides `+`, the type the show last showed (for V, the
+  one from the same origin as a chosen one), else the first in the order
+  T, H, V, S, +.
 - The player sends the showing file as `sub` in `playProgress`. At a stop
   that is not an early stop it becomes the episode's pick and `chosen`.
 - Same origin (`sameOrigin()`): two results for different episodes match when

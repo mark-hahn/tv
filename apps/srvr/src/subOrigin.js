@@ -24,13 +24,48 @@ export function sidecarType(suffix) {
   return "S";
 }
 
-// The subtitle panel's name for a sidecar: "T 3", "V CYR4Q", "S 1", "+".
-export function sidecarLabel(suffix) {
+// The subtitle panel's name for a sidecar: its type in lower case, then its
+// content letters (srtContent), then its number or tag: "tLS3", "vL CYR4Q",
+// "s1", "+".
+export function sidecarLabel(suffix, content = "") {
   const type = sidecarType(suffix);
   if (type === "+") return type;
-  if (type === "V") return `V ${suffix.slice(3).toUpperCase()}`;
-  const rest = /^(?:T|H|S|mb)(\d+)$/.exec(suffix)?.[1] ?? suffix;
-  return rest ? `${type} ${rest}` : type;
+  const head = type.toLowerCase() + content;
+  if (type === "V") return `${head} ${suffix.slice(3).toUpperCase()}`;
+  const num = /^(?:T|H|S|mb)(\d+)$/.exec(suffix)?.[1];
+  if (num) return head + num;
+  return suffix ? `${head} ${suffix}` : head;
+}
+
+// A sound description: [door slams], a line that is only (sighs), or a
+// speaker's name in capitals before what they say.
+const SOUND_RE = /\[[^\]]+\]|^-?\s*\([^)]+\)$|^-?\s*[A-Z][A-Z .']+:\s/;
+// A ♪ line that describes the music instead of singing it: "♪ tense music ♪".
+const MUSIC_WORD_RE =
+  /\b(music|humming|hums|vocalizing|whistling|singing|instrumental|melody)\b/i;
+const SOUND_LINES = 5;
+const LYRIC_LINES = 3;
+
+// What an .srt's text holds besides dialogue: "S" for sound descriptions,
+// "L" for song lyrics (♪ lines with words in them), "LS" for both, "" for
+// neither. A few lines of either are taken as noise.
+export function srtContent(text) {
+  let sounds = 0;
+  let lyrics = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/<[^>]+>/g, "").trim();
+    if (!line || line.includes("-->") || /^\d+$/.test(line)) continue;
+    if (SOUND_RE.test(line)) sounds++;
+    if (!/[♪♫]/.test(line)) continue;
+    const words = line.replace(/[♪♫#\s-]+/g, " ").trim();
+    if (
+      words &&
+      !/^[[(].*[\])]$/.test(words) &&
+      !(words.split(" ").length <= 4 && MUSIC_WORD_RE.test(words))
+    )
+      lyrics++;
+  }
+  return (lyrics >= LYRIC_LINES ? "L" : "") + (sounds >= SOUND_LINES ? "S" : "");
 }
 
 const norm = (s) =>

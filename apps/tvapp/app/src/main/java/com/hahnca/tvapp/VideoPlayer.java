@@ -80,6 +80,13 @@ class VideoPlayer extends FrameLayout {
   private static final long REPORT_MS = 10000;
   private static final long SEEK_BACK_MS = 10000;
   private static final long SEEK_FWD_MS = 30000;
+  // Resuming from a pause starts PAUSE_BACK_SHORT_MS back after a pause
+  // shorter than SHORT_PAUSE_MS, PAUSE_BACK_LONG_MS back after a longer one.
+  // A play from a stored resume point starts RESUME_BACK_MS before it.
+  private static final long SHORT_PAUSE_MS = 3000;
+  private static final long PAUSE_BACK_SHORT_MS = 1000;
+  private static final long PAUSE_BACK_LONG_MS = 3000;
+  private static final long RESUME_BACK_MS = 3000;
   // A hold steps one still at a time on its own clock, as fast as its speed
   // allows: right about two minutes of video a second, left 83 s. With the
   // stills 2.5 s apart that is a still every 20 ms right (50 a second) and
@@ -150,6 +157,9 @@ class VideoPlayer extends FrameLayout {
   // Past its first STATE_READY: the position is real and worth reporting.
   private boolean ready;
   private boolean subsPicked;
+  // When the video was paused (elapsedRealtime), -1 while it plays or once
+  // it has been seeked while paused.
+  private long pausedAt = -1;
   // Down put the time bar up (see key).
   private boolean barUp;
   // A left/right seek has the time bar up until it ends.
@@ -274,6 +284,7 @@ class VideoPlayer extends FrameLayout {
     close();
     playing = p;
     ready = false;
+    pausedAt = -1;
     int res = p.optInt("res");
     if (show == null) title.setParts(p.optString("showName"), "", "", "", "", "", "", "");
     else
@@ -315,8 +326,23 @@ class VideoPlayer extends FrameLayout {
 
           @Override
           public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+            if (!playWhenReady) pausedAt = SystemClock.elapsedRealtime();
+            else if (pausedAt >= 0) {
+              long pausedMs = SystemClock.elapsedRealtime() - pausedAt;
+              pausedAt = -1;
+              long back = pausedMs < SHORT_PAUSE_MS ? PAUSE_BACK_SHORT_MS : PAUSE_BACK_LONG_MS;
+              exo.seekTo(Math.max(0, exo.getCurrentPosition() - back));
+            }
             if (ready) report(playWhenReady ? "playing" : "paused");
             updateBar();
+          }
+
+          // A seek while paused (left/right, a stills landing, up, skip)
+          // resumes where it landed, with no step back.
+          @Override
+          public void onPositionDiscontinuity(
+              Player.PositionInfo oldPos, Player.PositionInfo newPos, int reason) {
+            if (reason == Player.DISCONTINUITY_REASON_SEEK) pausedAt = -1;
           }
 
           @Override
@@ -372,7 +398,8 @@ class VideoPlayer extends FrameLayout {
           }
         });
     long resumeMs = p.optLong("posMs");
-    exo.setMediaItem(mediaItem(p), resumeMs > 0 ? resumeMs : p.optLong("trimPosMs"));
+    exo.setMediaItem(
+        mediaItem(p), resumeMs > 0 ? Math.max(0, resumeMs - RESUME_BACK_MS) : p.optLong("trimPosMs"));
     exo.prepare();
     exo.play();
     setVisibility(VISIBLE);

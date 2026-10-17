@@ -480,7 +480,7 @@ class VideoPlayer extends FrameLayout {
    * A remote key while the video is up -- tvapprc mode's arrows and ok, the
    * same keys that drive the list: ok pauses and resumes, left and right seek,
    * a tap of up ends the episode as watched and closes the video, a held up
-   * jumps back to the start (trimPosMs, past the intro, when there is one),
+   * jumps back to the very start (0, not past the intro),
    * skip (the remotes' Skip key) jumps over the intro by the show's skip
    * length, and down toggles the time bar. Down's bar stays until down again, any key but a seek, or the
    * video closing. A seek's is up only until the seek ends, and the bar is
@@ -523,7 +523,7 @@ class VideoPlayer extends FrameLayout {
         } else if (upPending) {
           upPending = false;
           ui.removeCallbacks(upTap);
-          exo.seekTo(playing.optLong("trimPosMs"));
+          exo.seekTo(0);
         }
       }
       else if ("skip".equals(key)) {

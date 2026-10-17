@@ -652,7 +652,7 @@ because the TV is unreachable from any wireless host here.
 - OK pauses/resumes, left −10 s, right +30 s, down shows the time bar.
   Holding left or right scrubs through stills (below).
 - A tap of Up ends the episode as watched and closes the video; holding Up
-  jumps back to the start, past the intro (`trimPosMs`). A press with no
+  jumps back to 0, the very start, not past the intro. A press with no
   repeat or key-up within 2 s counts as a tap. The remotes' Skip key
   (`k,skip`) skips the intro by `skipDurMs`, and does nothing with no video
   up.

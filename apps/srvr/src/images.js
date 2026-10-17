@@ -9,7 +9,8 @@ import { getToken, clearToken } from "./tvdbToken.js";
  * way for every kind:
  *
  *  - providers in the order fanart.tv, TVDB, TMDB, TVmaze; the first one that
- *    has an image wins;
+ *    has an image in a wanted language wins, and only when none has, the
+ *    first with one in any language;
  *  - where a provider has a list to choose from, its own score picks;
  *  - a show's and an episode's lookups go by the show's tvdb, tmdb, imdb and
  *    tvmaze ids, and a search by name only runs once every id-based source has
@@ -175,9 +176,10 @@ function tvdbUrl(url) {
 }
 
 // The best of one provider's list, each item {url, lang, score}: the first
-// language in langs that is there at all, else any language, and the highest
-// score within it.
-function pickBest(items, langs) {
+// language in langs that is there at all, and the highest score within it.
+// Any language only with anyLang, so another provider's image in a wanted
+// language is tried first.
+function pickBest(items, langs, anyLang) {
   const rank = (item) => {
     const i = langs.indexOf(item.lang);
     return i < 0 ? langs.length : i;
@@ -185,6 +187,7 @@ function pickBest(items, langs) {
   let best = null;
   for (const item of items ?? []) {
     if (!item.url) continue;
+    if (!anyLang && rank(item) === langs.length) continue;
     if (
       !best ||
       rank(item) < rank(best) ||
@@ -224,14 +227,19 @@ async function firstOf(sources, trace, ...args) {
 
 // The sources with every id the show's own ids lead to; only if none of them
 // has an image, again with the ids a search for the show's name turns up; and
-// last the searches by name.
+// last the searches by name. All of that in the languages wanted first, and
+// only then in any language.
 async function firstById(sources, searches, ids, showName, trace, ...args) {
   const byId = await idsById(ids);
-  let url = await firstOf(sources, trace, byId, ...args);
-  if (url) return url;
-  const byName = showName ? await idsByName(byId, showName) : byId;
-  if (showName) url = await firstOf(sources, trace, byName, ...args);
-  return url || firstOf(searches, trace, byName, showName, ...args);
+  for (const anyLang of [false, true]) {
+    let url = await firstOf(sources, trace, { ...byId, anyLang }, ...args);
+    if (url) return url;
+    const byName = { ...(showName ? await idsByName(byId, showName) : byId), anyLang };
+    if (showName) url = await firstOf(sources, trace, byName, ...args);
+    url ||= await firstOf(searches, trace, byName, showName, ...args);
+    if (url) return url;
+  }
+  return "";
 }
 
 ////////////////////////  show ids  ////////////////////////
@@ -467,31 +475,31 @@ function mazeEpisodes(tvmazeId) {
 const SHOW_SOURCES = {
   // The portrait poster.
   poster: [
-    async ({ tvdbId }) => (tvdbId ? pickBest((await fanartShow(tvdbId)).tvposter, TITLED) : ""),
-    async ({ tvdbId }) => {
+    async ({ tvdbId, anyLang }) => (tvdbId ? pickBest((await fanartShow(tvdbId)).tvposter, TITLED, anyLang) : ""),
+    async ({ tvdbId, anyLang }) => {
       if (!tvdbId) return "";
       const art = await tvdbArtworks(tvdbId);
-      return pickBest(art.list.filter((a) => a.type === TVDB_POSTER_TYPE), TITLED) || pickBest([{ url: art.image, lang: "", score: 0 }], TITLED);
+      return pickBest(art.list.filter((a) => a.type === TVDB_POSTER_TYPE), TITLED, anyLang) || pickBest([{ url: art.image, lang: "", score: 0 }], TITLED);
     },
-    async ({ tmdbId }) => (tmdbId ? pickBest((await tmdbImages(tmdbId)).posters, TITLED) : ""),
-    async ({ tvmazeId }) =>
-      tvmazeId ? pickBest((await mazeImages(tvmazeId)).filter((i) => i.type === "poster"), TITLED) : "",
+    async ({ tmdbId, anyLang }) => (tmdbId ? pickBest((await tmdbImages(tmdbId)).posters, TITLED, anyLang) : ""),
+    async ({ tvmazeId, anyLang }) =>
+      tvmazeId ? pickBest((await mazeImages(tvmazeId)).filter((i) => i.type === "poster"), TITLED, anyLang) : "",
   ],
   // The landscape image of a tvapp show card: fanart.tv's title card, else wide
   // art with nothing on it.
   thumb: [
-    async ({ tvdbId }) => {
+    async ({ tvdbId, anyLang }) => {
       if (!tvdbId) return "";
       const fanart = await fanartShow(tvdbId);
-      return pickBest(fanart.tvthumb, TITLED) || pickBest(fanart.showbackground, TEXTLESS);
+      return pickBest(fanart.tvthumb, TITLED, anyLang) || pickBest(fanart.showbackground, TEXTLESS, anyLang);
     },
-    async ({ tvdbId }) =>
+    async ({ tvdbId, anyLang }) =>
       tvdbId
-        ? pickBest((await tvdbArtworks(tvdbId)).list.filter((a) => a.type === TVDB_BACKGROUND_TYPE), TEXTLESS)
+        ? pickBest((await tvdbArtworks(tvdbId)).list.filter((a) => a.type === TVDB_BACKGROUND_TYPE), TEXTLESS, anyLang)
         : "",
-    async ({ tmdbId }) => (tmdbId ? pickBest((await tmdbImages(tmdbId)).backdrops, TEXTLESS) : ""),
-    async ({ tvmazeId }) =>
-      tvmazeId ? pickBest((await mazeImages(tvmazeId)).filter((i) => i.type === "background"), TEXTLESS) : "",
+    async ({ tmdbId, anyLang }) => (tmdbId ? pickBest((await tmdbImages(tmdbId)).backdrops, TEXTLESS, anyLang) : ""),
+    async ({ tvmazeId, anyLang }) =>
+      tvmazeId ? pickBest((await mazeImages(tvmazeId)).filter((i) => i.type === "background"), TEXTLESS, anyLang) : "",
   ],
 };
 
@@ -536,8 +544,8 @@ export function showImage(kind, ids, showName) {
 const EPISODE_SOURCES = [
   async ({ tvdbId }, season, episode) =>
     tvdbId ? (await tvdbEpisodes(tvdbId)).get(episodeKey(season, episode))?.image || "" : "",
-  async ({ tmdbId }, season, episode) =>
-    tmdbId ? pickBest(await tmdbStills(tmdbId, season, episode), TEXTLESS) : "",
+  async ({ tmdbId, anyLang }, season, episode) =>
+    tmdbId ? pickBest(await tmdbStills(tmdbId, season, episode), TEXTLESS, anyLang) : "",
   async ({ tvmazeId }, season, episode) =>
     tvmazeId ? (await mazeEpisodes(tvmazeId)).get(episodeKey(season, episode))?.image || "" : "",
 ];

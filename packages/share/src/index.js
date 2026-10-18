@@ -662,9 +662,9 @@ export function getResolution(
 ) {
   const src = String(nameOrPath || "");
 
-  // ── Step 1: parse <N>p from the name ──────────────────────────────────────
+  // ── Step 1: parse <N>p (or interlaced <N>i) from the name ─────────────────
   let nameResolution = null;
-  const nameMatch = src.match(/\b(\d{3,4})p\b/i);
+  const nameMatch = src.match(/\b(\d{3,4})[pi]\b/i);
   if (nameMatch) {
     nameResolution = Number.parseInt(nameMatch[1], 10);
     if (!Number.isFinite(nameResolution)) nameResolution = null;

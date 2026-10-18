@@ -128,7 +128,7 @@ class CtrlServer extends WebSocketServer {
 
     void onPlayEpisode(int season, int episode);
 
-    void onPlayMovie(String url);
+    void onPlayMovie(String url, double fps);
 
     void onCustomChanged();
 
@@ -236,7 +236,13 @@ class CtrlServer extends WebSocketServer {
       return;
     }
     if (message.startsWith(CMD_PLAY_MOVIE + ",")) {
-      listener.onPlayMovie(message.substring(CMD_PLAY_MOVIE.length() + 1));
+      // m,<fps>,<url>; the url's own commas are escaped.
+      String[] m = message.substring(CMD_PLAY_MOVIE.length() + 1).split(",", 2);
+      try {
+        listener.onPlayMovie(m[1], Double.parseDouble(m[0]));
+      } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+        Log.w(TAG, "bad play-movie command: " + message);
+      }
       return;
     }
     if (message.startsWith(CMD_CAM + ",")) {

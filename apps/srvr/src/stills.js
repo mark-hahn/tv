@@ -627,7 +627,8 @@ function playStillArgs(videoFilePath, sec, out, dv5) {
   ];
 }
 
-// Duration, and the Dolby Vision profile (null for none).
+// Duration, frame rate (0 if unknown), and the Dolby Vision profile (null for
+// none).
 export function probePlay(videoFilePath) {
   return new Promise((resolve, reject) => {
     cp.execFile(
@@ -638,7 +639,7 @@ export function probePlay(videoFilePath) {
         "-select_streams",
         "v:0",
         "-show_entries",
-        "format=duration:stream_side_data=dv_profile",
+        "format=duration:stream=avg_frame_rate:stream_side_data=dv_profile",
         "-of",
         "json",
         videoFilePath,
@@ -655,7 +656,9 @@ export function probePlay(videoFilePath) {
           return;
         }
         const dv = (out.streams?.[0]?.side_data_list || []).find((d) => d.dv_profile != null);
-        resolve({ durationSec, dvProfile: dv?.dv_profile ?? null });
+        const [num, den] = String(out.streams?.[0]?.avg_frame_rate || "").split("/").map(Number);
+        const fps = num > 0 && den > 0 ? num / den : 0;
+        resolve({ durationSec, fps, dvProfile: dv?.dv_profile ?? null });
       },
     );
   });

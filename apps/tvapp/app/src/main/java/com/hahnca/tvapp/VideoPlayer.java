@@ -1,13 +1,19 @@
 package com.hahnca.tvapp;
 
+import android.annotation.TargetApi;
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.Display;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -130,6 +136,16 @@ class VideoPlayer extends FrameLayout {
   private static final int PART_GAP_DP = 15;
   // The time bar's row of text, the time included, is dimmed to 60% gray.
   private static final int BAR_TEXT_COLOR = 0xFF999999;
+  // A video plays with the tv at a refresh rate its frame rate divides (see
+  // hzFor), so every frame shows equally long; at 60 Hz 25 fps judders, its
+  // frames held 2, 3, 2, 3, 2 refreshes, and 24 fps 3, 2. The tv stays on a
+  // rate until a video of another plays or tvapp leaves the front
+  // (defaultRate). The tv has no seamless switch and goes dark through one, so
+  // a play that switches starts once the display reports the new mode and
+  // SWITCH_SETTLE_MS more, or after SWITCH_WAIT_MS.
+  private static final long SWITCH_POLL_MS = 100;
+  private static final long SWITCH_SETTLE_MS = 500;
+  private static final long SWITCH_WAIT_MS = 4000;
 
   private final PlayerView view;
   // The show and episode, right of the time display in the time bar.
@@ -192,6 +208,15 @@ class VideoPlayer extends FrameLayout {
       };
   private final Runnable holdStep = this::stepHold;
   private final Runnable stillsDown = this::landed;
+  // A refresh rate switch (see switchRate): the display mode it switches
+  // from, and when it was asked for.
+  private int switchFrom;
+  private long switchAt;
+  private final Runnable rateWait = this::waitRate;
+  private final Runnable startPlay =
+      () -> {
+        if (exo != null) exo.play();
+      };
   // An up press waiting UP_TAP_MS to learn if it is a hold (see key).
   private boolean upPending;
   // An up tap: the episode is done, as if it had run to the end, so tv-srvr
@@ -409,22 +434,89 @@ class VideoPlayer extends FrameLayout {
     exo.setMediaItem(
         mediaItem(p), resumeMs > 0 ? Math.max(0, resumeMs - RESUME_BACK_MS) : p.optLong("trimPosMs"));
     exo.prepare();
-    exo.play();
+    if (!switchRate(p.optDouble("fps", 0))) exo.play();
     setVisibility(VISIBLE);
+  }
+
+  /** tvapp leaves the front: the tv goes back to its own refresh rate, and tvapp comes back on it. */
+  void defaultRate() {
+    preferMode(0);
+  }
+
+  // Puts the tv on the refresh rate for fps (see hzFor), 0 if unknown. True
+  // when the display switches: the video plays once it is done.
+  private boolean switchRate(double fps) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false;
+    Display d = getDisplay();
+    if (d == null) return false;
+    int from = d.getMode().getModeId();
+    int mode = modeFor(d, fps);
+    if (!preferMode(mode)) return false;
+    Log.i(TAG, "display mode " + mode + " for " + fps + " fps, from " + from);
+    switchFrom = from;
+    switchAt = SystemClock.uptimeMillis();
+    ui.postDelayed(rateWait, SWITCH_POLL_MS);
+    return true;
+  }
+
+  // The refresh rate a video of fps plays at: 50 Hz for 25 and 50 fps, 48 for
+  // 24 and 23.976 (the tv's 48 is exactly 48, so 23.976 shows one frame a
+  // refresh longer every ~21 s), else 0, the tv's own (60 Hz).
+  private static int hzFor(double fps) {
+    long r = Math.round(fps);
+    return r == 25 || r == 50 ? 50 : r == 24 ? 48 : 0;
+  }
+
+  // The display's mode at its size for hzFor(fps), else 0, the tv's own.
+  @TargetApi(Build.VERSION_CODES.M)
+  private static int modeFor(Display d, double fps) {
+    int hz = hzFor(fps);
+    if (hz == 0) return 0;
+    Display.Mode now = d.getMode();
+    for (Display.Mode m : d.getSupportedModes())
+      if (m.getPhysicalWidth() == now.getPhysicalWidth()
+          && m.getPhysicalHeight() == now.getPhysicalHeight()
+          && Math.round(m.getRefreshRate()) == hz) return m.getModeId();
+    return 0;
+  }
+
+  // Asks for display mode `mode` (0: the tv's own) for tvapp's window; true
+  // when that is a change.
+  private boolean preferMode(int mode) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false;
+    Window w = ((Activity) getContext()).getWindow();
+    WindowManager.LayoutParams a = w.getAttributes();
+    if (a.preferredDisplayModeId == mode) return false;
+    a.preferredDisplayModeId = mode;
+    w.setAttributes(a);
+    return true;
+  }
+
+  // The switch switchRate asked for: done, given up on, or polled again.
+  @TargetApi(Build.VERSION_CODES.M)
+  private void waitRate() {
+    if (exo == null) return;
+    Display d = getDisplay();
+    if (d == null || d.getMode().getModeId() != switchFrom) ui.postDelayed(startPlay, SWITCH_SETTLE_MS);
+    else if (SystemClock.uptimeMillis() - switchAt >= SWITCH_WAIT_MS) {
+      Log.w(TAG, "display mode switch from " + switchFrom + " never came");
+      exo.play();
+    } else ui.postDelayed(rateWait, SWITCH_POLL_MS);
   }
 
   /**
    * A movie file (the local pane's TV button), from the start: no show, so no
    * play state reported, no subtitles and no scrub stills. Its title is its
-   * file name.
+   * file name. fps is its frame rate, 0 if unknown.
    */
-  void playMovie(String url) {
+  void playMovie(String url, double fps) {
     JSONObject p = new JSONObject();
     try {
       String name = Uri.parse(url).getLastPathSegment();
       p.put("url", url);
       p.put("showName", name.replaceFirst("\\.[^.]+$", ""));
       p.put("movie", true);
+      p.put("fps", fps);
     } catch (JSONException e) {
       Log.e(TAG, "movie play failed for " + url + ": " + e);
       return;
@@ -712,6 +804,8 @@ class VideoPlayer extends FrameLayout {
     ui.removeCallbacks(holdStep);
     ui.removeCallbacks(stillsDown);
     ui.removeCallbacks(upTap);
+    ui.removeCallbacks(rateWait);
+    ui.removeCallbacks(startPlay);
     clearCues();
     upPending = false;
     seeking = false;

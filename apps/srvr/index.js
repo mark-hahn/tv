@@ -3017,6 +3017,17 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
   const playStills = web
     ? null
     : stills.playStills(file, posMs > 0 ? posMs : trimPosMs);
+  // tvapp puts the tv on the refresh rate that fits the frame rate before it
+  // plays. Started before the wait too; 0 when the probe fails.
+  const fpsProbe = web
+    ? null
+    : stills.probePlay(file).then(
+        (p) => p.fps,
+        (e) => {
+          unilog(2980, `${showName} ${fmtSeasonEpisode(season, episode)} frame rate probe failed: ${e.message}`);
+          return 0;
+        },
+      );
   const { late: lateSubs } = await subs.subsBeforePlay(rec, season, episode, file);
   // The episode after this one, once this one's downloads are done, so the
   // two never share the API's 5 requests a second.
@@ -3054,7 +3065,7 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
           path: file,
           durMs: Math.round((await stills.probePlay(file)).durationSec * 1000),
         }
-      : { stills: playStills }),
+      : { stills: playStills, fps: await fpsProbe }),
   };
 }
 

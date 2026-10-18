@@ -382,6 +382,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     // does: tv-tv is holding a paused show either way.
     if (cam.isShowing()) cam.close(CamOverlay.CloseReason.BACK);
     video.close();
+    video.defaultRate();
     ctrlServer.shutdown();
     ctrlServer = null;
     updates.stop();
@@ -1452,12 +1453,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
    * up, without waiting on the list, and Back closes it to the list.
    */
   @Override
-  public void onPlayMovie(String url) {
+  public void onPlayMovie(String url, double fps) {
     ui.post(
         () -> {
           bumpKeepAwake();
           if (player.isPlaying()) player.close();
-          video.playMovie(url);
+          video.playMovie(url, fps);
         });
   }
 

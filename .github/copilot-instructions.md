@@ -560,7 +560,7 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-10-16**. tvapp (`apps/tvapp`, native Java, package
+Current as of **2026-10-17**. tvapp (`apps/tvapp`, native Java, package
 `com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
 (`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
@@ -626,6 +626,14 @@ because the TV is unreachable from any wireless host here.
     show's next-up.
 - `VideoPlayer` gets `/api/getPlayUrl?showName[&season&episode]` from tv-srvr
   and plays the file straight off nginx in Media3 ExoPlayer.
+- Refresh rate: the TV goes to 50 Hz for a 25 or 50 fps video and to 48 Hz
+  for 24 or 23.976 fps (`hzFor` in `VideoPlayer`), so every frame shows
+  equally long; at 60 Hz those rates judder. Any other rate plays at the
+  TV's own 60 Hz. The frame rate is `getPlayUrl`'s `fps` (ffprobe), since
+  Media3 can't read it from an mkv. The TV has no seamless switch and goes
+  dark through one, so a play that switches starts once the new mode is up
+  plus 0.5 s, at most 4 s. The rate stays until a video of another rate
+  plays; tvapp leaving the front puts the TV back on its own.
 - It starts at the resume point, or past the intro (`trimPosMs`) if there is
   none. A season 0 special has no intro to trim or skip.
 - Subtitles: the video's sidecar `.srt` files are sideloaded (served as
@@ -642,7 +650,8 @@ because the TV is unreachable from any wireless host here.
     chosen one;
   - feeds now-playing.
 - A movie: the local pane's TV button in movie mode has tv-tv send
-  `m,<url>`, and `VideoPlayer.playMovie` plays it at once over whatever is
+  `m,<fps>,<url>` (fps from ffprobe, 0 if unknown, for the refresh rate),
+  and `VideoPlayer.playMovie` plays it at once over whatever is
   up, without the list, from the start. nginx serves `/mnt/media/movies` at
   `/movies`. Its title is its file name; there is no `getPlayUrl`, no
   `playProgress`, no subtitles and no stills (a hold seeks instead). The
@@ -751,7 +760,7 @@ actor filter → filter text → top of list. At the top Back goes to the TV's h
 | `f,<text>` | filter text |
 | `s,<name>` | select that show |
 | `p,<season>,<episode>` | play that episode; sent after an `s` |
-| `m,<url>` | play that movie file at once (the local pane's TV button) |
+| `m,<fps>,<url>` | play that movie file at once (the local pane's TV button); fps sets the refresh rate |
 | `c` | the Custom list changed |
 | `h` | hide key: the watched mark on the Map episode, else hide/unhide the show |
 | `v,<url>` / `v,off` | camera on / off |
@@ -795,7 +804,7 @@ the bridge `o` to open tvapp.
 **tv-tv**
 - `/tv/showintvapp?showName[&season&episode]` sends `r`, `s`, then
   `p,<season>,<episode>` or `e`, launching tvapp first if it is down.
-- `/tv/movieintvapp?path=<file under /mnt/media/movies>` sends `m,<url>`,
+- `/tv/movieintvapp?path=<file under /mnt/media/movies>` sends `m,<fps>,<url>`,
   launching tvapp first if it is down.
 - `/tv/opentvapp` (like the bridge's `o`) opens tvapp on `lastRelevantShow`,
   the web client's selected show from `/tv/clientShow`.

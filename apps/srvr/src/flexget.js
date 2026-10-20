@@ -313,41 +313,18 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
 
   const newNormTitle = normTitle(rawTitle);
   const newNormQuality = normQuality(candidate.quality);
-  // Same file from a different provider: same normalized title + quality → deduplicate,
-  // but prefer the entry with more seeds if this one is better.
-  const sameFileIdx = list.findIndex(
-    (c) =>
-      normTitle(c.title) === newNormTitle &&
-      normQuality(c.quality) === newNormQuality,
-  );
-  if (sameFileIdx !== -1) {
-    const existing = list[sameFileIdx];
-    const cSeeds = parseInt(String(candidate.torrent_seeds || "0"), 10) || 0;
-    const eSeeds = parseInt(String(existing.torrent_seeds || "0"), 10) || 0;
-    if (cSeeds > eSeeds) {
-      // Update seeds/leeches/url/provider on the existing entry but keep sent timestamp
-      existing.torrent_seeds =
-        candidate.torrent_seeds || existing.torrent_seeds;
-      existing.torrent_leeches =
-        candidate.torrent_leeches || existing.torrent_leeches;
-      existing.url = candidate.url || existing.url;
-      existing.provider = String(candidate.url || "").includes("iptorrents.com")
-        ? "ipt"
-        : String(candidate.url || "").includes("torrentleech.org")
-          ? "tl"
-          : existing.provider;
-      flexgetHistory[histKey] = list;
-      await saveFlexgetHistory();
-      unilog(
-        1180,
-        `Flexget: same file, better seeds updated ${matchedName} ${sKey}${eKey} "${rawTitle}" (${eSeeds}->${cSeeds} seeds)`,
-      );
-    } else {
-      unilog(
-        1181,
-        `Flexget: same file from different provider ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-      );
-    }
+  // Same file from a different provider: same normalized title + quality → deduplicate.
+  if (
+    list.some(
+      (c) =>
+        normTitle(c.title) === newNormTitle &&
+        normQuality(c.quality) === newNormQuality,
+    )
+  ) {
+    unilog(
+      1181,
+      `Flexget: same file from different provider ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
+    );
     return;
   }
 
@@ -374,6 +351,8 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
 
   list.push(newCandidate);
   flexgetHistory[histKey] = list;
+  // A failed qbt add leaves no entry, so the next run tries the release again.
+  const dropFailed = () => list.splice(list.indexOf(newCandidate), 1);
 
   // Best-quality ever sent — used to decide if a new candidate is an upgrade.
   const lastSent = list.reduce((best, c) => {
@@ -403,6 +382,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         unilog(2986, `SENT(upgrade by ${factor}) ${matchedName} ${sKey}${eKey} "${rawTitle}" over "${disk.file}"`);
       } catch (e) {
         unilog(632, `qbt add failed for "${rawTitle}":`, e.message);
+        dropFailed();
       }
     }
   } else if (!lastSent) {
@@ -413,6 +393,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         unilog(633, `SENT(first) ${matchedName} ${sKey}${eKey} "${rawTitle}"`);
       } catch (e) {
         unilog(634, `qbt add failed for "${rawTitle}":`, e.message);
+        dropFailed();
       }
     }
   } else {
@@ -429,6 +410,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         unilog(2988, `SENT(better by ${factor}) ${matchedName} ${sKey}${eKey} "${rawTitle}" over "${lastSent.title}"`);
       } catch (e) {
         unilog(636, `qbt add failed for "${rawTitle}":`, e.message);
+        dropFailed();
       }
     }
   }

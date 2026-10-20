@@ -1492,9 +1492,11 @@ export default {
       const parts = [];
 
       // Add aired date of first selected episode at the far left
+      let selSeason = null;
       if (this.selectedCells.size > 0) {
         const firstKey = Array.from(this.selectedCells)[0];
         const { season, episode } = this.parseCellKey(firstKey);
+        selSeason = season;
         const aired = epd.getAired(this.tvdbData?.episodeData, season, episode);
         if (aired) {
           parts.push(aired);
@@ -1506,8 +1508,10 @@ export default {
         const si = this.mapShow?.seasonIntros;
         const entry =
           si &&
-          (si[1] ??
-            si[Object.keys(si).sort((a, b) => Number(a) - Number(b))[0]]);
+          (selSeason > 0
+            ? epd.getSeasonIntro(si, selSeason)
+            : si[1] ??
+              si[Object.keys(si).sort((a, b) => Number(a) - Number(b))[0]]);
         if (entry?.none === true) {
           parts.push(`${rt} mins | none`);
         } else {

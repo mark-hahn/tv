@@ -197,6 +197,17 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   shows them in season 0, and an episode card says where one belongs. They
   are left out of intro marking, trim and skip.
 
+## Which release is better
+
+- Every comparison of two files or torrents for one episode goes through
+  `compareRelease` (`packages/share/src/releaseCompare.js`, self-check
+  `releaseCompare.check.js`). Order: resolution, PROPER/REPACK, source,
+  HEVC/AV1, bit depth, size (only when 20% larger), seeds, bad group, tracker.
+  A choice sends every factor; a replacement leaves out seeds and tracker.
+  Details: `better-plan.md`.
+- The blocked-name list is data, `apps/srvr/data/blockedNames.txt` (tv-srvr
+  writes it, tv-api and tv-down read it on each use). Forcing overrides it.
+
 ## Subtitles
 
 - Every subtitle is a sidecar `.srt` beside its video. Embedded tracks are

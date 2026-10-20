@@ -997,6 +997,84 @@
       </div>
     </div>
     <div
+      id="send-dialog"
+      v-if="sendDialog"
+      @click.stop="closeSendDialog(false)"
+      style="
+        position: fixed;
+        font-size: 18px;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+      "
+    >
+      <div
+        @click.stop
+        style="
+          background: white;
+          padding: 30px;
+          border-radius: 10px;
+          max-width: 620px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        "
+      >
+        <div style="margin-bottom: 12px; line-height: 1.5">
+          tv-down would not take these as they are:
+        </div>
+        <div
+          v-for="(line, i) in sendDialog.lines"
+          :key="i"
+          style="
+            font-size: 15px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+          "
+        >
+          {{ line }}
+        </div>
+        <div
+          style="
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+          "
+        >
+          <button
+            @click.stop="closeSendDialog(false)"
+            style="
+              padding: 8px 20px;
+              font-size: 18px;
+              cursor: pointer;
+              border-radius: 5px;
+              border: 1px solid #ccc;
+            "
+          >
+            Cancel
+          </button>
+          <button
+            @click.stop="closeSendDialog(true)"
+            style="
+              padding: 8px 20px;
+              font-size: 18px;
+              cursor: pointer;
+              border-radius: 5px;
+              border: 1px solid #ccc;
+            "
+          >
+            Force
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
       id="existing-delete-modal"
       v-if="showExistingDeleteModal"
       @click.stop="cancelExistingDelete"
@@ -1318,7 +1396,15 @@ import { config } from "../config.js";
 import Stream from "./stream.vue";
 import parseTorrentTitle from "parse-torrent-title";
 import * as srvr from "../srvr.js";
-import { isHevc } from "@tv/share";
+import {
+  isHevc,
+  compareRelease,
+  releaseFactors,
+  sizeToBytes,
+  getFileName,
+  getRes,
+  isWatched,
+} from "@tv/share";
 import { unilog, logHere } from "../log.js";
 
 export default {
@@ -1378,6 +1464,8 @@ export default {
       showModal: false, // Show download confirmation modal
       showErrorModal: false,
       errorModalMsg: "",
+      // The Send dialog's reasons, or null when it is closed.
+      sendDialog: null,
       showInfoModal: false,
       infoModalMsg: "",
       showTorrentInfoModal: false,
@@ -1677,25 +1765,14 @@ export default {
           if (eA !== eB) return eA - eB; // Ascending
         }
 
-        // 5. Resolution (descending: 2160 > 1080 > 720 > unknown)
-        const resNum = (t) => {
-          const r = String(t.parsed?.resolution || "");
-          const m = r.match(/(\d+)/);
-          return m ? parseInt(m[1], 10) : 0;
-        };
-        const rA = resNum(a);
-        const rB = resNum(b);
-        if (rA !== rB) return rB - rA;
+        // 5. Within an episode, the better release first (a choice).
+        const better = compareRelease(
+          this.torrentFactors(b, true),
+          this.torrentFactors(a, true),
+        ).cmp;
+        if (better !== 0) return better;
 
-        // 5b. At equal resolution, hevc loses.
-        const hA = this.torrentIsHevc(a) ? 1 : 0;
-        const hB = this.torrentIsHevc(b) ? 1 : 0;
-        if (hA !== hB) return hA - hB;
-
-        // 6. Rest of priorities (Seeds -> Title)
-        const sd = asNumber(b?.raw?.seeds) - asNumber(a?.raw?.seeds);
-        if (sd !== 0) return sd;
-
+        // 6. Title
         const ta = String(a?.raw?.title || a?.title || "");
         const tb = String(b?.raw?.title || b?.title || "");
         return ta.localeCompare(tb);
@@ -2483,6 +2560,187 @@ export default {
       this.lastSelectedIndex = firstSelected
         ? this.filteredTorrents.indexOf(firstSelected)
         : null;
+    },
+
+    // A file's factors for compareRelease from its name and size.
+    nameFactors(name, bytes) {
+      const group = String(
+        parseTorrentTitle(String(name || "").replace(/\.[a-z0-9]{2,4}$/i, ""))
+          ?.group || "",
+      ).toLowerCase();
+      return {
+        ...releaseFactors(name),
+        size: bytes > 0 ? bytes : null,
+        badGroup: !!group && this.badGroups.has(group),
+      };
+    },
+
+    // The episode a torrent holds as "S01E02", or null for a season pack.
+    torrentEpisode(torrent) {
+      const s = torrent?.parsed?.season;
+      const e = torrent?.parsed?.episode;
+      if (torrent?.seasonRange?.isRange) return null;
+      if (!Number.isInteger(s) || !Number.isInteger(e) || e < 1) return null;
+      return `S${String(s).padStart(2, "0")}E${String(e).padStart(2, "0")}`;
+    },
+
+    // Resolves true for Force, false for Cancel.
+    askSendDialog(lines) {
+      return new Promise((resolve) => {
+        this._sendDialogResolve = resolve;
+        this.sendDialog = { lines };
+      });
+    },
+
+    closeSendDialog(force) {
+      this.sendDialog = null;
+      const resolve = this._sendDialogResolve;
+      this._sendDialogResolve = null;
+      if (resolve) resolve(force);
+    },
+
+    // The torrents of one Send, Hold or Force that may go, as
+    // [{ torrent, force }]. Only one pick per episode is allowed: two in this
+    // batch, or one for an episode whose earlier pick is still downloading in
+    // qbt, are refused with a notification. With askReasons, what would keep
+    // tv-down from taking a torrent is listed in one dialog: Cancel sends
+    // nothing, Force sends those forced.
+    async checkPicks(torrents, askReasons) {
+      const show = this.currentShow;
+      const isShow = (name) =>
+        !show?.name ||
+        !!util.smartTitleMatch(String(name || ""), [{ name: show.name }], null, false);
+      const sameShow = (fileName) =>
+        isShow(util.parseTitleFromFilename(String(fileName || ""), null, null));
+      const titleOf = (t) => String(t?.raw?.title || t?.title || "");
+
+      const perEpisode = new Map();
+      for (const t of torrents) {
+        const ep = this.torrentEpisode(t);
+        if (ep) perEpisode.set(ep, (perEpisode.get(ep) || 0) + 1);
+      }
+      const pendingEps = new Map();
+      try {
+        const qbtRes = await this.fetchWithTimeout(
+          `${config.torrentsApiUrl}/api/qbt/info`,
+          {},
+          15000,
+        );
+        if (!qbtRes?.ok) throw new Error(`qbt info HTTP ${qbtRes?.status}`);
+        const sentNames = new Set(
+          this.sentHistory.map((h) =>
+            this.normalizeQbtNameForMatch(h?.raw?.title || h?.title),
+          ),
+        );
+        for (const qt of await qbtRes.json()) {
+          if (Number(qt?.progress) >= 1) continue;
+          const qName = String(qt?.name || "");
+          if (!sentNames.has(this.normalizeQbtNameForMatch(qName))) continue;
+          const m = qName.match(/S(\d{2})E(\d{2})/i);
+          if (m && sameShow(qName))
+            pendingEps.set(`S${m[1]}E${m[2]}`.toUpperCase(), qName);
+        }
+      } catch (e) {
+        unilog(3001, `pick check could not read qbt: ${e.message}`);
+      }
+
+      const refused = [];
+      const allowed = [];
+      for (const t of torrents) {
+        const ep = this.torrentEpisode(t);
+        const pending = ep && pendingEps.get(ep);
+        if (ep && perEpisode.get(ep) > 1) {
+          refused.push(`${titleOf(t)}: another pick for ${ep} in this send`);
+        } else if (
+          pending &&
+          this.normalizeQbtNameForMatch(pending) !==
+            this.normalizeQbtNameForMatch(titleOf(t))
+        ) {
+          refused.push(`${titleOf(t)}: ${ep} is still downloading as ${pending}`);
+        } else {
+          allowed.push(t);
+        }
+      }
+      if (refused.length)
+        this.showError(
+          `Only one pick per episode is allowed. Not sent:\n\n${refused.join("\n")}`,
+        );
+      if (!askReasons || !allowed.length)
+        return allowed.map((torrent) => ({ torrent, force: !askReasons }));
+
+      const blockedNames = await srvr.getBlockedNames();
+      const downsRes = await fetch(`${config.tvDownUrl}/downloads`);
+      if (!downsRes.ok) throw new Error(`tv-down downloads HTTP ${downsRes.status}`);
+      const activeDowns = (await downsRes.json()).filter(
+        (d) =>
+          !d.error &&
+          (d.status === "waiting" || d.status === "downloading") &&
+          (d.seriesName ? isShow(d.seriesName) : sameShow(d.title)),
+      );
+      const ed = show?.episodeData;
+      const lines = [];
+      const withReasons = new Set();
+      for (const t of allowed) {
+        const title = titleOf(t);
+        const reasons = [];
+        const blocked = blockedNames.find((b) => title.includes(b));
+        if (blocked) reasons.push(`the name is blocked ("${blocked}")`);
+        if (show?.inLibrary === false) reasons.push("the show is not in the library");
+        const ep = this.torrentEpisode(t);
+        if (ep) {
+          const s = t.parsed.season;
+          const e = t.parsed.episode;
+          const pick = this.torrentFactors(t);
+          if (ed && isWatched(ed, s, e)) reasons.push(`${ep} is watched`);
+          const file = ed ? getFileName(ed, s, e) : null;
+          if (file) {
+            const disk = this.nameFactors(file, null);
+            disk.res = getRes(ed, s, e) ?? disk.res;
+            const { cmp, factor } = compareRelease(pick, disk);
+            if (cmp <= 0)
+              reasons.push(
+                `the video on disk is ${cmp < 0 ? `better by ${factor}` : "as good"}: ${file}`,
+              );
+          }
+          for (const d of activeDowns) {
+            if (d.season !== s || d.episode !== e) continue;
+            const { cmp, factor } = compareRelease(
+              pick,
+              this.nameFactors(d.title, d.fileSize),
+            );
+            if (cmp <= 0)
+              reasons.push(
+                `a download for ${ep} is ${cmp < 0 ? `better by ${factor}` : "as good"}: ${d.title}`,
+              );
+          }
+        }
+        if (reasons.length) {
+          withReasons.add(t);
+          lines.push(`${title}: ${reasons.join("; ")}`);
+        }
+      }
+      if (lines.length && !(await this.askSendDialog(lines))) return [];
+      return allowed.map((torrent) => ({
+        torrent,
+        force: withReasons.has(torrent),
+      }));
+    },
+
+    // A torrent's factors for compareRelease. A choice among torrents also
+    // weighs seeds and tracker; a replacement leaves them out.
+    torrentFactors(torrent, choice = false) {
+      const title = String(torrent?.raw?.title || torrent?.title || "");
+      const group = String(torrent?.parsed?.group || "").toLowerCase();
+      const f = {
+        ...releaseFactors(title),
+        size: sizeToBytes(torrent?.raw?.size),
+        badGroup: !!group && this.badGroups.has(group),
+      };
+      if (choice) {
+        f.seeds = Number(torrent?.raw?.seeds) || 0;
+        f.tracker = /torrentleech/i.test(String(torrent?.raw?.provider || ""));
+      }
+      return f;
     },
 
     torrentIsHevc(torrent) {
@@ -4091,129 +4349,6 @@ export default {
             .map((v) => v);
         };
 
-        // Quality gate: block send if qbt already has a higher-quality torrent for
-        // the same show + S/E. forceDownload bypasses this check entirely.
-        if (!forceDownload) {
-          const newTitle = String(torrent?.raw?.title || torrent?.title || "");
-          const seMatch = newTitle.match(/S(\d{2})E(\d{2})/i);
-          if (seMatch) {
-            const seStr = `S${seMatch[1]}E${seMatch[2]}`.toUpperCase();
-            const torRes = (t) => {
-              const s = String(t || "");
-              if (/2160p|4k|uhd/i.test(s)) return 2160;
-              if (/1080p|1080i/i.test(s)) return 1080;
-              if (/720p|720i/i.test(s)) return 720;
-              if (/576p|576i/i.test(s)) return 576;
-              if (/480p|480i/i.test(s)) return 480;
-              if (/384p|384i/i.test(s)) return 384;
-              return 480;
-            };
-            const torDepth = (t) =>
-              /10.?bit|hdr/i.test(String(t || "")) ? 10 : 8;
-            const torBadGroup = (t) => {
-              try {
-                const parsed = parseTorrentTitle(
-                  String(t || "").replace(/\.[a-z0-9]{2,4}$/i, ""),
-                );
-                return this.badGroups.has((parsed?.group || "").toLowerCase());
-              } catch {
-                return false;
-              }
-            };
-            // Extract normalized show name using shared parseTitleFromFilename
-            const showName = (t) => {
-              const s = String(t || "");
-              const parsed = util.parseTitleFromFilename(s, null, null);
-              return parsed ? parsed.toLowerCase().trim() : "";
-            };
-            const newRes = torRes(newTitle);
-            const newDepth = torDepth(newTitle);
-            const newBad = torBadGroup(newTitle);
-            const newHevc = isHevc(newTitle);
-            const newShow = showName(newTitle);
-            // qbt keeps a finished torrent after its usb files are deleted or
-            // pruned by tv-down; such a torrent no longer has the episode.
-            let usbNames = null;
-            const onUsb = async (qt) => {
-              if (!usbNames) {
-                const usbRes = await this.fetchWithTimeout(
-                  `${config.torrentsApiUrl}/api/usb/files`,
-                  {},
-                  15000,
-                );
-                if (!usbRes?.ok)
-                  throw new Error(`usb files HTTP ${usbRes?.status}`);
-                const usbTree = await usbRes.json();
-                usbNames = new Set(usbTree.map((n) => n.name));
-              }
-              const relPath = String(qt?.content_path || "")
-                .slice(String(qt?.save_path || "").length)
-                .replace(/^\/+/, "");
-              return usbNames.has(relPath.split("/")[0]);
-            };
-            try {
-              const qbtInfoUrl = new URL(
-                `${config.torrentsApiUrl}/api/qbt/info`,
-              );
-              const qbtInfoRes = await this.fetchWithTimeout(
-                qbtInfoUrl.toString(),
-                {},
-                15000,
-              );
-              if (qbtInfoRes && qbtInfoRes.ok) {
-                const qbtList = await qbtInfoRes.json().catch(() => []);
-                if (Array.isArray(qbtList)) {
-                  for (const qt of qbtList) {
-                    const qName = String(qt?.name || "");
-                    const qSeMatch = qName.match(/S(\d{2})E(\d{2})/i);
-                    if (!qSeMatch) continue;
-                    const qSe = `S${qSeMatch[1]}E${qSeMatch[2]}`.toUpperCase();
-                    if (qSe !== seStr) continue;
-                    // Skip if the show names don't match
-                    const qShow = showName(qName);
-                    if (newShow && qShow && qShow !== newShow) continue;
-                    const qRes = torRes(qName);
-                    const qDepth = torDepth(qName);
-                    const qBad = torBadGroup(qName);
-                    const qHevc = isHevc(qName);
-                    const qIsHigherQuality =
-                      qRes > newRes ||
-                      (qRes === newRes && qDepth > newDepth) ||
-                      (qRes === newRes &&
-                        qDepth === newDepth &&
-                        !qHevc &&
-                        newHevc) ||
-                      (qRes === newRes &&
-                        qDepth === newDepth &&
-                        qHevc === newHevc &&
-                        !qBad &&
-                        newBad);
-                    if (qIsHigherQuality) {
-                      if (Number(qt?.progress) >= 1 && !(await onUsb(qt)))
-                        continue;
-                      const showName =
-                        this.currentShow?.name || newShow || "unknown show";
-                      unilog(
-                        1186,
-                        `Client: qBittorrent has higher quality ${seStr} (${qRes}p vs ${newRes}p) for ${showName}: "${newTitle}"`,
-                      );
-                      this.showError(
-                        `qBittorrent already has a higher quality version of ${seStr}:\n${qName}`,
-                      );
-                      return {
-                        ok: false,
-                        message: "Higher quality already in qBittorrent",
-                      };
-                    }
-                  }
-                }
-              }
-            } catch {
-              // qbt check failed — proceed with the send
-            }
-          }
-        }
-
         let downloadsRes = null;
         try {
           const downloadsUrl = `${config.torrentsApiUrl}/downloads`;
@@ -5042,8 +5177,11 @@ export default {
       this._sendFlashTimer = window.setTimeout(() => {
         this.sendFlash = false;
       }, 500);
-      for (const t of this.selectedItems) {
-        void this.enqueueDownload(t, { forceDownload: false });
+      for (const { torrent, force } of await this.checkPicks(
+        [...this.selectedItems],
+        true,
+      )) {
+        void this.enqueueDownload(torrent, { forceDownload: force });
       }
     },
 
@@ -5056,8 +5194,11 @@ export default {
       this._holdFlashTimer = window.setTimeout(() => {
         this.holdFlash = false;
       }, 500);
-      for (const t of this.selectedItems) {
-        void this.enqueueDownload(t, { forceDownload: false, hold: true });
+      for (const { torrent, force } of await this.checkPicks(
+        [...this.selectedItems],
+        true,
+      )) {
+        void this.enqueueDownload(torrent, { forceDownload: force, hold: true });
       }
     },
 
@@ -5084,8 +5225,11 @@ export default {
       const msg = `Send ${count} selected torrent${count === 1 ? "" : "s"} to qbt even if already downloaded?`;
       const confirmed = await this.showConfirmDialog(msg);
       if (!confirmed) return;
-      for (const t of this.selectedItems) {
-        void this.enqueueDownload(t, { forceDownload: true });
+      for (const { torrent } of await this.checkPicks(
+        [...this.selectedItems],
+        false,
+      )) {
+        void this.enqueueDownload(torrent, { forceDownload: true });
       }
     },
 

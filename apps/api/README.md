@@ -133,17 +133,13 @@ The server normalizes provider results, then applies a few **hard filters** to k
 - **Year match** (optional): if `show` contains a year like `"Foo (2011)"`, keeps torrents that either have no year or match that year.
 - **Title excludes**: drops obvious unwanted variants by substring (currently `2160`, `nordic`, `mobile`).
 
-The server no longer hard-filters on:
-
-- **480p / low-res**
-- **0 seeds**
-
-Instead, it annotates returned torrents so the client can decide what to hide.
+The server does not hard-filter on low resolution or 0 seeds, and does not
+sort; the torrent pane sorts. Torrents with 0 seeds are annotated so the
+client can sort them last.
 
 Response fields:
 
 - Each torrent may include `warnings: [{ code, message }, ...]`.
-  - `code=low_res_480` for likely 480p/low-res releases
   - `code=zero_seeds` for `seeds <= 0`
 - The top-level response includes `warningSummary` (a count map of warning codes across returned torrents).
 

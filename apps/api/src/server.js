@@ -51,11 +51,7 @@ import {
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import { getActorCredits } from "./actor-credits.js";
-import {
-  parseFileSeasonEpisode,
-  parseTitleFromFilename,
-  TV_BLOCKED,
-} from "@tv/share";
+import { parseFileSeasonEpisode, parseTitleFromFilename } from "@tv/share";
 import { ChannelPeer } from "@tv/share/channelPeer";
 import { unilog, setUnilogSink, logHere } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
@@ -68,6 +64,10 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const BLOCKED_NAMES_PATH = path.resolve(
+  __dirname,
+  "../../srvr/data/blockedNames.txt",
+);
 const INTERNAL_SRVR_SUBS_COUNT_URL =
   "http://127.0.0.1:8739/api/subsCountEpisodes";
 const INTERNAL_SRVR_LOG_URL = "http://127.0.0.1:8739/api/log";
@@ -1565,10 +1565,13 @@ async function handleDownloadRequest(req, res) {
       return;
     }
 
-    // Block if torrent title contains any TV_BLOCKED substring (skipped when forceDownload).
+    // Block if torrent title contains any blocked name (skipped when forceDownload).
     if (!forceDownload) {
       const title = torTitle();
-      const blockedKey = Object.keys(TV_BLOCKED).find((k) => title.includes(k));
+      const blockedKey = (await fs.promises.readFile(BLOCKED_NAMES_PATH, "utf8"))
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find((k) => k && title.includes(k));
       if (blockedKey) {
         unilog(1170, `API: TV_BLOCKED substring "${blockedKey}" in "${title}"`);
         res.json({

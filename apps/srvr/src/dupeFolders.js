@@ -18,12 +18,11 @@
 //     being judged, which is the misfiled-show signature),
 //   * nothing under the losing folder is still being written.
 //
-// An episode sitting in both folders is not a refusal: the two files are put
-// through `flexgetIsBetterSameRun`, the same comparator flexget uses to choose
-// between two candidates for one episode arriving in a single batch
-// (resolution -> bit depth -> hevc -> seeds -> bad group). The loser is
-// deleted with its sidecars, exactly as down does when a better release
-// replaces a file already on disk, so one video per episode survives.
+// An episode sitting in both folders is not a refusal: the two files are
+// judged by compareRelease as a choice, by their real resolution, name and
+// size. The loser is deleted with its sidecars, exactly as down does when a
+// better release replaces a file already on disk, so one video per episode
+// survives.
 //
 // Nothing is ever overwritten and no other video file is ever deleted: files
 // are renamed across, and the losing folder is removed only once it is proven
@@ -39,7 +38,8 @@ import {
   resIsSampleName,
   vidDeleteWithSidecars,
 } from "./videoFiles.js";
-import { flexgetIsBetterSameRun } from "./flexgetScore.js";
+import { isBadGroup } from "./badGroups.js";
+import { fileResolution } from "./disk.js";
 
 const TV_DIR = "/mnt/media/tv";
 
@@ -95,10 +95,17 @@ export function videosUnder(showDir) {
   return out;
 }
 
-// A filename is all flexgetIsBetterSameRun needs: it reads resolution and
-// bit depth out of `quality`/`title` and the group out of `title`. Neither
-// file came from a torrent run, so both score 0 seeds and that tier is a tie.
-const asCandidate = (name) => ({ title: name, quality: name });
+// A video's factors for compareRelease: its real resolution, what its name
+// tells, and its size. Files have no seeds or tracker.
+const fileFactors = (dir, name) => {
+  const full = path.join(dir, name);
+  return {
+    ...epd.releaseFactors(name),
+    res: fileResolution(full) ?? 480,
+    size: fs.statSync(full).size,
+    badGroup: isBadGroup(name),
+  };
+};
 
 /**
  * Read a show folder as a list of episodes, and note anything that says the
@@ -198,14 +205,19 @@ export function planFolderMerge(showName, winnerAudit, loserAudit) {
         let best = rivals[0];
         for (const cur of rivals.slice(1)) {
           if (
-            flexgetIsBetterSameRun(
-              asCandidate(cur.name),
-              asCandidate(best.name),
-            )
+            epd.compareRelease(
+              fileFactors(dstSeason, cur.name),
+              fileFactors(dstSeason, best.name),
+            ).cmp > 0
           )
             best = cur;
         }
-        if (flexgetIsBetterSameRun(asCandidate(name), asCandidate(best.name))) {
+        if (
+          epd.compareRelease(
+            fileFactors(srcSeason, name),
+            fileFactors(dstSeason, best.name),
+          ).cmp > 0
+        ) {
           for (const cur of rivals)
             deletions.push(path.join(dstSeason, cur.name));
         } else {

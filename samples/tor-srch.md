@@ -63,7 +63,6 @@ Torrents whose titles contain any of `"2160"`, `"nordic"`, or `"mobile"` are dro
 
 Warnings are attached to individual torrents but they are **not** filtered out:
 
-- `low_res_480` — title/resolution indicates 480p
 - `zero_seeds` — seed count is 0 or missing
 
 ### 12. SeasonEpisode Assignment
@@ -82,21 +81,13 @@ A display string (`S##` or `S##E##`) is computed and stored on each torrent.
 
 ### 14. Sort Order
 
-Remaining torrents are sorted by (priority order):
-
-1. Season number (ascending)
-2. Kind: season pack (0) < season range (1) < episode (2)
-3. Within range torrents: end season ascending
-4. Within episodes: episode number ascending
-5. 1080p before 720p
-6. 10-bit before 8-bit
-7. More seeds first
-8. Larger size first
-9. TorrentLeech before IPTorrents
+None. The torrent pane sorts the results: no-seeds torrents last, then season,
+kind and episode, then the better release first by `compareRelease`
+(`@tv/share`), then title.
 
 ### 15. Return
 
-Returns the filtered, sorted torrent array. The caller also receives `rawProviderCounts` (counts before filtering) and a `warningSummary` (aggregated warning counts across returned torrents).
+Returns the filtered torrent array. The caller also receives `rawProviderCounts` (counts before filtering) and a `warningSummary` (aggregated warning counts across returned torrents).
 
 ---
 
@@ -110,7 +101,7 @@ The function returns a single object:
   "count": 42,
   "torrents": [ ... ],
   "rawProviderCounts": { "TorrentLeech": 310, "IpTorrents": 87 },
-  "warningSummary": { "zero_seeds": 5, "low_res_480": 2 }
+  "warningSummary": { "zero_seeds": 5 }
 }
 ```
 
@@ -118,7 +109,7 @@ The function returns a single object:
 | ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `show`              | string | The show name that was searched                                                                                                             |
 | `count`             | number | Length of the `torrents` array                                                                                                              |
-| `torrents`          | array  | Filtered, sorted torrent objects (see below)                                                                                                |
+| `torrents`          | array  | Filtered torrent objects, unsorted (see below)                                                                                              |
 | `rawProviderCounts` | object | Per-provider counts **before** any filtering — `{ ProviderName: n }`. Used by the client to decide whether to show cookie-missing warnings. |
 | `warningSummary`    | object | Count of each warning code across all returned torrents — `{ code: n }`                                                                     |
 
@@ -193,12 +184,11 @@ Array of `{ code, message }` objects attached by `searchTorrents`. Torrents with
 
 | Code            | Message                   | Condition                                  |
 | --------------- | ------------------------- | ------------------------------------------ |
-| `"low_res_480"` | `"Low resolution (480p)"` | `parsed.resolution` or title contains 480p |
 | `"zero_seeds"`  | `"No seeds (seeds=N)"`    | `raw.seeds` is 0 or missing                |
 
 ### `notorrent`
 
-`boolean | undefined` — When `true`, marks a dummy/placeholder torrent. These are sorted to the end of the array.
+`boolean | undefined` — When `true`, marks a dummy/placeholder torrent.
 
 ---
 

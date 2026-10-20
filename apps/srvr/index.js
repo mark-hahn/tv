@@ -63,12 +63,8 @@ import {
   hasBadGroup,
   isBadGroup,
 } from "./src/badGroups.js";
-import {
-  flexgetFmtSent,
-  flexgetIsBetterSameRun,
-  flexgetIsBetterCrossRun,
-  parseResolutionStrict,
-} from "./src/flexgetScore.js";
+import { flexgetFmtSent } from "./src/flexgetScore.js";
+import { readBlockedNames, addBlockedName } from "./src/blockedNames.js";
 import {
   wss,
   startWss,
@@ -1580,6 +1576,11 @@ app.post(
 );
 app.post("/api/tvRemoteFilterOpen", apiWrapper(tvRemoteFilterOpen));
 app.get("/api/getGroupCounts", apiWrapper(groupCounts.getGroupCounts));
+app.get("/api/getBlockedNames", apiWrapper(readBlockedNames));
+app.post(
+  "/api/addBlockedName",
+  apiWrapper(({ name }) => addBlockedName(name)),
+);
 app.get("/api/getBadGroups", (_req, res) => {
   try {
     res.json(syncBadGroupsFromDisk());

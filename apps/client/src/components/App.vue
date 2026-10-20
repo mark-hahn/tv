@@ -145,6 +145,22 @@
               {{ t.label }}
             </button>
             <button
+              v-if="restoreList.length > 0"
+              @click.stop="restoreOpen = true"
+              :style="{
+                fontSize: '13px',
+                cursor: 'pointer',
+                borderRadius: '7px',
+                padding: '4px 10px',
+                marginLeft: '4px',
+                border: '1px solid #c88',
+                backgroundColor: '#faa',
+                color: 'black',
+              }"
+            >
+              Restore? {{ restoreList.length }}
+            </button>
+            <button
               v-if="introCount > 0"
               @click.stop="clickIntro"
               :style="{
@@ -403,6 +419,95 @@
     </div>
     <!-- Missing episode warning modal -->
     <div
+      v-if="restoreOpen && restoreList.length > 0"
+      @click.stop.prevent="restoreOpen = false"
+      style="
+        position: fixed;
+        font-size: 18px;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 3000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <div
+        @click.stop
+        style="
+          background-color: white;
+          border-radius: 10px;
+          padding: 24px 28px;
+          max-width: 560px;
+          width: calc(100% - 40px);
+          font-size: 18px;
+        "
+      >
+        <div style="font-weight: bold; margin-bottom: 12px">
+          Restore a deleted video?
+        </div>
+        <div style="margin-bottom: 12px; line-height: 1.4">
+          This file was downloaded before and its copy on disk was deleted. It
+          is still on usb and could be downloaded again.
+        </div>
+        <div style="margin-bottom: 6px">
+          Show: {{ restoreList[0].seriesName }}
+        </div>
+        <div style="margin-bottom: 6px">
+          Episode: S{{ String(restoreList[0].season).padStart(2, "0") }}E{{
+            String(restoreList[0].episode).padStart(2, "0")
+          }}
+        </div>
+        <div style="margin-bottom: 6px; overflow-wrap: anywhere">
+          File: {{ restoreList[0].title }}
+        </div>
+        <div style="margin-bottom: 16px">
+          Downloaded: {{ fmtUnixDatePst(restoreList[0].dateEnded) }}
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end">
+          <button
+            @click.stop="restoreOpen = false"
+            style="
+              font-size: 18px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 6px 18px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Cancel
+          </button>
+          <button
+            @click.stop="restoreBlock"
+            style="
+              font-size: 18px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 6px 18px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Block
+          </button>
+          <button
+            @click.stop="restoreRestore"
+            style="
+              font-size: 18px;
+              cursor: pointer;
+              border-radius: 7px;
+              padding: 6px 18px;
+              border: 1px solid #bbb;
+              background-color: whitesmoke;
+            "
+          >
+            Restore
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
       v-if="missingEpWarning"
       @click.stop.prevent
       @pointerdown.stop
@@ -610,6 +715,10 @@ import { config } from "../config.js";
 import paneHelp from "../paneHelp.js";
 import * as util from "../util.js";
 
+// How often the Restore? count is read from tv-down, which builds the list
+// once a cycle.
+const RESTORE_POLL_MS = 60 * 1000;
+
 // Hardwired split percentages for simple mode.
 // These control the List pane size (and TabArea gets the rest minus divider).
 // Values are percentages (e.g. 50 means 50%).
@@ -652,6 +761,9 @@ export default {
       videoPlayerMapSeason: null,
       videoPlayerMapEpisode: null,
       introCount: 0,
+      // Usb files that would restore a deleted video (tv-down's /restoreList).
+      restoreList: [],
+      restoreOpen: false,
       browseTabHasMore: false,
       _browseHasMoreChannel: null,
       currentPane: "info", // 'info', 'map', 'actors', 'reviews', 'trailer', 'tor', 'flex', 'qbt', 'down'
@@ -1004,6 +1116,7 @@ export default {
     },
   },
   unmounted() {
+    clearInterval(this._restoreTimer);
     evtBus.off("downActivePart", this.handleDownActivePart);
     evtBus.off("tvdb-mismatch", this.handleTvdbMismatch);
     if (this._onMissingEpWarning)
@@ -1078,6 +1191,50 @@ export default {
       const res = await srvr.introFile(show?.name);
       if (!res?.ok) return { error: res?.error || "no playable episode found" };
       return { path: res.path, season: res.season, episode: res.episode };
+    },
+
+    fmtUnixDatePst(unixSeconds) {
+      return util.fmtUnixDatePst(unixSeconds);
+    },
+
+    async loadRestoreList() {
+      try {
+        const res = await fetch(`${config.tvDownUrl}/restoreList`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        this.restoreList = (await res.json()).list;
+      } catch (e) {
+        unilog(2998, `restore list read failed: ${e.message}`);
+      }
+      if (this.restoreList.length === 0) this.restoreOpen = false;
+    },
+
+    // Block: the file's name joins the blocked-name list, so it is never
+    // offered or downloaded again unless forced.
+    async restoreBlock() {
+      const item = this.restoreList[0];
+      try {
+        await srvr.addBlockedName(item.title);
+      } catch (e) {
+        unilog(2999, `block failed for ${item.seriesName} "${item.title}": ${e.message}`);
+      }
+      await this.loadRestoreList();
+    },
+
+    // Restore: tv-down forgets it downloaded the file, so its next cycle
+    // treats the file as never downloaded.
+    async restoreRestore() {
+      const item = this.restoreList[0];
+      try {
+        const res = await fetch(`${config.tvDownUrl}/restore`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: item.title }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch (e) {
+        unilog(3000, `restore failed for ${item.seriesName} "${item.title}": ${e.message}`);
+      }
+      await this.loadRestoreList();
     },
 
     async clickIntro() {
@@ -1925,6 +2082,12 @@ export default {
     },
   },
   mounted() {
+    this.loadRestoreList();
+    this._restoreTimer = setInterval(
+      () => this.loadRestoreList(),
+      RESTORE_POLL_MS,
+    );
+
     this._onAppWindowResize = () => {
       this.windowW = window.innerWidth;
       this.windowH = window.innerHeight;

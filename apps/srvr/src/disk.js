@@ -23,6 +23,7 @@ import * as season0 from "./season0.js";
 import { showFolderFor, folderToRecord } from "./showPaths.js";
 import * as util from "./util.js";
 import { videoFileExtensions } from "./videoFiles.js";
+import { isBadGroup } from "./badGroups.js";
 
 const tvDir = "/mnt/media/tv";
 
@@ -148,6 +149,12 @@ function probeRawHeight(filePath) {
   return h;
 }
 
+// A file's resolution the way the disk scan reads one with none recorded:
+// the name's tag, else the probed height.
+export function fileResolution(filePath) {
+  return getResolution(filePath, { probeFileFn: probeRawHeight });
+}
+
 // A probed height is already persisted in the record's episodeData (res field)
 // next to the file it came from, so reuse it instead of running ffprobe again.
 // probedRawHeightByPath is empty after a restart; without this, every file whose
@@ -259,6 +266,9 @@ export const getShowDiskInfo = async (showFolderName) => {
   let errFlg = null;
   // Per-episode file name + resolution: { [season]: { [episode]: { file, res } } }
   const diskByEp = {};
+  // The compareRelease factors of each diskByEp pick, to judge the next video
+  // of the same episode against.
+  const pickFactors = new Map();
   // Read before the caller overwrites it, so already-probed files keep their res.
   const showEpisodeData =
     folderToRecord().get(showFolderName)?.rec?.episodeData ?? null;
@@ -300,10 +310,19 @@ export const getShowDiskInfo = async (showFolderName) => {
               probeFileFn: probeRawHeight,
             });
           if (titleMatch) {
-            // Track per-episode file name; prefer the higher-resolution file.
+            // Several videos for one episode: a choice by compareRelease,
+            // the first one found staying on equal.
             if (!diskByEp[parsed.season]) diskByEp[parsed.season] = {};
-            const cur = diskByEp[parsed.season][parsed.episode];
-            if (!cur || (quality != null && quality > (cur.res ?? 0))) {
+            const epKey = `${parsed.season}/${parsed.episode}`;
+            const factors = {
+              ...epd.releaseFactors(fname),
+              res: quality ?? 480,
+              size: fstat.size,
+              badGroup: isBadGroup(fname),
+            };
+            const cur = pickFactors.get(epKey);
+            if (!cur || epd.compareRelease(factors, cur).cmp > 0) {
+              pickFactors.set(epKey, factors);
               diskByEp[parsed.season][parsed.episode] = {
                 file: fname,
                 res: quality ?? null,

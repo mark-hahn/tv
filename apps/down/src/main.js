@@ -18,9 +18,10 @@ import {
   smartTitleMatch,
   parseFileSeasonEpisode,
   parseTitleFromFilename,
-  TV_BLOCKED,
-  getResolution,
-  isHevc,
+  compareRelease,
+  releaseFactors,
+  getFullPath as edGetFullPath,
+  getRes as edGetRes,
   isWatched as edIsWatched,
   unilog,
   setUnilogSink,
@@ -276,12 +277,17 @@ async function main() {
 
   forcedFiles = null;
   processingForced = false;
-  // torFilePaths: Set of usbFilePaths registered as coming from the tor pane.
-  // Persists across cycles so non-forced tor files are recognized when the
-  // normal scan picks them up.
-  var torFilePaths = null;
-
   var usbFileBytes = null;
+  // tv-down's record of the current file when it was downloaded before and
+  // its landed copy is gone (see deletedDownload).
+  var restoreEntry = null;
+  // Usb files that would restore a deleted video, from the last full cycle,
+  // and the list the running cycle is building.
+  var restoreList = [];
+  var nextRestoreList = null;
+  // Set when forced files cut the running cycle short, so its partial
+  // Restore list is not used.
+  var cycleCutShort = false;
 
   debug = false;
   FAST_TEST = false;
@@ -394,19 +400,20 @@ async function main() {
     }
     return out;
   };
-  var FLEXGET_HISTORY_PATH = path.join(
-    APP_DIR,
-    "..",
-    "srvr",
-    "data",
-    "flexget-history.json",
-  );
   var BAD_GROUPS_PATH = path.join(
     APP_DIR,
     "..",
     "srvr",
     "data",
     "badGroups.txt",
+  );
+  // The blocked-name list, one substring per line, read every cycle.
+  var BLOCKED_NAMES_PATH = path.join(
+    APP_DIR,
+    "..",
+    "srvr",
+    "data",
+    "blockedNames.txt",
   );
   var badGroupsSet = new Set();
   try {
@@ -543,6 +550,69 @@ async function main() {
   request = requestPkg;
   rimraf = rimrafPkg;
   var parseTorrentTitle = parseTorrentTitlePkg.parse;
+
+  // A file's factors for compareRelease: what its name tells, its size, and
+  // whether its group is a bad one. Files have no seeds or tracker.
+  var fileFactors = function (name, bytes) {
+    var group =
+      parseTorrentTitle(String(name || "").replace(/\.[a-z0-9]{2,4}$/i, ""))
+        ?.group || "";
+    return {
+      ...releaseFactors(name),
+      size: bytes > 0 ? bytes : null,
+      badGroup: badGroupsSet.has(group.toLowerCase()),
+    };
+  };
+
+  // tv-down's record of a video it downloaded and finished whose landed copy
+  // is no longer on disk, or null.
+  var deletedDownload = function (title) {
+    if (!isVideoEpisodeFile(title)) return null;
+    var entry = tvJson.getEntryByTitle(title);
+    if (
+      !entry ||
+      entry.status !== "finished" ||
+      entry.error ||
+      !entry.localPath
+    )
+      return null;
+    var landed = path.join(entry.localPath, entry.destTitle || entry.title);
+    return fs.existsSync(landed) ? null : entry;
+  };
+
+  // The episode's video on disk as { file, factors }: the recorded one, the
+  // one that plays, with its recorded resolution; with none recorded, the
+  // first video for the episode in the season folder (one that landed after
+  // this cycle read the records). null when there is neither.
+  var diskVideo = function (libraryKey, seasonPath, season, episode, seStr) {
+    var rec = tvdbMap && tvdbMap[libraryKey];
+    var full =
+      rec && rec.path
+        ? edGetFullPath(
+            rec.episodeData,
+            String(rec.path).split("/").pop(),
+            season,
+            episode,
+            tvPath.replace(/\/+$/, ""),
+          )
+        : null;
+    if (full && fs.existsSync(full)) {
+      var recorded = fileFactors(path.basename(full), fs.statSync(full).size);
+      recorded.res = edGetRes(rec.episodeData, season, episode) ?? recorded.res;
+      return { file: path.basename(full), factors: recorded };
+    }
+    var seRe = new RegExp(seStr, "i");
+    var name = fs.existsSync(seasonPath)
+      ? fs.readdirSync(seasonPath).find(function (n) {
+          return seRe.test(n) && isVideoEpisodeFile(n);
+        })
+      : null;
+    if (!name) return null;
+    return {
+      file: name,
+      factors: fileFactors(name, fs.statSync(path.join(seasonPath, name)).size),
+    };
+  };
 
   // --- startProc server state ------------------------------------------------
   var cycleRestartNeeded = false;
@@ -1020,17 +1090,14 @@ async function main() {
               }
               try {
                 var parsed0 = body ? JSON.parse(body) : [];
-                var files, fromTorFlag;
-                // Accept either a plain array (legacy) or { files: [...], fromTor: true }.
+                var files;
+                // Accept either a plain array (legacy) or { files: [...] }.
                 if (Array.isArray(parsed0)) {
                   files = parsed0;
-                  fromTorFlag = false;
                 } else if (parsed0 && Array.isArray(parsed0.files)) {
                   files = parsed0.files;
-                  fromTorFlag = parsed0.fromTor === true;
                 } else {
                   files = [];
-                  fromTorFlag = false;
                 }
                 if (!Array.isArray(files) || files.length === 0) {
                   return json(res, 400, {
@@ -1039,20 +1106,8 @@ async function main() {
                   });
                 }
 
-                if (fromTorFlag) {
-                  if (!torFilePaths) torFilePaths = new Set();
-                  for (var tfi = 0; tfi < files.length; tfi++) {
-                    torFilePaths.add(String(files[tfi]));
-                  }
-                }
-
                 forcedFiles = files;
-                unilog(
-                  296,
-                  "Received forced files:",
-                  forcedFiles.length,
-                  fromTorFlag ? "(fromTor)" : "",
-                );
+                unilog(2990, `Received forced files: ${forcedFiles.length}`);
 
                 // Start cycle if not running, or restart if running
                 if (cycleRunning) {
@@ -1060,6 +1115,7 @@ async function main() {
                   // Abort the current cycle so forced files get processed immediately
                   // instead of waiting for all normal USB files to finish.
                   if (usbFiles) usbFiles.length = 0;
+                  cycleCutShort = true;
                 } else {
                   if (nextCycleTimer) {
                     clearTimeout(nextCycleTimer);
@@ -1083,9 +1139,33 @@ async function main() {
           });
         }
 
-        // Handle /torFiles endpoint — register file paths as from-tor without forcing
-        // POST body: JSON array of USB file paths (same format as /forceDown)
-        if (pathname === "/torFiles") {
+        // Handle /restoreList endpoint — usb files that would restore a
+        // deleted video, from the last full cycle, less any name blocked
+        // since. GET returns { list: [{ title, seriesName, season, episode,
+        // dateEnded }] }.
+        if (pathname === "/restoreList") {
+          if (req.method === "GET") {
+            var blockedNow = fs
+              .readFileSync(BLOCKED_NAMES_PATH, "utf8")
+              .split(/\r?\n/)
+              .map((l) => l.trim())
+              .filter(Boolean);
+            return json(res, 200, {
+              list: restoreList.filter(
+                (r) => !blockedNow.some((b) => r.title.includes(b)),
+              ),
+            });
+          }
+          return json(res, 405, {
+            status: "error",
+            error: "method not allowed",
+          });
+        }
+
+        // Handle /restore endpoint — forget tv-down's record of a file on the
+        // Restore list, so the next cycle treats it as never downloaded.
+        // POST body: { title: string }
+        if (pathname === "/restore") {
           if (req.method === "POST") {
             return readBody(req, (err1, body) => {
               if (err1) {
@@ -1095,18 +1175,19 @@ async function main() {
                 });
               }
               try {
-                var torFileList = body ? JSON.parse(body) : [];
-                if (!Array.isArray(torFileList) || torFileList.length === 0) {
-                  return json(res, 400, {
+                var restoreTitle = String(JSON.parse(body || "{}").title || "");
+                if (!restoreList.some((r) => r.title === restoreTitle)) {
+                  return json(res, 404, {
                     status: "error",
-                    error: "body must be a non-empty JSON array of file paths",
+                    error: "not on the restore list",
                   });
                 }
-                if (!torFilePaths) torFilePaths = new Set();
-                for (var tfi2 = 0; tfi2 < torFileList.length; tfi2++) {
-                  torFilePaths.add(String(torFileList[tfi2]));
-                }
-                unilog(297, "Registered tor files:", torFileList.length);
+                tvJson.deleteByTitles([restoreTitle]);
+                restoreList = restoreList.filter(
+                  (r) => r.title !== restoreTitle,
+                );
+                unilog(2991, `restored "${restoreTitle}"`);
+                startProc();
                 return json(res, 200, { status: "ok" });
               } catch (e) {
                 return json(res, 400, {
@@ -1536,7 +1617,12 @@ async function main() {
     var f, j, len, line, mapLines, mapStr, results, t;
     // Do not cache tv-finished.json / tv-inProgress.json here.
     // Those are loaded once per cycle immediately after the USB file list is fetched.
-    blocked = Object.assign({}, TV_BLOCKED);
+    blocked = {};
+    for (var blockedLine of fs
+      .readFileSync(BLOCKED_NAMES_PATH, "utf8")
+      .split(/\r?\n/)) {
+      if (blockedLine.trim()) blocked[blockedLine.trim()] = true;
+    }
     map = {};
     mapStr = fs.readFileSync(TV_MAP_PATH, "utf8");
     mapLines = mapStr.split("\n");
@@ -2546,6 +2632,8 @@ async function main() {
     // Load queued titles once per cycle and block any file already present there.
     // This prevents duplicates after restarts where tv-inProgress.json may be cleared.
     // Backed by SQLite (tvJson.js).
+    nextRestoreList = processingForced ? null : [];
+    cycleCutShort = false;
     try {
       tvJsonTitles = tvJson.getTitlesMap ? tvJson.getTitlesMap() : {};
     } catch (e) {
@@ -2553,18 +2641,23 @@ async function main() {
     }
     cycleSeMap = {};
 
-    // Build an index of in-flight downloads keyed by season dir + SxxExx → best res.
-    // Active downloads (waiting/downloading) occupy an episode even though the
-    // new file is not on disk yet (it is still in .rsync-tmp-<procId>, and the
-    // file it replaces is still live), so this lets the fromFlex check skip a
-    // stale same/worse-quality candidate for the same episode instead of racing
-    // it (see down-coll-plan.md).
+    // Build an index of in-flight downloads keyed by season dir + SxxExx: each
+    // active download (waiting/downloading) with its factors and whether it
+    // is automatic. They occupy an episode even though the new file is not on
+    // disk yet (it is still in .rsync-tmp-<procId>, and the file it replaces
+    // is still live), so a later file for the episode is judged against them:
+    // one download per episode at a time (see down-coll-plan.md).
     inProgressSeIndex = {};
     try {
       var _activeDownloads = tvJson.getDownloads ? tvJson.getDownloads() : [];
       for (var _di = 0; _di < _activeDownloads.length; _di++) {
         var _de = _activeDownloads[_di];
-        if (!_de || _de.error || _de.status === "finished") continue;
+        if (
+          !_de ||
+          _de.error ||
+          (_de.status !== "waiting" && _de.status !== "downloading")
+        )
+          continue;
         var _deTitle = _de.destTitle || _de.title || "";
         // Only a video occupies its episode; a subtitle file on its way does not.
         if (!isVideoEpisodeFile(_deTitle)) continue;
@@ -2574,13 +2667,11 @@ async function main() {
         var _deDir = String(_de.localPath || "").replace(/\/+$/, "");
         if (!_deDir) continue;
         var _deKey = _deDir + "\x00" + _deSeStr.toUpperCase();
-        var _deRes = getResolution(_deTitle) ?? 480;
-        if (
-          !(_deKey in inProgressSeIndex) ||
-          _deRes > inProgressSeIndex[_deKey]
-        ) {
-          inProgressSeIndex[_deKey] = _deRes;
-        }
+        (inProgressSeIndex[_deKey] ||= []).push({
+          title: String(_de.title),
+          fromFlex: !!_de.fromFlex,
+          factors: fileFactors(_deTitle, _de.fileSize),
+        });
       }
     } catch (e) {
       inProgressSeIndex = {};
@@ -2643,45 +2734,9 @@ async function main() {
         var s = Number.isInteger(parsed.season) ? parsed.season : 0;
         var e = Number.isInteger(parsed.episode) ? parsed.episode : 0;
         var key = `${titleKey}\u0000${String(s).padStart(4, "0")}\u0000${String(e).padStart(4, "0")}\u0000${base.toLowerCase()}`;
-        var epKey =
-          !processingForced &&
-          s > 0 &&
-          e > 0 &&
-          isVideoEpisodeFile(base) &&
-          !(torFilePaths && torFilePaths.has(filePath))
-            ? `${titleKey}\u0000${s}\u0000${e}`
-            : null;
-        var bytes = parseInt(line.split("-").pop(), 10) || 0;
-        return { line, key, base, filePath, epKey, bytes };
+        return { line, key };
       })
       .sort((a, b) => a.key.localeCompare(b.key));
-
-    // Same episode twice in one usb list: only the best file goes on to
-    // checkFile, the larger one when neither is better. Forced and tor files
-    // are explicit picks and are never dropped. A file whose download failed
-    // is never the best: checkFile skips it, and it would hide the others.
-    var bestByEp = {};
-    for (var bi = 0; bi < usbFiles.length; bi++) {
-      var bf = usbFiles[bi];
-      if (!bf.epKey) continue;
-      if (tvJsonTitles && tvJsonTitles[bf.base] && tvJsonTitles[bf.base].error)
-        continue;
-      var cur = bestByEp[bf.epKey];
-      if (
-        !cur ||
-        flexFileIsBetterThanSent(bf.base, { title: cur.base }) ||
-        (!flexFileIsBetterThanSent(cur.base, { title: bf.base }) &&
-          bf.bytes > cur.bytes)
-      ) {
-        bestByEp[bf.epKey] = bf;
-      }
-    }
-    usbFiles = usbFiles.filter((x) => {
-      if (!x.epKey || bestByEp[x.epKey] === x) return true;
-      if (skipLoggedOnce(x.filePath))
-        unilog(2613, `same episode in usb list, skipping "${x.base}" for "${bestByEp[x.epKey].base}"`);
-      return false;
-    });
 
     usbFiles = usbFiles.map((x) => x.line);
     skipPaths = [];
@@ -2731,6 +2786,7 @@ async function main() {
     tvDbErrCount = 0;
 
     if ((usbLine = usbFiles.shift())) {
+      restoreEntry = null;
       usbLineParts = usbLine.split("-");
       usbFileBytes = parseInt(usbLineParts.pop(), 10);
       usbLine = usbLineParts.join("-");
@@ -2855,10 +2911,16 @@ async function main() {
         return;
       }
 
+      // A video downloaded before whose landed copy is gone is never
+      // downloaded again by itself: it goes through every other check and,
+      // if it would be downloaded, is offered for Restore instead.
       if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
-        recentCount++;
-        process.nextTick(checkFile);
-        return;
+        restoreEntry = deletedDownload(fname);
+        if (!restoreEntry) {
+          recentCount++;
+          process.nextTick(checkFile);
+          return;
+        }
       }
 
       if (inProgress && inProgress[fname]) {
@@ -2867,7 +2929,7 @@ async function main() {
         return;
       }
       for (blkName in blocked) {
-        if (fname.indexOf(blkName) > -1) {
+        if (!processingForced && fname.indexOf(blkName) > -1) {
           blockedCount++;
           unilog(
             1185,
@@ -3025,6 +3087,9 @@ async function main() {
         }
         _cycleTiming = null;
       }
+      // A full cycle that ran to its end replaces the Restore list.
+      if (nextRestoreList && !cycleCutShort) restoreList = nextRestoreList;
+      nextRestoreList = null;
       cycleRunning = false;
       // If a startProc request came in during this cycle, finish the cycle first,
       // then restart immediately (do not abort between files).
@@ -3281,34 +3346,6 @@ async function main() {
     return tryTvdbQuery(tvdbQueryVariants);
   };
 
-  function flexBitDepth(s) {
-    return /10.?bit|hdr/i.test(String(s || "")) ? 10 : 8;
-  }
-  function flexFileIsBetterThanSent(usbFname, sentEntry) {
-    var sentSrc = String(sentEntry.quality || sentEntry.title || "");
-    var usbRes = getResolution(usbFname) ?? 480;
-    var sentRes = getResolution(sentSrc) ?? 480;
-    if (usbRes !== sentRes) return usbRes > sentRes;
-    var usbDepth = flexBitDepth(usbFname);
-    var sentDepth = flexBitDepth(sentSrc);
-    if (usbDepth !== sentDepth) return usbDepth > sentDepth;
-    var usbHevc = isHevc(usbFname);
-    var sentHevc = isHevc(sentSrc);
-    if (usbHevc !== sentHevc) return sentHevc; // sent needs transcoding → usb is better
-    var usbGroup = (
-      parseTorrentTitle(usbFname.replace(/\.[a-z0-9]{2,4}$/i, ""))?.group || ""
-    ).toLowerCase();
-    var sentGroup = (
-      parseTorrentTitle(
-        String(sentEntry.title || "").replace(/\.[a-z0-9]{2,4}$/i, ""),
-      )?.group || ""
-    ).toLowerCase();
-    var usbBad = badGroupsSet.has(usbGroup);
-    var sentBad = badGroupsSet.has(sentGroup);
-    if (usbBad !== sentBad) return sentBad; // sent is bad group → usb file is better
-    return false;
-  }
-
   checkFileExists = () => {
     var e, tvFilePath, tvSeasonPath, usbLongPath, videoPath;
     const seriesMatchYear = titleYear || folderTitleYear || null;
@@ -3423,7 +3460,12 @@ async function main() {
     }
 
     // tv.json authority: do not create duplicates for titles already queued.
-    if (!processingForced && tvJsonTitles && tvJsonTitles[fname]) {
+    if (
+      !processingForced &&
+      !restoreEntry &&
+      tvJsonTitles &&
+      tvJsonTitles[fname]
+    ) {
       existsCount++;
       const skipStatus =
         tvJsonTitles[fname].status === "finished"
@@ -3485,179 +3527,71 @@ async function main() {
       }
     }
 
-    // For flex downloads (automatic, not forced, not from tor): block if the
-    // episode already has a file under any name in the season folder, or if the
-    // episode is already watched.
-    var fromTor = !!(torFilePaths && torFilePaths.has(usbFilePath));
-    if (fromTor && torFilePaths) torFilePaths.delete(usbFilePath);
-    var fromFlex = !processingForced && !fromTor;
-    if (
-      fromFlex &&
+    // Episode videos are judged by compareRelease, as replacements: an
+    // automatic file (not forced) is downloaded only when it is better than a
+    // download already running for the episode and than the episode's video
+    // on disk. One download runs per episode at a time.
+    var fromFlex = !processingForced;
+    var isEpisodeFile =
       !isSrtFile &&
       Number.isInteger(season) &&
       season > 0 &&
       Number.isInteger(episode) &&
-      episode > 0
-    ) {
-      var flexSeStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
-      var flexSeRe = new RegExp(flexSeStr, "i");
-
-      // Skip if a same-or-better-quality download for this exact episode is already
-      // in flight under a different filename. During a higher-quality replacement the
-      // new file lives in .rsync-tmp-<procId> and the disk check below only sees the
-      // file it replaces — without this guard a stale same/worse-quality USB candidate
-      // that beats that file gets queued and races the in-flight download, leaving a
-      // duplicate live file on disk (see down-coll-plan.md).
-      if (inProgressSeIndex) {
-        var _ipKey =
-          String(tvSeasonPath).replace(/\/+$/, "") + "\x00" + flexSeStr;
-        var _ipRes = inProgressSeIndex[_ipKey];
-        if (_ipRes != null && _ipRes >= (getResolution(fname) ?? 480)) {
+      episode > 0;
+    var flexSeStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
+    var episodeShow = seriesName || "unknown show";
+    var runningKey =
+      String(tvSeasonPath).replace(/\/+$/, "") + "\x00" + flexSeStr;
+    var running = (inProgressSeIndex && inProgressSeIndex[runningKey]) || [];
+    var usbFactors = fileFactors(fname, usbFileBytes);
+    // The downloads this file replaces, stopped once it is queued.
+    var toStop = [];
+    if (fromFlex && isEpisodeFile) {
+      // A forced download runs to its end. This file waits for a later
+      // cycle, which judges it against the forced file once that has landed.
+      if (
+        running.some(function (d) {
+          return !d.fromFlex;
+        })
+      ) {
+        existsCount++;
+        if (skipLoggedOnce(usbFilePath))
+          unilog(2992, `${episodeShow} ${flexSeStr}: forced download running, "${fname}" waits`);
+        return process.nextTick(checkFile);
+      }
+      for (var runningDown of running) {
+        var vsRunning = compareRelease(usbFactors, runningDown.factors);
+        if (vsRunning.cmp <= 0) {
           existsCount++;
-          unilog(
-            1535,
-            `skip: same/better quality already downloading for ${seriesName || "unknown show"} ${flexSeStr}`,
-          );
+          if (skipLoggedOnce(usbFilePath))
+            unilog(2993, `${episodeShow} ${flexSeStr}: running download "${runningDown.title}" ${vsRunning.cmp < 0 ? `better by ${vsRunning.factor}` : "equal"}, skipping "${fname}"`);
           return process.nextTick(checkFile);
         }
+        toStop.push({
+          title: runningDown.title,
+          why: `better by ${vsRunning.factor}`,
+        });
       }
 
-      // Check flexget-history.json: only allow the most-recently-sent candidate.
-      var flexHistKeyExists = false;
-      var flexHistMostRecentSent = null;
-      try {
-        var flexHistText = fs.readFileSync(FLEXGET_HISTORY_PATH, "utf8");
-        var flexHistJson = JSON.parse(flexHistText);
-        var sHistKey = "S" + String(season).padStart(2, "0");
-        var eHistKey = "E" + String(episode).padStart(2, "0");
-        var flexHistoryKey = seriesName + "\x00" + sHistKey + "\x00" + eHistKey;
-        if (flexHistJson[flexHistoryKey]) {
-          flexHistKeyExists = true;
-          flexHistMostRecentSent = flexHistJson[flexHistoryKey].reduce(
-            function (best, c) {
-              if (c.sent === null) return best;
-              if (!best || c.sent > best.sent) return c;
-              return best;
-            },
-            null,
-          );
+      var disk = diskVideo(
+        libraryKeyForFolder,
+        tvSeasonPath,
+        season,
+        episode,
+        flexSeStr,
+      );
+      if (disk) {
+        var vsDisk = compareRelease(usbFactors, disk.factors);
+        if (vsDisk.cmp <= 0) {
+          existsCount++;
+          if (skipLoggedOnce(usbFilePath))
+            unilog(2994, `${episodeShow} ${flexSeStr}: disk "${disk.file}" ${vsDisk.cmp < 0 ? `better by ${vsDisk.factor}` : "equal"}, skipping "${fname}"`);
+          return process.nextTick(checkFile);
         }
-      } catch (e3) {
-        // Missing or unreadable — fall through to old behavior.
-      }
-
-      if (flexHistKeyExists && flexHistMostRecentSent) {
-        // Find any existing disk file for this S/E.
-        var _diskFile = null;
-        try {
-          if (flexSeRe) {
-            var _seasonFiles = fs.readdirSync(tvSeasonPath);
-            _diskFile =
-              _seasonFiles.find(function (f) {
-                return flexSeRe.test(f) && isVideoEpisodeFile(f);
-              }) || null;
-          }
-        } catch (e4) {
-          // Season dir doesn't exist — not on disk.
-        }
-        var _epOnDisk = !!_diskFile;
-
-        if (!_epOnDisk) {
-          // File was sent but never landed on disk — allow download regardless of quality.
-          // fall through to download
-        } else {
-          // File is on disk. Allow if USB is better than what's on disk.
-          var _diskRes = getResolution(_diskFile) ?? 480;
-          var _usbRes = getResolution(fname) ?? 480;
-          var _diskDepth = flexBitDepth(_diskFile);
-          var _usbDepth = flexBitDepth(fname);
-          var _diskGroup = (
-            parseTorrentTitle(_diskFile.replace(/\.[a-z0-9]{2,4}$/i, ""))
-              ?.group || ""
-          ).toLowerCase();
-          var _usbGroup = (
-            parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""))?.group ||
-            ""
-          ).toLowerCase();
-          var _diskIsBad = badGroupsSet.has(_diskGroup);
-          var _usbIsBad = badGroupsSet.has(_usbGroup);
-          var _diskIsHevc = isHevc(_diskFile);
-          var _usbIsHevc = isHevc(fname);
-          var _usbBetterThanDisk =
-            _usbRes > _diskRes ||
-            (_usbRes === _diskRes && _usbDepth > _diskDepth) ||
-            (_usbRes === _diskRes &&
-              _usbDepth === _diskDepth &&
-              _diskIsHevc &&
-              !_usbIsHevc) ||
-            (_usbRes === _diskRes &&
-              _usbDepth === _diskDepth &&
-              _diskIsHevc === _usbIsHevc &&
-              _diskIsBad &&
-              !_usbIsBad);
-          if (!_usbBetterThanDisk) {
-            existsCount++;
-            unilog(
-              1205,
-              `Down: skip, disk file same/better quality ${flexSeStr} "${fname}" (${seriesName || "unknown show"})`,
-            );
-            return process.nextTick(checkFile);
-          }
-          // USB is better than disk. The disk file stays until the better
-          // one has landed; the worker then deletes it with its sidecars.
-        }
-        // Allow through — download the better USB file.
-      } else if (!flexHistKeyExists) {
-        // No flexget history for this episode — block if a same-quality-or-better file
-        // already exists on disk for the same S/E.
-        var diskFile = null;
-        try {
-          var seasonFiles = fs.readdirSync(tvSeasonPath);
-          diskFile =
-            seasonFiles.find(function (f) {
-              return flexSeRe.test(f) && isVideoEpisodeFile(f);
-            }) || null;
-        } catch (e2) {
-          // Season dir doesn't exist yet — nothing to compare.
-        }
-        if (diskFile) {
-          var diskRes = getResolution(diskFile) ?? 480;
-          var usbRes = getResolution(fname) ?? 480;
-          var diskDepth = flexBitDepth(diskFile);
-          var usbDepth = flexBitDepth(fname);
-          var diskGroup = (
-            parseTorrentTitle(diskFile.replace(/\.[a-z0-9]{2,4}$/i, ""))
-              ?.group || ""
-          ).toLowerCase();
-          var usbGroup = (
-            parseTorrentTitle(fname.replace(/\.[a-z0-9]{2,4}$/i, ""))?.group ||
-            ""
-          ).toLowerCase();
-          var diskIsBad = badGroupsSet.has(diskGroup);
-          var usbIsBad = badGroupsSet.has(usbGroup);
-          var diskIsHevc = isHevc(diskFile);
-          var usbIsHevc = isHevc(fname);
-          var usbIsBetter =
-            usbRes > diskRes ||
-            (usbRes === diskRes && usbDepth > diskDepth) ||
-            (usbRes === diskRes &&
-              usbDepth === diskDepth &&
-              diskIsHevc &&
-              !usbIsHevc) ||
-            (usbRes === diskRes &&
-              usbDepth === diskDepth &&
-              diskIsHevc === usbIsHevc &&
-              diskIsBad &&
-              !usbIsBad);
-          if (!usbIsBetter) {
-            existsCount++;
-            if (skipLoggedOnce(usbFilePath))
-              unilog(2189, `${downloadCount}/${chkCount} SKIP (disk file same/better quality): ${fname} ${flexSeStr} disk=${diskRes}p usb=${usbRes}p`);
-            return process.nextTick(checkFile);
-          }
-          // USB is better. The disk file stays until the better one has
-          // landed; the worker then deletes it with its sidecars.
-        }
+        // Better than disk. The disk file stays until this one has landed;
+        // the worker then deletes it with its sidecars.
+        if (!restoreEntry)
+          unilog(2995, `${episodeShow} ${flexSeStr}: "${fname}" better than disk "${disk.file}" by ${vsDisk.factor}`);
       }
 
       // Check if the episode is already watched.
@@ -3685,61 +3619,63 @@ async function main() {
 
     mkdirp.sync(tvSeasonPath);
 
-    // Within-cycle S/E dedup for fromFlex: if two files for the same episode arrive in
-    // the same USB scan, only keep the better one. Bad group loses to non-bad group;
-    // otherwise the first-seen wins.
-    if (
-      fromFlex &&
-      !isSrtFile &&
-      Number.isInteger(season) &&
-      season > 0 &&
-      Number.isInteger(episode) &&
-      episode > 0 &&
-      cycleSeMap
-    ) {
-      var _cycleKey = (seriesName || "") + "\x00" + flexSeStr;
-      var _cycleExistingFname = cycleSeMap[_cycleKey];
-      if (_cycleExistingFname) {
-        var _newGroup = (parseTorrentTitle(fname).group || "").toLowerCase();
-        var _oldGroup = (
-          parseTorrentTitle(_cycleExistingFname).group || ""
-        ).toLowerCase();
-        var _newIsBad = badGroupsSet.has(_newGroup);
-        var _oldIsBad = badGroupsSet.has(_oldGroup);
-        if (_oldIsBad && !_newIsBad) {
-          // New file is better — delete the old queued entry and continue to addEntry.
-          var _oldEntry = tvJson.getEntryByTitle(_cycleExistingFname);
-          if (_oldEntry && typeof _oldEntry.procId === "number") {
-            tvJson.deleteProcids([_oldEntry.procId]);
-          }
-          if (tvJsonTitles) delete tvJsonTitles[_cycleExistingFname];
-          unilog(
-            340,
-            "------",
-            downloadCount,
-            "/",
-            chkCount,
-            "CYCLE DEDUP (bad group replaced):",
-            _cycleExistingFname,
-            "->",
-            fname,
-          );
-        } else {
-          // Old file is at least as good — skip the new one.
-          unilog(
-            341,
-            "------",
-            downloadCount,
-            "/",
-            chkCount,
-            "CYCLE DEDUP SKIP:",
-            fname,
-            "(keeping",
-            _cycleExistingFname + ")",
-          );
+    // A video downloaded before whose copy was deleted would be downloaded
+    // now: it is offered for Restore instead, and replaces nothing.
+    if (restoreEntry) {
+      if (nextRestoreList)
+        nextRestoreList.push({
+          title: fname,
+          seriesName: episodeShow,
+          season: season,
+          episode: episode,
+          dateEnded: restoreEntry.dateEnded,
+        });
+      return process.nextTick(checkFile);
+    }
+
+    // Two files for one episode in this cycle: a choice, the one queued
+    // first staying on equal. A better one replaces the queued one, even
+    // once it has started.
+    if (fromFlex && isEpisodeFile && cycleSeMap) {
+      var queued = cycleSeMap[(seriesName || "") + "\x00" + flexSeStr];
+      if (queued) {
+        var vsQueued = compareRelease(
+          usbFactors,
+          fileFactors(queued.fname, queued.bytes),
+        );
+        if (vsQueued.cmp <= 0) {
+          unilog(2996, `${episodeShow} ${flexSeStr}: queued "${queued.fname}" ${vsQueued.cmp < 0 ? `better by ${vsQueued.factor}` : "equal"}, skipping "${fname}"`);
           return process.nextTick(checkFile);
         }
+        toStop.push({
+          title: queued.fname,
+          why: `better by ${vsQueued.factor}`,
+        });
       }
+    }
+
+    // A forced video replaces every automatic download running for its
+    // episode.
+    if (processingForced && isEpisodeFile) {
+      for (var autoDown of running) {
+        if (autoDown.fromFlex)
+          toStop.push({ title: autoDown.title, why: "forced" });
+      }
+    }
+    for (var stop of toStop) {
+      var stopEntry = tvJson.getEntryByTitle(stop.title);
+      // One that has landed meanwhile is replaced when this one lands.
+      if (
+        !stopEntry ||
+        (stopEntry.status !== "waiting" && stopEntry.status !== "downloading")
+      )
+        continue;
+      tvJson.abortEntry(stop.title);
+      if (inProgressSeIndex && inProgressSeIndex[runningKey])
+        inProgressSeIndex[runningKey] = inProgressSeIndex[runningKey].filter(
+          (d) => d.title !== stop.title,
+        );
+      unilog(2997, `${episodeShow} ${flexSeStr}: stopped "${stop.title}" for "${fname}", ${stop.why}`);
     }
 
     // Create a new tv.json entry (tvJson.js will assign procId when a worker starts).
@@ -3778,7 +3714,10 @@ async function main() {
         Number.isInteger(episode) &&
         episode > 0
       ) {
-        cycleSeMap[(seriesName || "") + "\x00" + flexSeStr] = fname;
+        cycleSeMap[(seriesName || "") + "\x00" + flexSeStr] = {
+          fname: fname,
+          bytes: usbFileBytes,
+        };
       }
     } catch (e) {
       // keep going

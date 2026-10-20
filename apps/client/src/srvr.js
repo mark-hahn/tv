@@ -756,6 +756,13 @@ export function toggleBadGroup(group) {
   return httpCall("/api/toggleBadGroup", { group }, "POST");
 }
 
+export function getBlockedNames() {
+  return httpCall("/api/getBlockedNames");
+}
+export function addBlockedName(name) {
+  return httpCall("/api/addBlockedName", { name }, "POST");
+}
+
 export function incrementGroupCount(group) {
   return httpCall("/api/incrementGroupCount", { group }, "POST");
 }

@@ -332,32 +332,6 @@ function loadCookiesFromCurl(filename) {
   }
 }
 
-// Parse size string to bytes for comparison
-function parseSizeToBytes(sizeStr) {
-  if (!sizeStr) return 0;
-  if (typeof sizeStr === "number") return sizeStr;
-
-  const match = sizeStr.match(/^([\d.]+)\s*(B|KB|MB|GB|GiB|MiB|KiB|TB|TiB)?$/i);
-  if (!match) return 0;
-
-  const value = parseFloat(match[1]);
-  const unit = (match[2] || "B").toUpperCase();
-
-  const multipliers = {
-    B: 1,
-    KB: 1024,
-    KIB: 1024,
-    MB: 1024 * 1024,
-    MIB: 1024 * 1024,
-    GB: 1024 * 1024 * 1024,
-    GIB: 1024 * 1024 * 1024,
-    TB: 1024 * 1024 * 1024 * 1024,
-    TIB: 1024 * 1024 * 1024 * 1024,
-  };
-
-  return value * (multipliers[unit] || 1);
-}
-
 function getIPTorrentsUserAgent() {
   // 1. Try curl-ipt.txt. NO FALLBACKS.
   try {
@@ -960,28 +934,9 @@ export async function searchTorrents({
     return !excludedStrings.some((excluded) => title.includes(excluded));
   });
 
-  // Do NOT filter on 0 seeds or 480p/384p; attach warnings for the client to filter.
+  // Do NOT filter on 0 seeds; attach a warning for the client to sort last.
   const filtered2 = filtered1;
   filtered2.forEach((torrent) => {
-    const titleLower = String(torrent?.raw?.title || "").toLowerCase();
-    const res = String(torrent?.parsed?.resolution || "").toLowerCase();
-
-    if (
-      res.includes("384") ||
-      titleLower.includes("384p") ||
-      titleLower.includes(" 384 ")
-    ) {
-      addTorrentWarning(torrent, "low_res_384", "Low resolution (384p)");
-    }
-
-    if (
-      res.includes("480") ||
-      titleLower.includes("480p") ||
-      titleLower.includes(" 480 ")
-    ) {
-      addTorrentWarning(torrent, "low_res_480", "Low resolution (480p)");
-    }
-
     const seeds = parseInt(torrent?.raw?.seeds || 0);
     if (Number.isFinite(seeds) && seeds <= 0) {
       addTorrentWarning(torrent, "zero_seeds", `No seeds (seeds=${seeds})`);
@@ -1096,105 +1051,6 @@ export async function searchTorrents({
       return false;
     });
   }
-
-  // Sort torrents (apply to both loadall and regular cases)
-  filtered.sort((a, b) => {
-    // Skip sorting for dummy torrents (they stay at the end)
-    if (a.notorrent || b.notorrent) {
-      return a.notorrent ? 1 : -1;
-    }
-
-    // Highest-priority: sort by the same label shown in the UI (season/episode at left).
-    // Ordering: season packs first, then season-range packs, then individual episodes.
-    const key = (t) => {
-      if (t.completeSeries) {
-        return { season: 0, kind: -1, episode: 0, endSeason: 9999 };
-      }
-
-      const range = t.seasonRange;
-      if (range && range.isRange) {
-        const startSeason = Number(range.startSeason);
-        const endSeason = Number(range.endSeason);
-        return {
-          season: Number.isFinite(startSeason) ? startSeason : 9999,
-          kind: 1, // range
-          episode: 0,
-          endSeason: Number.isFinite(endSeason) ? endSeason : 9999,
-        };
-      }
-
-      const season = Number(t?.parsed?.season);
-      const episode = Number(t?.parsed?.episode);
-      const hasSeason = Number.isFinite(season);
-      const hasEpisode = Number.isFinite(episode) && episode > 0;
-
-      return {
-        season: hasSeason ? season : 9999,
-        kind: hasEpisode ? 2 : 0, // 0 season pack, 2 episode
-        episode: hasEpisode ? episode : 0,
-        endSeason: 0,
-      };
-    };
-
-    const ak = key(a);
-    const bk = key(b);
-
-    if (ak.season !== bk.season) return ak.season - bk.season;
-    if (ak.kind !== bk.kind) return ak.kind - bk.kind;
-    if (ak.kind === 1 && ak.endSeason !== bk.endSeason)
-      return ak.endSeason - bk.endSeason;
-    if (ak.kind === 2 && ak.episode !== bk.episode)
-      return ak.episode - bk.episode;
-
-    // 1080 before 720
-    const aHas1080 = a.parsed.resolution?.includes("1080") || false;
-    const bHas1080 = b.parsed.resolution?.includes("1080") || false;
-    if (aHas1080 !== bHas1080) {
-      return aHas1080 ? -1 : 1;
-    }
-
-    // 10-bit before non-10-bit
-    const aHas10bit = a.parsed.bitDepth === 10;
-    const bHas10bit = b.parsed.bitDepth === 10;
-    if (aHas10bit !== bHas10bit) {
-      return aHas10bit ? -1 : 1;
-    }
-
-    // More seeds before fewer seeds
-    const aSeeds = a.raw?.seeds || 0;
-    const bSeeds = b.raw?.seeds || 0;
-    if (aSeeds !== bSeeds) {
-      return bSeeds - aSeeds; // More seeds first
-    }
-
-    // Larger size before smaller size (low priority)
-    const aSize = a.raw?.size;
-    const bSize = b.raw?.size;
-
-    // If one has size and the other doesn't, prioritize the one with size
-    if (aSize && !bSize) return -1;
-    if (!aSize && bSize) return 1;
-
-    // If both have size, compare them
-    if (aSize && bSize) {
-      const aSizeBytes = parseSizeToBytes(aSize);
-      const bSizeBytes = parseSizeToBytes(bSize);
-      if (aSizeBytes !== bSizeBytes) {
-        return bSizeBytes - aSizeBytes; // Larger first
-      }
-    }
-
-    // TorrentLeech before IPTorrents (lowest priority)
-    const aProvider = a.raw?.provider?.toLowerCase() || "";
-    const bProvider = b.raw?.provider?.toLowerCase() || "";
-    const aIsTL = aProvider === "torrentleech";
-    const bIsTL = bProvider === "torrentleech";
-    if (aIsTL !== bIsTL) {
-      return aIsTL ? -1 : 1;
-    }
-
-    return 0;
-  });
 
   // Count by provider (for filtered results only)
   const providerCounts = {};

@@ -14,14 +14,9 @@ import { parse as parseTorrentTitle } from "parse-torrent-title";
 import { SRVR_ROOT_DIR, SRVR_DATA_DIR } from "./srvrPaths.js";
 import * as util from "./util.js";
 import * as tvdb from "./tvdb.js";
-import {
-  flexgetFmtSent,
-  parseResolutionStrict,
-  getFlexgetNextSeason,
-  flexgetIsBetterSameRun,
-  flexgetIsBetterCrossRun,
-} from "./flexgetScore.js";
-import { isBadGroup, hasBadGroup } from "./badGroups.js";
+import { flexgetFmtSent, getFlexgetNextSeason } from "./flexgetScore.js";
+import { isBadGroup } from "./badGroups.js";
+import { showFolderFor } from "./showPaths.js";
 
 const exec = promisify(cp.exec);
 const TV_DIR = "/mnt/media/tv";
@@ -163,48 +158,50 @@ async function saveFlexgetHistory() {
   notifyFlexgetChange();
 }
 
-function getEpisodeDiskResolution(showPath, season, episode) {
-  try {
-    const sKey = `S${String(season).padStart(2, "0")}`;
-    const eKey = `E${String(episode).padStart(2, "0")}`;
-    const seasonDir = path.join(TV_DIR, showPath, `Season ${season}`);
-    const files = fs.readdirSync(seasonDir);
-    const videoExts = new Set([".mkv", ".mp4", ".avi", ".m4v"]);
-    const epRe = new RegExp(`${sKey}${eKey}`, "i");
-    for (const f of files) {
-      if (!epRe.test(f)) continue;
-      if (!videoExts.has(path.extname(f).toLowerCase())) continue;
-      if (/2160p/i.test(f)) return 2160;
-      if (/1080p/i.test(f)) return 1080;
-      if (/720p/i.test(f)) return 720;
-      if (/576p/i.test(f)) return 576;
-      if (/480p/i.test(f)) return 480;
-      if (/384p/i.test(f)) return 384;
-    }
-    return 0;
-  } catch {
-    return 0;
+// A candidate's factors for compareRelease. A choice among candidates also
+// weighs seeds and tracker; a replacement leaves them out.
+function candidateFactors(c, choice = false) {
+  const title = String(c.title || "");
+  const f = {
+    ...epd.releaseFactors(title, `${title} ${c.quality || ""}`),
+    size: epd.sizeToBytes(c.content_size),
+    badGroup: isBadGroup(title),
+  };
+  if (choice) {
+    f.seeds = c.torrent_seeds == null ? null : Number(c.torrent_seeds) || 0;
+    f.tracker = String(c.url || "").includes("torrentleech.org");
   }
+  return f;
 }
 
-function getEpisodeDiskGroup(showPath, season, episode) {
+// The episode's recorded video, the one that plays, as { file, factors }:
+// its recorded resolution and size on disk. null when the record names none.
+async function recordedVideo(showName, rec, season, episode) {
+  const full = epd.getFullPath(
+    rec.episodeData,
+    showFolderFor(showName, rec),
+    season,
+    episode,
+    TV_DIR,
+  );
+  if (!full) return null;
+  const file = path.basename(full);
+  const named = epd.releaseFactors(file);
+  let size = null;
   try {
-    const sKey = `S${String(season).padStart(2, "0")}`;
-    const eKey = `E${String(episode).padStart(2, "0")}`;
-    const seasonDir = path.join(TV_DIR, showPath, `Season ${season}`);
-    const files = fs.readdirSync(seasonDir);
-    const videoExts = new Set([".mkv", ".mp4", ".avi", ".m4v"]);
-    const epRe = new RegExp(`${sKey}${eKey}`, "i");
-    for (const f of files) {
-      if (!epRe.test(f)) continue;
-      if (!videoExts.has(path.extname(f).toLowerCase())) continue;
-      const parsed = parseTorrentTitle(f.replace(/\.[a-z0-9]{2,4}$/i, ""));
-      return (parsed?.group || "").toLowerCase();
-    }
-    return "";
-  } catch {
-    return "";
+    size = (await fs.promises.stat(full)).size;
+  } catch (e) {
+    unilog(2984, `${showName}: recorded video ${file} not readable: ${e.message}`);
   }
+  return {
+    file,
+    factors: {
+      ...named,
+      res: epd.getRes(rec.episodeData, season, episode) ?? named.res,
+      size,
+      badGroup: isBadGroup(file),
+    },
+  };
 }
 
 async function storeFlexgetRejectedCandidate(
@@ -260,10 +257,6 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   let episode = ptt?.episode;
   if (!episode && Array.isArray(ptt?.episodes) && ptt.episodes.length)
     episode = ptt.episodes[0];
-  const newRes = parseResolutionStrict(
-    ptt?.resolution || rawTitle,
-    candidate.quality,
-  );
 
   if (!showName || !Number.isInteger(season) || !Number.isInteger(episode))
     return;
@@ -386,45 +379,28 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const lastSent = list.reduce((best, c) => {
     if (c.sent === null) return best;
     if (!best) return c;
-    return flexgetIsBetterCrossRun(c, best) ? c : best;
+    return epd.compareRelease(candidateFactors(c), candidateFactors(best)).cmp >
+      0
+      ? c
+      : best;
   }, null);
 
-  const episodeOnDisk = epd.hasFile(rec.episodeData, season, episode);
-  const diskRes =
-    episodeOnDisk && rec.path
-      ? getEpisodeDiskResolution(rec.path, season, episode)
-      : 0;
-  const diskGroup =
-    episodeOnDisk && rec.path
-      ? getEpisodeDiskGroup(rec.path, season, episode)
-      : "";
-  const diskIsBadGroup = diskGroup ? hasBadGroup(diskGroup) : false;
-  const newIsBadGroup = isBadGroup(rawTitle);
+  const newFactors = candidateFactors(newCandidate);
+  const disk = epd.hasFile(rec.episodeData, season, episode)
+    ? await recordedVideo(matchedName, rec, season, episode)
+    : null;
 
   if (storeOnly) {
     /* skip: store-only (run-loser) */
-  } else if (episodeOnDisk) {
-    if (!newRes) {
-      unilog(
-        1182,
-        `Flexget: no resolution parsed ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-      );
-    } else if (
-      diskRes > newRes ||
-      (diskRes === newRes && (!diskIsBadGroup || newIsBadGroup))
-    ) {
-      unilog(
-        1183,
-        `Flexget: disk quality ${diskRes}p >= new ${newRes}p ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-      );
+  } else if (disk) {
+    const { cmp, factor } = epd.compareRelease(newFactors, disk.factors);
+    if (cmp <= 0) {
+      unilog(2985, `disk ${cmp < 0 ? `better by ${factor}` : "equal"} ${matchedName} ${sKey}${eKey} "${rawTitle}" vs "${disk.file}"`);
     } else if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
         newCandidate.sent = flexgetFmtSent();
-        unilog(
-          631,
-          `SENT(upgrade-${diskRes}p->${newRes}p) ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-        );
+        unilog(2986, `SENT(upgrade by ${factor}) ${matchedName} ${sKey}${eKey} "${rawTitle}" over "${disk.file}"`);
       } catch (e) {
         unilog(632, `qbt add failed for "${rawTitle}":`, e.message);
       }
@@ -439,24 +415,22 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
         unilog(634, `qbt add failed for "${rawTitle}":`, e.message);
       }
     }
-  } else if (flexgetIsBetterCrossRun(newCandidate, lastSent)) {
-    if (newCandidate.url) {
+  } else {
+    const { cmp, factor } = epd.compareRelease(
+      newFactors,
+      candidateFactors(lastSent),
+    );
+    if (cmp <= 0) {
+      unilog(2987, `last sent ${cmp < 0 ? `better by ${factor}` : "equal"} ${matchedName} ${sKey}${eKey} "${rawTitle}" vs "${lastSent.title}"`);
+    } else if (newCandidate.url) {
       try {
         await addUrlToQbt(newCandidate.url);
         newCandidate.sent = flexgetFmtSent();
-        unilog(
-          635,
-          `SENT(better) ${matchedName} ${sKey}${eKey} "${rawTitle}" over "${lastSent.title}"`,
-        );
+        unilog(2988, `SENT(better by ${factor}) ${matchedName} ${sKey}${eKey} "${rawTitle}" over "${lastSent.title}"`);
       } catch (e) {
         unilog(636, `qbt add failed for "${rawTitle}":`, e.message);
       }
     }
-  } else {
-    unilog(
-      1184,
-      `Flexget: worse quality than last sent ${matchedName} ${sKey}${eKey} "${rawTitle}"`,
-    );
   }
 }
 
@@ -537,6 +511,11 @@ function parseFlexgetDumpOutput(stdout) {
           const m = val.match(/regexp '(.+?)' matched/);
           if (m) current.regexp = m[1];
         } else if (key === "description") {
+          // The listed size, ahead of the category on iptorrents and after
+          // "Size:" on torrentleech.
+          const sizeMatch = val.match(/(?:^|Size:\s*)([\d.]+\s*[KMGT]i?B)\b/i);
+          if (sizeMatch && current.content_size === null)
+            current.content_size = sizeMatch[1];
           // iptorrents: "1.44 GB; TV/Web-DL (S:4 L:4)"
           const ipMatch = val.match(/\(S:(\d+)\s+L:(\d+)\)/);
           // torrentleech: "Category: ... - Seeders: 14 - Leechers: 0"
@@ -564,33 +543,42 @@ async function processFlexgetOutput(stdout) {
   }
   unilog(62, `processing ${candidates.length} accepted candidates`);
 
+  // Candidates for one episode are grouped by the library show they match,
+  // so two spellings of a show's name compete as one.
+  const showNames = Object.keys(tvdb.getAllTvdbSync());
   const runGroups = new Map();
   for (let i = 0; i < candidates.length; i++) {
     const rawTitle = String(candidates[i].title || "").trim();
     const ptt = parseTorrentTitle(rawTitle.replace(/\.[a-z0-9]{2,4}$/i, ""));
-    const sn = ptt?.title;
+    const shown = ptt?.title
+      ? smartTitleMatch(ptt.title, showNames, null, false)
+      : null;
     let ep = ptt?.episode;
     if (!ep && Array.isArray(ptt?.episodes) && ptt.episodes.length)
       ep = ptt.episodes[0];
-    const roughKey =
-      sn && Number.isInteger(ptt?.season) && Number.isInteger(ep)
-        ? `${sn}\x00${ptt.season}\x00${ep}`
+    const groupKey =
+      shown && Number.isInteger(ptt?.season) && Number.isInteger(ep)
+        ? `${shown}\x00${ptt.season}\x00${ep}`
         : `__solo__${i}`;
-    if (!runGroups.has(roughKey)) runGroups.set(roughKey, []);
-    runGroups.get(roughKey).push(i);
+    if (!runGroups.has(groupKey)) runGroups.set(groupKey, []);
+    runGroups.get(groupKey).push(i);
   }
 
+  // A choice: the best of each group goes on, the rest are only recorded.
   const storeOnlySet = new Set();
-  for (const indices of runGroups.values()) {
+  for (const [groupKey, indices] of runGroups) {
     if (indices.length <= 1) continue;
     let bestIdx = indices[0];
     for (let j = 1; j < indices.length; j++) {
-      if (flexgetIsBetterSameRun(candidates[indices[j]], candidates[bestIdx])) {
-        storeOnlySet.add(bestIdx);
-        bestIdx = indices[j];
-      } else {
-        storeOnlySet.add(indices[j]);
-      }
+      const { cmp, factor } = epd.compareRelease(
+        candidateFactors(candidates[indices[j]], true),
+        candidateFactors(candidates[bestIdx], true),
+      );
+      const [winIdx, loseIdx] =
+        cmp > 0 ? [indices[j], bestIdx] : [bestIdx, indices[j]];
+      storeOnlySet.add(loseIdx);
+      bestIdx = winIdx;
+      unilog(2989, `run choice ${groupKey.split("\x00")[0]} kept "${candidates[winIdx].title}" over "${candidates[loseIdx].title}" (${factor ? `by ${factor}` : "equal, earlier kept"})`);
     }
   }
 

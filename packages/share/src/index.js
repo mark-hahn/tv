@@ -4,34 +4,7 @@ export * from "./showFolder.js";
 export * from "./showFilterSort.js";
 export * from "./videoFiles.js";
 export * from "./srt.js";
-
-export const TV_BLOCKED = {
-  sample: true,
-  ".sfv": true,
-  ".FLEMISH.": true,
-  ".flemish.": true,
-  "Deleted Scenes": true,
-  Commentary: true,
-  Featurettes: true,
-  Features: true,
-  "Physical - S01E01": true,
-  "Legends.Of.Tomorrow": true,
-  "Last.Man.Standing": true,
-  "Uncle.From.Another.World": true,
-  german: true,
-  "Crash and Burn": true,
-  "Christine Keeler": true,
-  "Love Recipe": true,
-  "Millionaire Hot Seat": true,
-  Hootenanny: true,
-  "bravery-pleaselikeme": true,
-  Blacklist: true,
-  "Breakfast.at.Tiffany": true,
-  "The.Postman.Always.Rings": true,
-  Harlots: true,
-  "Theater.Camp": true,
-  Audio: true,
-};
+export * from "./releaseCompare.js";
 
 function normalizeBasic(s) {
   return String(s || "")

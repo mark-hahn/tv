@@ -23,6 +23,7 @@ import {
   parseFileSeasonEpisode,
   cleanSrt,
   vidIsVideoName,
+  vidDeleteWithSidecars,
 } from "@tv/share";
 import cron from "node-cron";
 import { notifyClients } from "./messaging.js";
@@ -32,6 +33,7 @@ import * as tvdb from "./tvdb.js";
 import * as subs from "./subs.js";
 import { stillsBusy } from "./stills.js";
 import { getRecodePending } from "./recode.js";
+import { addBlockedName } from "./blockedNames.js";
 import { prepareVideoSubs, retimePass, needsRetime } from "./subPrepare.js";
 
 // ---- hard-wired constants (no env vars per repo convention) ----
@@ -328,14 +330,18 @@ async function extractEmbSrts(videoFilePath, fromUI) {
   // A failed probe must never look like "this video has no subtitle streams" —
   // that would route a file with embedded subs straight to ASR. Throw instead;
   // processSubQueueEntry drops the entry and the sweep re-queues it.
+  // Except a file ffprobe reads but can't make out (a broken download): it
+  // never will, so its name is blocked and it is deleted with its sidecars.
   let probeStreams;
+  let broken = false;
   await new Promise((resolve, reject) => {
     cp.execFile(
       "ffprobe",
-      ["-v", "quiet", "-print_format", "json", "-show_streams", videoFilePath],
+      ["-v", "error", "-print_format", "json", "-show_streams", videoFilePath],
       { maxBuffer: 4 * 1024 * 1024 },
-      (err, stdout) => {
+      (err, stdout, stderr) => {
         if (err) {
+          broken = /Invalid data found/.test(stderr);
           reject(
             new Error(`ffprobe failed for ${videoFilePath}: ${err.message}`),
           );
@@ -352,6 +358,14 @@ async function extractEmbSrts(videoFilePath, fromUI) {
         resolve();
       },
     );
+  }).catch(async (e) => {
+    if (broken) {
+      const name = path.basename(videoFilePath);
+      await addBlockedName(name);
+      vidDeleteWithSidecars(videoFilePath);
+      e.message += ` (not a readable video: deleted, ${name} blocked)`;
+    }
+    throw e;
   });
   const textCodecs = [
     "subrip",

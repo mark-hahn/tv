@@ -307,9 +307,9 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   file is not read and is just `+`.
 - The start pick (`pickSidecar`, within the first of those groups that has
   any): the file the episode last showed, else, among the files without S
-  when there are any besides `+`, and of those the files with L when there
-  are any, the type the show last showed (for V, the one from the same
-  origin as a chosen one), else the first in the order T, H, V, S, +.
+  when there are any besides `+`, the type the show last showed (for V, the
+  one from the same origin as a chosen one), else the first in the order
+  T, H, V, S, +.
 - The player sends the showing file as `sub` in `playProgress`. At a stop
   that is not an early stop it becomes the episode's pick and `chosen`.
 - Same origin (`sameOrigin()`): two results for different episodes match when

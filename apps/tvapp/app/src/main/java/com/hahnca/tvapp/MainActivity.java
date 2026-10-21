@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -109,10 +108,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   // it ran.
   private static final long CLEAR_FLASH_MS = 500;
 
-  private static final String PREFS_NAME = "tvapp";
-  private static final String KEY_SELECTED_SHOW = "selectedShow";
-  private static final String KEY_SORT = "sort";
-
   private static final String PLAY_URL_URL = "https://hahnca.com/tv-srvr/api/getPlayUrl";
   private static final String NO_FILE_TOAST = "No file.";
   // Not a Toast: the wait is ten seconds and the longest toast is three and a
@@ -154,15 +149,19 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
 
   private CtrlServer ctrlServer;
   private Updates updates;
-  // The set coming on: whatever the keys were talking to before it went off --
-  // the sort or filter buttons, or cardMisc -- is handed back to the show list.
+  // The set coming on: tvapp is reset, and the shows are loaded again and
+  // sorted afresh, since what was watched elsewhere meanwhile is not in them.
   private final BroadcastReceiver screenOn =
       new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-          focusArea(Area.LIST);
+          resetUi();
+          resortOnLoad = true;
+          if (showsLoadedAt != 0 || firstLoadFailed) reloadShows();
         }
       };
+  // The next full load sorts the list again; any other keeps its order.
+  private boolean resortOnLoad;
   private ShowListView showList;
   private RelatedActors relatedActors;
   private ShowCounts showCounts;
@@ -173,7 +172,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   private LinearLayout buttonColumn;
   private View sortGroup;
   private View filterGroup;
-  private Shows.Sort sort = Shows.Sort.ALPHA;
+  private Shows.Sort sort = Shows.Sort.WATCHING;
   private boolean customOn;
   // Which of the four the keys are talking to. Only one of them is focused at
   // a time, and the show list is where the screen starts and comes back to.
@@ -226,9 +225,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   // arrives meanwhile, so those pushes are kept and put in again once it lands.
   private boolean loadInFlight;
   private final Map<String, JSONObject> pushedDuringLoad = new LinkedHashMap<>();
-  // The show tvapp stepped aside to play, so the next foreground turn can put
-  // it where the Watched sort is about to put it anyway.
-  private Shows.Show playedShow;
   private long trashAt;
 
   @Override
@@ -240,17 +236,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     registerReceiver(screenOn, new IntentFilter(Intent.ACTION_SCREEN_ON));
 
     showList.setSelectionListener(this::onShowSelected);
-    sort = Shows.Sort.of(prefs().getString(KEY_SORT, null));
+    // A fresh start is the reset's screen: Watched, with its top show selected.
     showList.setSort(sort);
-    // The column was painted while building the ui, before the remembered sort
-    // was read back, so it is showing Alpha as the lit button until now.
-    repaintButtons();
-    String remembered = prefs().getString(KEY_SELECTED_SHOW, null);
 
     showList.setCountsListener(
         count -> sendToPhone(CtrlServer.MSG_COUNTS + "," + count));
 
-    loadShows(remembered, true);
+    loadShows(null, true);
   }
 
   /**
@@ -281,6 +273,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
                     Map<String, JSONObject> pushed = new LinkedHashMap<>(pushedDuringLoad);
                     pushedDuringLoad.clear();
                     applyShowUpdates(pushed);
+                  }
+                  if (resortOnLoad) {
+                    resortOnLoad = false;
+                    if (!customOn) showList.setSort(sort, false);
                   }
                   runPendingSelect();
                   if (showWait) endShowsLoadingWhenDrawn();
@@ -361,10 +357,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     super.onStart();
     ctrlServer = new CtrlServer(this);
     ctrlServer.start();
-    // The show just watched is the most recently watched one, so in the
-    // Watched sort it goes to the top now rather than when the reload lands.
-    if (playedShow != null && sort == Shows.Sort.WATCHING) showList.moveToTop(playedShow);
-    playedShow = null;
     // Every return from the background: the records may have changed
     // meanwhile, and tv-srvr's word of it went out while the updates socket
     // below was not listening.
@@ -396,7 +388,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     // the failure label down.
     if (firstLoadFailed) {
       firstLoadFailed = false;
-      loadShows(prefs().getString(KEY_SELECTED_SHOW, null), true);
+      loadShows(null, true);
       return;
     }
     Shows.Show selected = showList.getSelected();
@@ -682,7 +674,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     // buttons, the typed text, an actor -- stays exactly as it was: leaving
     // Custom is a sort choice and nothing more.
     if (customOn) setCustomOn(false);
-    applySort(sortForLabel(next), true);
+    // Watched starts on its top show, the most recently watched; the other
+    // sorts keep the selected show.
+    Shows.Sort newSort = sortForLabel(next);
+    applySort(newSort, newSort != Shows.Sort.WATCHING);
   }
 
   private static Shows.Sort sortForLabel(String label) {
@@ -694,7 +689,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   private void applySort(Shows.Sort newSort, boolean keepSelection) {
     sort = newSort;
     showList.setSort(sort, keepSelection);
-    prefs().edit().putString(KEY_SORT, sort.name()).apply();
     repaintButtons();
   }
 
@@ -867,6 +861,22 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   }
 
   /**
+   * The set coming on: the screen a fresh start shows. Every filter comes off,
+   * the sort goes to Watched with its top show, the most recently watched,
+   * selected, cardMisc and the actor displays close, and the show list has the
+   * focus.
+   */
+  private void resetUi() {
+    relatedActors.close();
+    showCounts.close();
+    clearAllFilters();
+    selectedFilter = CLEAR_FILTER_LABEL;
+    if (customOn) setCustomOn(false);
+    applySort(Shows.Sort.WATCHING, false);
+    focusArea(Area.LIST);
+  }
+
+  /**
    * The filter text goes with the list it was narrowing, so anything that
    * replaces that list clears it -- on the phone's input screen as well, which
    * is holding the same string.
@@ -968,15 +978,10 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
     activeShowHidden = show.hiddenFromRow;
     sendActiveShow();
     TrailerList.settle(show, () -> showList.onTrailersReady(show));
-    prefs().edit().putString(KEY_SELECTED_SHOW, show.name).apply();
   }
 
   private String since() {
     return (SystemClock.uptimeMillis() - trashAt) + "ms";
-  }
-
-  private SharedPreferences prefs() {
-    return getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
   }
 
   private LinearLayout.LayoutParams column(float fraction, float leftMargin) {
@@ -1127,7 +1132,6 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
                       showBigCenterToast(NO_FILE_TOAST);
                       return;
                     }
-                    playedShow = show;
                     video.play(resp, show);
                   });
             },
@@ -1375,6 +1379,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
                     show.hiddenFromRow = hidden;
                     lastHidden = hidden ? show : null;
                     if (hidden) showList.onShowHidden();
+                    else showList.onShowUnhidden(show.name);
                     // The label follows the selection: a hide that moved it on
                     // leaves the label to the show moved to.
                     Shows.Show selected = showList.getSelected();

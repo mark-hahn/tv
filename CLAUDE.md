@@ -99,6 +99,8 @@
     `getSortKey(show, "Viewed")` in `packages/share/src/showFilterSort.js`, `Shows.java` in tvapp,
     and `getViewedSortValue()` in `apps/android/App.js`
   - any change to how srvr stamps `fakeLastPlayed` must be checked against all three
+  - tvapp sorts by it only at a sort choice, at startup and when the set comes on,
+    so between those its order can lag (see Sort order in the tvapp summary)
   - exception: Android-only control overlays that have no web client counterpart
     are never mirrored
 - when modifying files use local changes and don't replace entire files because another copilot conversation might be changing the same file
@@ -571,7 +573,7 @@ node unilog/query.js --sql "SELECT s.project, COUNT(*) n FROM log_events e
 
 # tvapp and tvapprc — Architecture Summary
 
-Current as of **2026-10-17**. tvapp (`apps/tvapp`, native Java, package
+Current as of **2026-10-20**. tvapp (`apps/tvapp`, native Java, package
 `com.hahnca.tvapp`) runs on the Sony Bravia. tvapprc is a mode of the Android
 phone remote (`apps/android/App.js`) and of the web tv pane
 (`apps/client/src/components/tvpane.vue`). `startTvapprcBridge()` in
@@ -596,7 +598,8 @@ because the TV is unreachable from any wireless host here.
   `tvdbUpdated` carries the show's whole record and replaces it in place, and
   `tvdbDeleted` carries a deleted or renamed-away show's name and removes it.
   Pushes are gathered for 1.5 s and applied together. Only the changed shows'
-  cards are rebuilt, and the selection and the map cursor stay put. A push
+  cards are rebuilt, and the selection, the map cursor and the list's order
+  stay put. A push
   that lands while a full load is on its way is applied again after it.
 - tv-srvr pushes a record whenever it changes, renames and deletes included.
   The exceptions are the player's progress saves between a play's start and
@@ -628,6 +631,26 @@ because the TV is unreachable from any wireless host here.
   OK. The filter cursor is remembered. Right returns to the list.
 - Turning Trash on puts up a "Waiting for trash" view and drops list keys
   until the rebuild has drawn. While a video is up the keys still reach it.
+
+**Sort order** (`order` in `ShowListView`)
+- The list keeps the order it was last sorted into. It is sorted again only
+  when a sort is chosen in the sort group, when tvapp starts, and when the
+  set comes on. Full loads and pushes leave every show where it is, so a
+  show just played does not jump to the top of Watched. A show new to the
+  list goes where the sort would put it among the rest.
+- Hide (`h` on a show): the selection steps to the show above it (the one
+  under it at the top of the list). In Watched the hidden show drops to the
+  bottom at once; in the other orders it stays where it is.
+- Unhide (`h` on a hidden show, or holding it for the last hidden one): in
+  Watched the show goes to the top. It is selected in any order.
+- Reset, when the set comes on (`ACTION_SCREEN_ON`): every filter comes off
+  (the buttons, the typed text, the actor), the filter cursor goes back to
+  Clear, Custom goes off, the sort goes to Watched with its top show (the
+  most recently watched) selected, cardMisc and the actor displays close,
+  and the list has the focus. The shows are loaded again and sorted afresh
+  when they land, the top show selected again.
+- tvapp starts on the same screen: Watched, its top show selected. Neither
+  the sort nor the selection is remembered across a restart.
 
 **Playing** (`playClick`, reached by `e` and by OK on the list)
 - Which one plays:

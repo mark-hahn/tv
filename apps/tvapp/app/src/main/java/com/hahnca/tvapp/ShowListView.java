@@ -31,6 +31,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -209,10 +210,11 @@ class ShowListView extends ScrollView {
   // card while an up/down hold is in letter-skip mode.
   private final Map<Shows.Show, TextView> letterBadges = new HashMap<>();
   private final Map<String, Shows.Show> byName = new HashMap<>();
-  // The show just played, held at the top of the Watched sort across reloads
-  // until tv-srvr's own order puts it there: a reload that lands before
-  // tv-srvr has stamped the play would sort it straight back to where it was.
-  private String pinnedTop;
+  // Show names in the order the list was last sorted into. Only setSort sorts
+  // it again; a reload or a push leaves every show where it is, so a show just
+  // played does not jump to the top of Watched under the selection. A show not
+  // seen before goes where the sort would put it among the rest.
+  private final List<String> order = new ArrayList<>();
   private SelectionListener listener;
   private CountsListener countsListener;
   private FilterTextListener filterTextListener;
@@ -374,6 +376,8 @@ class ShowListView extends ScrollView {
     hideEpisodeCard();
     column.removeAllViews();
     for (Shows.Show show : shows) byName.put(show.name, show);
+    if (order.isEmpty()) resort();
+    else addToOrder();
     for (Shows.Show show : shows) {
       if (!cards.containsKey(show)) cards.put(show, buildCard(show));
     }
@@ -418,6 +422,33 @@ class ShowListView extends ScrollView {
       renderMisc(active);
       loadVisibleMedia();
     }
+  }
+
+  private void resort() {
+    List<Shows.Show> sorted = new ArrayList<>(shows);
+    Collections.sort(sorted, Shows.order(sort));
+    order.clear();
+    for (Shows.Show show : sorted) order.add(show.name);
+  }
+
+  /** Drops gone shows from the order and puts new ones where the sort would. */
+  private void addToOrder() {
+    order.retainAll(byName.keySet());
+    Set<String> known = new HashSet<>(order);
+    Comparator<Shows.Show> cmp = Shows.order(sort);
+    for (Shows.Show show : shows) {
+      if (known.contains(show.name)) continue;
+      int at = 0;
+      while (at < order.size() && cmp.compare(show, byName.get(order.get(at))) >= 0) at++;
+      order.add(at, show.name);
+    }
+  }
+
+  /** Every loaded show, in the sorted order. */
+  private List<Shows.Show> inOrder() {
+    List<Shows.Show> list = new ArrayList<>();
+    for (String name : order) list.add(byName.get(name));
+    return list;
   }
 
   /** Everything this view holds for a show whose record is gone or changed. */
@@ -466,10 +497,9 @@ class ShowListView extends ScrollView {
    * that is selected -- the actor filter. The selection is theirs to keep.
    */
   void setSort(Shows.Sort sort, boolean keepSelection) {
-    if (this.sort == sort && customOrder == null) return;
     customOrder = null;
     this.sort = sort;
-    pinnedTop = null;
+    resort();
     if (!keepSelection) clearActive();
     apply();
   }
@@ -523,64 +553,51 @@ class ShowListView extends ScrollView {
   }
 
   /**
-   * Puts one show at the top of the list as it stands, ahead of the reload
-   * that will sort it there: the show just played, in the Watched sort. A
-   * custom order is the server's and is left as it is.
+   * The selected show was just hidden, and the selection steps to the show
+   * above it (the one under it from the top). In the Watched sort a hidden
+   * show sinks to the bottom, so it goes there now; every other card stays
+   * put. Any other order -- a custom one included, which is the server's --
+   * leaves the hidden show where it is.
    */
-  void moveToTop(Shows.Show show) {
-    if (customOrder != null) return;
-    pinnedTop = show.name;
-    int index = visible.indexOf(show);
-    if (index <= 0) return;
-    visible.remove(index);
-    visible.add(0, show);
+  void onShowHidden() {
+    int index = visible.indexOf(active);
+    if (index < 0) return;
+    Shows.Show hidden = active;
+    if (visible.size() > 1) setActive(visible.get(index > 0 ? index - 1 : 1));
+    if (sort == Shows.Sort.WATCHING && customOrder == null) {
+      order.remove(hidden.name);
+      order.add(hidden.name);
+      moveCard(hidden, visible.size() - 1);
+    }
+    scrollToActive();
+  }
+
+  /**
+   * A show just unhidden goes back to the top of Watched, where a hide's undo
+   * belongs, and is selected in any order.
+   */
+  void onShowUnhidden(String name) {
+    Shows.Show show = byName.get(name);
+    if (show == null) return;
+    if (sort == Shows.Sort.WATCHING && customOrder == null) {
+      order.remove(name);
+      order.add(0, name);
+      if (visible.contains(show)) moveCard(show, 0);
+    }
+    selectByName(name);
+  }
+
+  /** One card to another place in the list, every other card left as it is. */
+  private void moveCard(Shows.Show show, int to) {
+    visible.remove(show);
+    visible.add(to, show);
     View card = cards.get(show);
     column.removeView(card);
     LinearLayout.LayoutParams params =
         new LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     params.bottomMargin = (int) dp(CARD_GAP_DP);
-    column.addView(card, 0, params);
-    if (show == active) {
-      post(
-          () -> {
-            scrollTo(0, 0);
-            loadVisibleMedia();
-          });
-    }
-  }
-
-  /**
-   * The selected show was just hidden. In the Watched sort a hidden show sinks
-   * to the bottom once the reload lands, so it goes there now and the list
-   * starts over from the top with the top show selected. Any other order --
-   * a custom one included, which is the server's -- leaves the hidden show
-   * where it is and steps the selection to the show under it.
-   */
-  void onShowHidden() {
-    if (sort != Shows.Sort.WATCHING || customOrder != null || active == null) {
-      moveSelection(1);
-      return;
-    }
-    int index = visible.indexOf(active);
-    if (index >= 0 && index < visible.size() - 1) {
-      Shows.Show hidden = active;
-      visible.remove(index);
-      visible.add(hidden);
-      View card = cards.get(hidden);
-      column.removeView(card);
-      LinearLayout.LayoutParams params =
-          new LinearLayout.LayoutParams(
-              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-      params.bottomMargin = (int) dp(CARD_GAP_DP);
-      column.addView(card, params);
-    }
-    setActive(visible.get(0));
-    post(
-        () -> {
-          scrollTo(0, 0);
-          loadVisibleMedia();
-        });
+    column.addView(card, to, params);
   }
 
   /** Everything loaded, whatever the list is currently narrowed to. */
@@ -958,21 +975,18 @@ class ShowListView extends ScrollView {
         if (show != null) visible.add(show);
       }
     } else if (actorFilter != null) {
-      for (Shows.Show show : shows) {
+      for (Shows.Show show : inOrder()) {
         if (hasActor(show, actorFilter)) visible.add(show);
       }
-      Collections.sort(visible, Shows.order(sort));
     } else {
       String needle = filter.toLowerCase();
-      for (Shows.Show show : shows) {
+      for (Shows.Show show : inOrder()) {
         if ((needle.isEmpty() || show.name.toLowerCase().contains(needle))
             && matchesActiveFilters(show)) {
           visible.add(show);
         }
       }
-      Collections.sort(visible, Shows.order(sort));
     }
-    applyPinnedTop();
     applyAt = android.os.SystemClock.uptimeMillis();
     android.util.Log.i("tvapp", "trash timing: apply visible=" + visible.size());
     column.removeAllViews();
@@ -1036,28 +1050,6 @@ class ShowListView extends ScrollView {
           loadVisibleMedia();
         });
     dispatchCounts();
-  }
-
-  /**
-   * Keeps the pinned show at the top of a freshly sorted Watched list. Once the
-   * sort itself lands it there the server has caught up and the pin is done;
-   * a show narrowed out of view is left pinned for when the filter comes off.
-   */
-  private void applyPinnedTop() {
-    if (pinnedTop == null || sort != Shows.Sort.WATCHING || customOrder != null) return;
-    Shows.Show show = byName.get(pinnedTop);
-    if (show == null) {
-      pinnedTop = null;
-      return;
-    }
-    int index = visible.indexOf(show);
-    if (index < 0) return;
-    if (index == 0) {
-      pinnedTop = null;
-      return;
-    }
-    visible.remove(index);
-    visible.add(0, show);
   }
 
   private void dispatchCounts() {

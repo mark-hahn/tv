@@ -224,15 +224,7 @@ class Shows {
   enum Sort {
     ALPHA,
     WATCHING,
-    ADDED;
-
-    /** Reading back what was remembered, which may name a sort we dropped. */
-    static Sort of(String name) {
-      for (Sort sort : values()) {
-        if (sort.name().equals(name)) return sort;
-      }
-      return ALPHA;
-    }
+    ADDED
   }
 
   /**

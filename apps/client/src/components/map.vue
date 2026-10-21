@@ -1787,8 +1787,8 @@ export default {
     },
 
     // Silence every gap-check error on the selected episodes -- missing file,
-    // resolution drop, watch gap, stray. Held only until the show's gap result
-    // changes at all, at which point the whole list is dropped.
+    // resolution drop, watch gap, stray. Each is held only until that
+    // episode's own gap result changes, at which point it is dropped.
     async onIgnoreGapsClick() {
       const show = this.mapShow;
       if (!show?.name || !this.canIgnoreGaps) return;

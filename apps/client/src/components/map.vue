@@ -1810,7 +1810,7 @@ export default {
         ? `ignore failed: ${r?.error || "unknown error"}`
         : remove
           ? `no longer ignoring ${r.removed} episode(s) for gap checks`
-          : `ignoring ${r.added} more episode(s) for gap checks`;
+          : `ignoring ${r.added} episode(s) for gap checks`;
       setTimeout(() => {
         this.gapchkResult = "";
       }, 8000);
@@ -1832,7 +1832,7 @@ export default {
       if (!showName || episodes.length === 0) return;
       const r = await srvr.ignoreGaps(showName, episodes);
       this.gapchkResult = r?.success
-        ? `ignoring ${r.added} more episode(s) for gap checks — nothing else was done`
+        ? `ignoring ${r.added} episode(s) for gap checks — nothing else was done`
         : `ignore failed: ${r?.error || "unknown error"}`;
       setTimeout(() => {
         this.gapchkResult = "";

@@ -1251,10 +1251,10 @@ app.post(
 );
 
 // Episodes whose gap-check errors are suppressed for this show -- missing
-// file, resolution drop, watch gap, stray, all of them. The list is only good
-// for the gap result it was granted against: the check signs the whole result
-// into gapSig and throws the entire list away the moment that signature moves,
-// so any change at all puts every episode back in front of the user.
+// file, resolution drop, watch gap, stray, all of them. Each ignore is only
+// good for its episode's gap result as it was granted: the check signs the
+// result into gapSig and drops an ignore the moment its own episode's part of
+// that signature moves, putting that episode back in front of the user.
 const asEpKeys = (list) =>
   (Array.isArray(list) ? list : [])
     .map((v) => (typeof v === "string" ? v.split("|")[0] : v?.ep))

@@ -48,8 +48,8 @@ function signStrays(showName, rec, strays) {
 }
 
 // Sign the whole gap-check result: every occurrence of every gap type, plus
-// the stray file identities. Any movement here retires every ignore the show
-// has, because an ignore was a judgement about this exact result.
+// the stray file identities. An ignore is judged against its own episode's
+// part of this (episodeSigs), so a change elsewhere in the show leaves it be.
 function signGaps(showName, rec, hits, strays) {
   const parts = [];
   for (const kind of Object.keys(hits).sort()) {
@@ -62,6 +62,39 @@ function signGaps(showName, rec, hits, strays) {
   const straySig = signStrays(showName, rec, strays);
   if (straySig) parts.push(`stray:${straySig}`);
   return parts.join(";");
+}
+
+// Each episode's part of a signed result: the gap kinds it appears in and, for
+// a stray, its file identity. Reads the stored format as signGaps writes it:
+// the kind lists, then the strays last.
+function episodeSigs(sig) {
+  const byEp = new Map();
+  const add = (key, part) => byEp.set(key, [...(byEp.get(key) || []), part]);
+  let inStrays = false;
+  let lastStray = null;
+  for (let seg of String(sig || "").split(";")) {
+    if (!inStrays && seg.startsWith("stray:")) {
+      inStrays = true;
+      seg = seg.slice("stray:".length);
+    }
+    if (inStrays) {
+      // A file name holding a ";" splits its entry; the piece belongs to the
+      // entry before it.
+      if (lastStray && !/^S\d+E\d+\|/.test(seg)) {
+        const parts = byEp.get(lastStray);
+        parts[parts.length - 1] += `;${seg}`;
+        continue;
+      }
+      lastStray = seg.split("|")[0];
+      add(lastStray, `stray|${seg}`);
+      continue;
+    }
+    const [kind, list = ""] = seg.split(":");
+    for (const key of list.split(",")) if (key) add(key, kind);
+  }
+  return new Map(
+    [...byEp].map(([key, parts]) => [key, parts.sort().join(";")]),
+  );
 }
 
 /**
@@ -244,7 +277,7 @@ const getShowState = (showName, showMeta) => {
         // on, because the two cases look identical from episodeData alone.
         //
         // Collected raw here; ignoring is applied after the pass, because
-        // whether an ignore still counts depends on the whole result.
+        // whether an ignore still counts depends on the result being signed.
         if (haveFile && !aired) {
           rawStrays.push({
             season: seasonNumber,
@@ -414,24 +447,26 @@ const getShowState = (showName, showMeta) => {
     // episode hide every later one of the same kind, which is why the pass
     // collects them all instead.
     gapSig = signGaps(showName, showMeta, hits, rawStrays);
-    const sigHeld = gapSig === (showMeta?.gapSig ?? null);
+    // An ignore holds while its own episode's part of the result is what it
+    // was at the last check. Another episode's gap opening or closing -- a
+    // missing file arriving -- leaves it standing.
+    const nowByEp = episodeSigs(gapSig);
+    const thenByEp = episodeSigs(showMeta?.gapSig);
+    const held = (key) =>
+      (nowByEp.get(key) ?? "") === (thenByEp.get(key) ?? "");
     // Earlier names for this list, folded in once and cleared as records pass.
     const legacy = [
       ...(Array.isArray(showMeta?.ignoreStrays) ? showMeta.ignoreStrays : []),
       ...(Array.isArray(showMeta?.strayOk) ? showMeta.strayOk : []),
     ].map((v) => (typeof v === "string" ? v.split("|")[0] : v?.ep));
-    ignoreGaps = sigHeld
-      ? [
-          ...new Set(
-            [
-              ...(Array.isArray(showMeta?.ignoreGaps)
-                ? showMeta.ignoreGaps
-                : []),
-              ...legacy,
-            ].filter(Boolean),
-          ),
-        ]
-      : [];
+    ignoreGaps = [
+      ...new Set(
+        [
+          ...(Array.isArray(showMeta?.ignoreGaps) ? showMeta.ignoreGaps : []),
+          ...legacy,
+        ].filter(Boolean),
+      ),
+    ].filter(held);
 
     const ignoreSet = new Set(ignoreGaps);
     const firstOf = (kind) =>

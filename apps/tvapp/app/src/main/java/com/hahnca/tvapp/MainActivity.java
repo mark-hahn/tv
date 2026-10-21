@@ -1458,12 +1458,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
    * up, without waiting on the list, and Back closes it to the list.
    */
   @Override
-  public void onPlayMovie(String url, double fps) {
+  public void onPlayMovie(String url, double fps, int res) {
     ui.post(
         () -> {
           bumpKeepAwake();
           if (player.isPlaying()) player.close();
-          video.playMovie(url, fps);
+          video.playMovie(url, fps, res);
         });
   }
 

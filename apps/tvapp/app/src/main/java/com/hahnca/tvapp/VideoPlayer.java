@@ -144,6 +144,8 @@ class VideoPlayer extends FrameLayout {
   // a play that switches starts once the display reports the new mode and
   // SWITCH_SETTLE_MS more, or after SWITCH_WAIT_MS.
   private static final long SWITCH_POLL_MS = 100;
+  // A video this tall or taller stays off 48 Hz (see hzFor).
+  private static final int RES_4K = 2160;
   private static final long SWITCH_SETTLE_MS = 500;
   private static final long SWITCH_WAIT_MS = 4000;
 
@@ -434,7 +436,7 @@ class VideoPlayer extends FrameLayout {
     exo.setMediaItem(
         mediaItem(p), resumeMs > 0 ? Math.max(0, resumeMs - RESUME_BACK_MS) : p.optLong("trimPosMs"));
     exo.prepare();
-    if (!switchRate(p.optDouble("fps", 0))) exo.play();
+    if (!switchRate(p.optDouble("fps", 0), res)) exo.play();
     setVisibility(VISIBLE);
   }
 
@@ -443,14 +445,14 @@ class VideoPlayer extends FrameLayout {
     preferMode(0);
   }
 
-  // Puts the tv on the refresh rate for fps (see hzFor), 0 if unknown. True
-  // when the display switches: the video plays once it is done.
-  private boolean switchRate(double fps) {
+  // Puts the tv on the refresh rate for fps and res (see hzFor), each 0 if
+  // unknown. True when the display switches: the video plays once it is done.
+  private boolean switchRate(double fps, int res) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false;
     Display d = getDisplay();
     if (d == null) return false;
     int from = d.getMode().getModeId();
-    int mode = modeFor(d, fps);
+    int mode = modeFor(d, fps, res);
     if (!preferMode(mode)) return false;
     Log.i(TAG, "display mode " + mode + " for " + fps + " fps, from " + from);
     switchFrom = from;
@@ -459,18 +461,20 @@ class VideoPlayer extends FrameLayout {
     return true;
   }
 
-  // The refresh rate a video of fps plays at: 50 Hz for 25 and 50 fps, 48 for
-  // 24 and 23.976 (the tv's 48 is exactly 48, so 23.976 shows one frame a
-  // refresh longer every ~21 s), else 0, the tv's own (60 Hz).
-  private static int hzFor(double fps) {
+  // The refresh rate a video of fps and res (its height in lines) plays at:
+  // 50 Hz for 25 and 50 fps, 48 for 24 and 23.976 below 4K (the tv's 48 is
+  // exactly 48, so 23.976 shows one frame a refresh longer every ~21 s), else
+  // 0, the tv's own (60 Hz). At 48 Hz the tv shows a 4K video's frames late
+  // and the player skips a fifth of them; at 60 it shows them all.
+  private static int hzFor(double fps, int res) {
     long r = Math.round(fps);
-    return r == 25 || r == 50 ? 50 : r == 24 ? 48 : 0;
+    return r == 25 || r == 50 ? 50 : r == 24 && res < RES_4K ? 48 : 0;
   }
 
-  // The display's mode at its size for hzFor(fps), else 0, the tv's own.
+  // The display's mode at its size for hzFor(fps, res), else 0, the tv's own.
   @TargetApi(Build.VERSION_CODES.M)
-  private static int modeFor(Display d, double fps) {
-    int hz = hzFor(fps);
+  private static int modeFor(Display d, double fps, int res) {
+    int hz = hzFor(fps, res);
     if (hz == 0) return 0;
     Display.Mode now = d.getMode();
     for (Display.Mode m : d.getSupportedModes())
@@ -507,9 +511,10 @@ class VideoPlayer extends FrameLayout {
   /**
    * A movie file (the local pane's TV button), from the start: no show, so no
    * play state reported, no subtitles and no scrub stills. Its title is its
-   * file name. fps is its frame rate, 0 if unknown.
+   * file name. fps is its frame rate and res 2160 when it is 4K, each 0 if
+   * unknown.
    */
-  void playMovie(String url, double fps) {
+  void playMovie(String url, double fps, int res) {
     JSONObject p = new JSONObject();
     try {
       String name = Uri.parse(url).getLastPathSegment();
@@ -517,6 +522,7 @@ class VideoPlayer extends FrameLayout {
       p.put("showName", name.replaceFirst("\\.[^.]+$", ""));
       p.put("movie", true);
       p.put("fps", fps);
+      p.put("res", res);
     } catch (JSONException e) {
       Log.e(TAG, "movie play failed for " + url + ": " + e);
       return;

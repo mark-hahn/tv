@@ -118,7 +118,7 @@ const CMD_SELECT_SHOW = "s"; // select a show by name
 const CMD_PLAY_EPISODE = "p"; // play one specific episode of the selected show: p,<season>,<episode>
 const CMD_CLEAR_STATE = "r"; // back to a bare show list
 const CMD_CUSTOM_CHANGED = "c"; // the shared filter settings changed
-const CMD_PLAY_MOVIE = "m"; // play a movie file full screen: m,<fps>,<url>
+const CMD_PLAY_MOVIE = "m"; // play a movie file full screen: m,<fps>,<res>,<url>
 // A live camera over the whole screen, hand-mirrored in CtrlServer.java. The
 // argument is a page url that plays it, or CAM_OFF to take it back off; what
 // the page does is no business of this file's.
@@ -129,6 +129,9 @@ const TVAPP_SELECT_DIAL_TIMEOUT_MS = 8000;
 // The local pane's movies, and where nginx serves them.
 const MOVIES_DIR = "/mnt/media/movies";
 const MOVIES_URL = "https://hahnca.com/movies";
+// A movie this wide or wider is sent to tvapp as res UHD_RES (see movieRate).
+const UHD_WIDTH = 3840;
+const UHD_RES = 2160;
 
 const PIC_TARGETS = [
   "pictureMode",
@@ -444,9 +447,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
-// A movie file's frame rate, which tvapp puts the tv's refresh rate on; 0 when
-// ffprobe can't tell.
-async function movieFps(file) {
+// A movie file's frame rate and res, which tvapp picks the tv's refresh rate
+// by: res is 2160 for a file 4K wide (a scope 4K movie is only ~1600 tall),
+// else 0. Each is 0 when ffprobe can't tell.
+async function movieRate(file) {
   try {
     const { stdout } = await execFileAsync("ffprobe", [
       "-v",
@@ -454,16 +458,20 @@ async function movieFps(file) {
       "-select_streams",
       "v:0",
       "-show_entries",
-      "stream=avg_frame_rate",
+      "stream=avg_frame_rate,width",
       "-of",
-      "csv=p=0",
+      "json",
       file,
     ]);
-    const [num, den] = stdout.trim().split("/").map(Number);
-    return num > 0 && den > 0 ? num / den : 0;
+    const { avg_frame_rate, width } = JSON.parse(stdout).streams[0];
+    const [num, den] = avg_frame_rate.split("/").map(Number);
+    return {
+      fps: num > 0 && den > 0 ? num / den : 0,
+      res: width >= UHD_WIDTH ? UHD_RES : 0,
+    };
   } catch (e) {
     unilog(2982, `frame rate probe failed for ${file}: ${e.message}`);
-    return 0;
+    return { fps: 0, res: 0 };
   }
 }
 
@@ -1515,7 +1523,7 @@ app.get("/tv/movieintvapp", async (req, res) => {
     .split("/")
     .map(encodeURIComponent)
     .join("/")}`;
-  const fps = movieFps(file);
+  const rate = movieRate(file);
   let sock = await probeTvappOpen();
   if (!sock) {
     await launchTvapp();
@@ -1525,7 +1533,8 @@ app.get("/tv/movieintvapp", async (req, res) => {
     res.json({ ok: false, error: "tvapp did not come up" });
     return;
   }
-  sock.send(`${CMD_PLAY_MOVIE},${await fps},${url}`);
+  const { fps, res: lines } = await rate;
+  sock.send(`${CMD_PLAY_MOVIE},${fps},${lines},${url}`);
   sock.close();
   res.json({ ok: true });
 });

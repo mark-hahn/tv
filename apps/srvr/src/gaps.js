@@ -388,7 +388,6 @@ const getShowState = (showName, showMeta) => {
       if (!seasonNotWatchedNoFiles && fileEndCount > 2)
         hit("fileEndError", fileEndStartSeason, fileEndStartEpisode);
       if (!seasonNotWatchedNoFiles && fileEndCount > 2) {
-        unilog(2842, `fileEndError set for ${showName} S${storySeason.season}: fileEndCount=${fileEndCount} fileCount=${fileCount}`);
         fileEndError = true;
         if (fileEndErrorSeason === null) {
           fileEndErrorSeason = fileEndStartSeason;
@@ -534,6 +533,18 @@ const getShowState = (showName, showMeta) => {
       watchGap = false;
       watchGapSeason = null;
       watchGapEpisode = null;
+    }
+
+    // Logged only as it turns on or moves, after the corrections above, so a
+    // standing error does not repeat every gap check and a cleared one is not
+    // logged at all.
+    if (
+      fileEndError &&
+      (!showMeta?.fileEndError ||
+        showMeta.fileEndErrorSeason !== fileEndErrorSeason ||
+        showMeta.fileEndErrorEpisode !== fileEndErrorEpisode)
+    ) {
+      unilog(3020, `fileEndError set for ${showName} S${fileEndErrorSeason}E${fileEndErrorEpisode}: fileCount=${fileCount}`);
     }
   } catch (error) {
     unilog(2510, `getShowState error for ${showName}:`, error.message);

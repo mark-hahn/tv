@@ -2285,6 +2285,32 @@ app.get(
   }),
 );
 
+// The subtitle files of a show's unwatched episodes laid out again by
+// cleanSrt (scripts/reflow-subs.js drives it, show by show).
+app.get(
+  "/api/reflowSubs",
+  apiWrapper(async ({ showName }) => {
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec) throw new Error(`reflowSubs: no show ${showName}`);
+    const videos = [];
+    epd.forEachEpisode(rec.episodeData, (season, episode, ep) => {
+      if (ep.watched || !ep.file) return;
+      videos.push(
+        epd.getFullPath(
+          rec.episodeData,
+          showPaths.showFolderFor(showName, rec),
+          season,
+          episode,
+          tvDir,
+        ),
+      );
+    });
+    let files = 0;
+    for (const video of videos) files += await subPrepare.reflowSidecars(video);
+    return { videos: videos.length, files };
+  }),
+);
+
 app.post("/api/applySubOffset", async (req, res) => {
   const { videoPath, srtFile, offsetMs } = req.body || {};
   if (typeof videoPath !== "string" || !videoPath) {

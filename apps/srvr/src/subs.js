@@ -771,6 +771,15 @@ export function saveCheck({ file, video, verdict, offsetMs = null, method = null
   });
 }
 
+// The file was rewritten without moving its timing (a new line layout): its
+// check, if it has one, stays, made current for the file as it is now.
+export function restatCheck(file) {
+  const check = fileCheck.get(file);
+  if (!check) return;
+  const st = fs.statSync(file);
+  upsertCheck.run({ ...check, size: st.size, mtimeMs: Math.round(st.mtimeMs) });
+}
+
 export function forgetCheck(file) {
   deleteCheckRow.run(file);
 }

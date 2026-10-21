@@ -20,7 +20,7 @@
 
 import fsp from "fs/promises";
 import * as path from "node:path";
-import { logHere, unilog} from "@tv/share"
+import { logHere, unilog, cleanSrt } from "@tv/share"
 import * as subs from "./subs.js";
 import * as sc from "./subSpotCheck.js";
 import { syncSubToAudio, asrOffset, shiftedSrt, sidecarVideo } from "./subSync.js";
@@ -490,6 +490,29 @@ export async function judgeHandTimed(file) {
       detail: "timed by hand",
     });
   unilog(2807, `${path.basename(file)} timed by hand: ${r.verdict}${r.offsetMs == null ? "" : ` ${fmtOfs(r.offsetMs)}`}`);
+}
+
+// The video's sidecars laid out again by cleanSrt, after a change to its line
+// layout. No timing moves, so each file keeps its check, made current for the
+// rewritten file, and the watcher leaves it alone. Returns how many changed.
+export async function reflowSidecars(videoPath) {
+  await notBusy(videoPath);
+  busy.add(videoPath);
+  try {
+    let rewritten = 0;
+    for (const { file } of subs.listSidecars(videoPath)) {
+      const full = path.join(path.dirname(videoPath), file);
+      const raw = await fsp.readFile(full, "utf8");
+      const clean = cleanSrt(raw);
+      if (clean === raw) continue;
+      await fsp.writeFile(full, clean, "utf8");
+      subs.restatCheck(full);
+      rewritten++;
+    }
+    return rewritten;
+  } finally {
+    busy.delete(videoPath);
+  }
 }
 
 // The video is gone, and so is what was learned about it.

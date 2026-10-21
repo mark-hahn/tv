@@ -114,6 +114,8 @@
               @actors-click="startActorsListMode"
               @get-click="handleGetClick"
               @tv-click="handleTvClick"
+              @top-click="topClick"
+              @prev-next-click="prevNextClick"
             ></HdrTop>
             <HdrBot
               v-if="!simpleMode"
@@ -123,8 +125,6 @@
               :selectedSort="actorsListMode ? '---' : sortChoice"
               :selectedFilter="fltrChoice"
               :reversed="reversed"
-              @top-click="topClick"
-              @prev-next-click="prevNextClick"
               @all-click="allClick"
               @cond-fltr-click="condFltrClick"
               @sort-action="sortAction"
@@ -226,6 +226,8 @@
             @actors-click="startActorsListMode"
             @get-click="handleGetClick"
             @tv-click="handleTvClick"
+            @top-click="topClick"
+            @prev-next-click="prevNextClick"
           ></HdrTop>
           <HdrBot
             v-if="!simpleMode"
@@ -235,8 +237,6 @@
             :selectedSort="actorsListMode ? '---' : sortChoice"
             :selectedFilter="fltrChoice"
             :reversed="reversed"
-            @top-click="topClick"
-            @prev-next-click="prevNextClick"
             @all-click="allClick"
             @cond-fltr-click="condFltrClick"
             @sort-action="sortAction"

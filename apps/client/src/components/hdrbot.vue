@@ -19,54 +19,6 @@
       id="botlft"
       style="width: 550px; overflow: hidden"
     >
-      <button
-        @click="$emit('top-click')"
-        style="
-          margin-left: 10px;
-          margin-right: 5px;
-          fontsize: 15px;
-          margin: 4px;
-          background-color: white;
-        "
-      >
-        Top
-      </button>
-      <button
-        @click="$emit('prev-next-click', false)"
-        style="
-          margin-left: 10px;
-          margin-right: 5px;
-          fontsize: 15px;
-          margin: 4px;
-          background-color: white;
-        "
-      >
-        Prev
-      </button>
-      <button
-        @click="$emit('prev-next-click', true)"
-        style="
-          margin-left: 10px;
-          margin-right: 5px;
-          fontsize: 15px;
-          margin: 4px;
-          background-color: white;
-        "
-      >
-        Next
-      </button>
-      <button
-        @click="$emit('rev-click')"
-        :style="{
-          marginLeft: '10px',
-          marginRight: '5px',
-          fontSize: '15px',
-          margin: '4px',
-          backgroundColor: reversed ? 'lightblue' : 'white',
-        }"
-      >
-        Rev
-      </button>
       <div
         id="sortFltr"
         style="display: inline-flex; gap: 4px; align-items: center"
@@ -76,7 +28,7 @@
           @change="sortChange"
           :style="{
             fontSize: '15px',
-            margin: '4px',
+            margin: '4px 4px 4px 15px',
             padding: '2px 4px',
             cursor: 'pointer',
             backgroundColor: 'white',
@@ -90,6 +42,18 @@
             {{ displaySortChoice(sortChoice) }}
           </option>
         </select>
+        <button
+          @click="$emit('rev-click')"
+          :style="{
+            marginLeft: '10px',
+            marginRight: '5px',
+            fontSize: '15px',
+            margin: '4px',
+            backgroundColor: reversed ? 'lightblue' : 'white',
+          }"
+        >
+          Rev
+        </button>
         <select
           :value="selectedFilter"
           @change="$emit('fltr-action', $event.target.value)"
@@ -198,8 +162,6 @@ export default {
   },
 
   emits: [
-    "top-click",
-    "prev-next-click",
     "all-click",
     "cond-fltr-click",
     "sort-action",

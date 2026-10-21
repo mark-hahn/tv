@@ -36,7 +36,7 @@
         placeholder="Filter..."
         style="
           margin: 0 15px 0 15px;
-          width: 120px;
+          width: 96px;
           padding: 5px;
           border: 1.5px solid black;
           background-color: #eee;
@@ -52,7 +52,7 @@
           font-size: 13px;
           cursor: pointer;
           margin: 5px 5px 5px 0;
-          width: 163px;
+          width: 130px;
           flex-shrink: 0;
           white-space: nowrap;
           overflow: hidden;
@@ -60,6 +60,51 @@
         "
       >
         {{ watchingName }}
+      </button>
+      <button
+        v-if="!simpleMode"
+        @click="$emit('top-click')"
+        style="
+          height: 24px;
+          background-color: white;
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          margin: 0 5px 0 0;
+          flex-shrink: 0;
+        "
+      >
+        Top
+      </button>
+      <button
+        v-if="!simpleMode"
+        @click="$emit('prev-next-click', false)"
+        style="
+          height: 24px;
+          background-color: white;
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          margin: 0 5px 0 0;
+          flex-shrink: 0;
+        "
+      >
+        Prev
+      </button>
+      <button
+        v-if="!simpleMode"
+        @click="$emit('prev-next-click', true)"
+        style="
+          height: 24px;
+          background-color: white;
+          font-size: 13px;
+          cursor: pointer;
+          border-radius: 7px;
+          margin: 0 5px 0 0;
+          flex-shrink: 0;
+        "
+      >
+        Next
       </button>
     </div>
     <div
@@ -207,6 +252,8 @@ export default {
     "actors-click",
     "get-click",
     "tv-click",
+    "top-click",
+    "prev-next-click",
   ],
 
   data() {

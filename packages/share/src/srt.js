@@ -1,5 +1,6 @@
 // Pure SRT subtitle text helpers: time <-> ms conversion, parse/serialize,
-// formatting strip, and "rolling" de-flicker sanitization. No I/O, no state.
+// formatting strip, "rolling" de-flicker sanitization, and the line layout
+// shared with ASR. No I/O, no state.
 
 export function srtTimeToMs(timeStr) {
   // "hh:mm:ss,mmm" -> ms
@@ -156,6 +157,108 @@ export function derollSrt(entries) {
   return result;
 }
 
+// Subtitle geometry, shared with ASR's cue building: a cue is at most two
+// lines of this width. Splitting is done at sentence, then clause, then word
+// boundaries so a cue rarely ends mid-phrase.
+export const MAX_LINE_CHARS = 60;
+export const MAX_CUE_CHARS = MAX_LINE_CHARS * 2;
+// Break early at a sentence end once a cue is at least this full.
+export const SENTENCE_BREAK_MIN = 56;
+export const SENTENCE_END = /[.!?]["\')\]]?$/;
+const CLAUSE_END = /[,;:]["\')\]]?$/;
+
+// Group words into cues that fit MAX_CUE_CHARS, breaking at the end of a
+// sentence where possible and at a clause otherwise.
+export function groupWords(words) {
+  const groups = [];
+  let current = [];
+  let len = 0;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const added = len === 0 ? word.length : len + 1 + word.length;
+    if (len > 0 && added > MAX_CUE_CHARS) {
+      groups.push(current);
+      current = [word];
+      len = word.length;
+      continue;
+    }
+    current.push(word);
+    len = added;
+    const last = i === words.length - 1;
+    if (last) break;
+    if (len >= SENTENCE_BREAK_MIN && SENTENCE_END.test(word)) {
+      groups.push(current);
+      current = [];
+      len = 0;
+    }
+  }
+  if (current.length) groups.push(current);
+  return groups;
+}
+
+// Wrap a cue onto two lines, preferring a break after punctuation and
+// otherwise the most even split.
+export function wrapLines(words) {
+  const text = words.join(" ");
+  if (text.length <= MAX_LINE_CHARS || words.length < 2) return text;
+  let best = -1;
+  let bestScore = Infinity;
+  let len = 0;
+  for (let i = 0; i < words.length - 1; i++) {
+    len = len === 0 ? words[i].length : len + 1 + words[i].length;
+    const rest = words.slice(i + 1).join(" ").length;
+    if (len > MAX_LINE_CHARS || rest > MAX_LINE_CHARS) continue;
+    let score = Math.abs(len - rest);
+    if (SENTENCE_END.test(words[i])) score -= 40;
+    else if (CLAUSE_END.test(words[i])) score -= 20;
+    if (score < bestScore) {
+      bestScore = score;
+      best = i + 1;
+    }
+  }
+  if (best < 0) {
+    // no split leaves both lines within the limit, so take the most even one
+    // rather than emitting one over-long line
+    let even = Math.ceil(words.length / 2);
+    let evenDiff = Infinity;
+    let run = 0;
+    for (let i = 0; i < words.length - 1; i++) {
+      run = run === 0 ? words[i].length : run + 1 + words[i].length;
+      const diff = Math.abs(run - (text.length - run));
+      if (diff < evenDiff) {
+        evenDiff = diff;
+        even = i + 1;
+      }
+    }
+    best = even;
+  }
+  return `${words.slice(0, best).join(" ")}\n${words.slice(best).join(" ")}`;
+}
+
+// Lay every cue out the way ASR's are: its lines joined into one, a cue over
+// MAX_CUE_CHARS cut into several by groupWords with its time shared out by
+// characters, and each wrapped by wrapLines.
+export function reflowSrt(entries) {
+  const out = [];
+  for (const e of entries) {
+    const words = e.text.split(/\s+/).filter(Boolean);
+    const total = words.join(" ").length;
+    const groups = total > MAX_CUE_CHARS ? groupWords(words) : [words];
+    const span = e.endMs - e.startMs;
+    let done = 0;
+    for (const group of groups) {
+      const len = group.join(" ").length;
+      out.push({
+        startMs: e.startMs + Math.round((done / total) * span),
+        endMs: e.startMs + Math.round(((done + len) / total) * span),
+        text: wrapLines(group),
+      });
+      done += len + 1;
+    }
+  }
+  return out;
+}
+
 // Returns sanitized SRT string if anything changed, null if unchanged.
 export function sanitizeSrt(raw) {
   const stripped = stripSrtFormatting(raw);
@@ -175,10 +278,8 @@ export function sanitizeSrt(raw) {
   const reordered = sorted.some((e, i) => e !== entries[i]);
   const changed =
     reordered || merged.length !== entries.length || stripped !== raw;
-  const derolled = derollSrt(merged);
-  if (changed || derolled.length !== merged.length) {
-    return serializeSrt(derolled);
-  }
+  const out = serializeSrt(reflowSrt(derollSrt(merged)));
+  if (changed || out !== serializeSrt(merged)) return out;
   return null;
 }
 

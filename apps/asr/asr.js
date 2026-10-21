@@ -16,7 +16,17 @@ import path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { setTimeout as sleep } from "timers/promises";
-import { unilog, setUnilogSink, logHere, cleanSrt } from "@tv/share";
+import {
+  unilog,
+  setUnilogSink,
+  logHere,
+  cleanSrt,
+  MAX_CUE_CHARS,
+  SENTENCE_BREAK_MIN,
+  SENTENCE_END,
+  groupWords,
+  wrapLines,
+} from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -105,13 +115,6 @@ const MIN_CUE_SEC = 0.9;
 const CUE_MERGE_SEC = 0.45;
 // enough that the earlier cue can always reach MIN_CUE_SEC
 const MIN_CUE_SPACING = MIN_CUE_SEC + CUE_GAP_SEC;
-// Subtitle geometry: a cue is at most two lines of this width. Splitting is
-// done at sentence, then clause, then word boundaries so a cue rarely ends
-// mid-phrase.
-const MAX_LINE_CHARS = 42;
-const MAX_CUE_CHARS = MAX_LINE_CHARS * 2;
-// Break early at a sentence end once a cue is at least this full.
-const SENTENCE_BREAK_MIN = 28;
 
 // Set by processOneVideo so the run's unilog rows can name the file even from
 // inside the transcription helpers.
@@ -418,77 +421,6 @@ function normalizeCues(cues) {
     );
   }
   return merged;
-}
-
-const SENTENCE_END = /[.!?]["\')\]]?$/;
-const CLAUSE_END = /[,;:]["\')\]]?$/;
-
-// Group words into cues that fit MAX_CUE_CHARS, breaking at the end of a
-// sentence where possible and at a clause otherwise.
-function groupWords(words) {
-  const groups = [];
-  let current = [];
-  let len = 0;
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const added = len === 0 ? word.length : len + 1 + word.length;
-    if (len > 0 && added > MAX_CUE_CHARS) {
-      groups.push(current);
-      current = [word];
-      len = word.length;
-      continue;
-    }
-    current.push(word);
-    len = added;
-    const last = i === words.length - 1;
-    if (last) break;
-    if (len >= SENTENCE_BREAK_MIN && SENTENCE_END.test(word)) {
-      groups.push(current);
-      current = [];
-      len = 0;
-    }
-  }
-  if (current.length) groups.push(current);
-  return groups;
-}
-
-// Wrap a cue onto two lines, preferring a break after punctuation and
-// otherwise the most even split.
-function wrapLines(words) {
-  const text = words.join(" ");
-  if (text.length <= MAX_LINE_CHARS || words.length < 2) return text;
-  let best = -1;
-  let bestScore = Infinity;
-  let len = 0;
-  for (let i = 0; i < words.length - 1; i++) {
-    len = len === 0 ? words[i].length : len + 1 + words[i].length;
-    const rest = words.slice(i + 1).join(" ").length;
-    if (len > MAX_LINE_CHARS || rest > MAX_LINE_CHARS) continue;
-    let score = Math.abs(len - rest);
-    if (SENTENCE_END.test(words[i])) score -= 40;
-    else if (CLAUSE_END.test(words[i])) score -= 20;
-    if (score < bestScore) {
-      bestScore = score;
-      best = i + 1;
-    }
-  }
-  if (best < 0) {
-    // no split leaves both lines within the limit, so take the most even one
-    // rather than emitting one over-long line
-    let even = Math.ceil(words.length / 2);
-    let evenDiff = Infinity;
-    let run = 0;
-    for (let i = 0; i < words.length - 1; i++) {
-      run = run === 0 ? words[i].length : run + 1 + words[i].length;
-      const diff = Math.abs(run - (text.length - run));
-      if (diff < evenDiff) {
-        evenDiff = diff;
-        even = i + 1;
-      }
-    }
-    best = even;
-  }
-  return `${words.slice(0, best).join(" ")}\n${words.slice(best).join(" ")}`;
 }
 
 // A long cue becomes several, cut at measured word boundaries, so each piece

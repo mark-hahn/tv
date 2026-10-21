@@ -1,12 +1,12 @@
 // Invariant checks from asr-timing-handoff.md §4 — all three must be zero.
 import fs from "fs";
+import { MAX_LINE_CHARS } from "@tv/share";
 // out() not console.log: the deploy reconciler rewrites console.* calls
 // into unilog DB rows, and these result lines must reach stdout.
 const out = (s) => process.stdout.write(s + "\n");
 
 const MIN_CUE_SEC = 0.9;
 const MIN_START_GAP = 0.45;
-const MAX_LINE_CHARS = 42;
 const MAX_CHARS_PER_SEC = 28;
 
 const text = fs.readFileSync(process.argv[2], "utf8");
@@ -60,5 +60,5 @@ for (let i = 0; i < cues.length; i++) {
   }
 }
 
-out(`${cues.length} cues | short: ${short} | overlaps: ${overlap} | close starts: ${closeStarts} | lines>42: ${longLines} | >28 ch/s: ${fastCues}`);
+out(`${cues.length} cues | short: ${short} | overlaps: ${overlap} | close starts: ${closeStarts} | lines>${MAX_LINE_CHARS}: ${longLines} | >28 ch/s: ${fastCues}`);
 process.exit(short + overlap + closeStarts ? 1 : 0);

@@ -298,7 +298,8 @@ export function clearDownloadedWithout(episodes) {
 // episode last showed, else one of the type the show last showed (for a
 // download, the one from the same origin as a chosen one), else the first.
 // Past the episode's own pick, files without sound descriptions win: with any
-// that are not ASR's, the choice is among them.
+// that are not ASR's, the choice is among them. Then files with lyrics win:
+// with any left, the choice is among them.
 export function pickSidecar(showId, season, episode, sidecars, dir = null) {
   if (sidecars.length === 0) return -1;
   // A good ASR file is the start only when nothing of another type is good:
@@ -319,10 +320,17 @@ export function pickSidecar(showId, season, episode, sidecars, dir = null) {
       );
     if (i !== -1 && !otherGoodSince) return i;
   }
-  const quiet = sidecars.some((s) => s.type !== "+" && !s.content.includes("S"));
+  const lyrics = sidecars.some((s) => s.content.includes("L"));
+  const lyric = (s) => !lyrics || s.content.includes("L");
+  const quiet = sidecars.some(
+    (s) => lyric(s) && s.type !== "+" && !s.content.includes("S"),
+  );
   const first = (want) =>
     sidecars.findIndex(
-      (s) => (!quiet || (s.type !== "+" && !s.content.includes("S"))) && want(s),
+      (s) =>
+        lyric(s) &&
+        (!quiet || (s.type !== "+" && !s.content.includes("S"))) &&
+        want(s),
     );
   const last = lastShowPick.get(showId);
   if (!last || (last.type === "+" && others)) return first(() => true);

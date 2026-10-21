@@ -180,6 +180,8 @@ class VideoPlayer extends FrameLayout {
   private long pausedAt = -1;
   // Down put the time bar up (see key).
   private boolean barUp;
+  // Down took the time bar down while paused (see key).
+  private boolean barDown;
   // A left/right seek has the time bar up until it ends.
   private boolean seeking;
   // Where the last left/right aimed. A held key steps on from it: a stills
@@ -367,6 +369,7 @@ class VideoPlayer extends FrameLayout {
               exo.seekTo(Math.max(0, exo.getCurrentPosition() - back));
             }
             if (ready) report(playWhenReady ? "playing" : "paused");
+            barDown = false;
             updateBar();
           }
 
@@ -581,8 +584,9 @@ class VideoPlayer extends FrameLayout {
    * jumps back to the very start (0, not past the intro),
    * skip (the remotes' Skip key) jumps over the intro by the show's skip
    * length, and down toggles the time bar. Down's bar stays until down again, any key but a seek, or the
-   * video closing. A seek's is up only until the seek ends, and the bar is
-   * always up while paused. repeat: an auto-repeat of a held key (the tv's
+   * video closing. A seek's is up only until the seek ends. The bar is up
+   * while paused, unless down took it down, until down again, any key but a
+   * seek, or the video playing. repeat: an auto-repeat of a held key (the tv's
    * own remote); a left/right's first one starts a hold. Any key during a
    * remote's hold (see hold) only ends it.
    */
@@ -593,8 +597,13 @@ class VideoPlayer extends FrameLayout {
       return;
     }
     boolean seek = "left".equals(key) || "right".equals(key);
-    if ("down".equals(key)) barUp = !barUp;
-    else if (!seek) barUp = false;
+    if ("down".equals(key)) {
+      if (exo.getPlayWhenReady()) barUp = !barUp;
+      else barDown = !barDown;
+    } else if (!seek) {
+      barUp = false;
+      barDown = false;
+    }
     boolean hold = seek && repeat;
     if (!hold) endHold();
     seeking = seek;
@@ -773,7 +782,8 @@ class VideoPlayer extends FrameLayout {
   }
 
   private void updateBar() {
-    if (exo != null && (barUp || seeking || !exo.getPlayWhenReady())) view.showController();
+    boolean paused = exo != null && !exo.getPlayWhenReady();
+    if (exo != null && (seeking || (paused ? !barDown : barUp))) view.showController();
     else view.hideController();
   }
 
@@ -823,6 +833,7 @@ class VideoPlayer extends FrameLayout {
     if (ready) report("stopped");
     ready = false;
     barUp = false;
+    barDown = false;
     view.hideController();
     view.setKeepContentOnPlayerReset(false);
     reloadSubId = null;

@@ -638,6 +638,8 @@ because the TV is unreachable from any wireless host here.
   set comes on. Full loads and pushes leave every show where it is, so a
   show just played does not jump to the top of Watched. A show new to the
   list goes where the sort would put it among the rest.
+- Choosing Watched in the sort group selects its top show, the most
+  recently watched. Choosing Alpha or Added keeps the selected show.
 - Hide (`h` on a show): the selection steps to the show above it (the one
   under it at the top of the list). In Watched the hidden show drops to the
   bottom at once; in the other orders it stays where it is.

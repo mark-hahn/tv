@@ -92,16 +92,10 @@ export function serializeSrt(entries) {
   );
 }
 
-// Fix "rolling/scrolling" subtitle format that causes on-screen flashing.
-// Pattern: the same text appears in back-to-back entries with a tiny gap, and
-// short (<250 ms) transitional entries carry one line from the previous cue
-// and one from the next. Emby renders each entry independently so the 40 ms
-// gap causes a visible blink.
-export function derollSrt(entries) {
+// Merge consecutive identical-text entries where the gap is < 250 ms.
+function mergeRepeats(entries) {
   if (entries.length === 0) return entries;
-
-  // Pass 1: merge consecutive identical-text entries where the gap is < 250 ms.
-  let merged = [];
+  const merged = [];
   let cur = { ...entries[0] };
   for (let i = 1; i < entries.length; i++) {
     const next = entries[i];
@@ -113,6 +107,19 @@ export function derollSrt(entries) {
     }
   }
   merged.push(cur);
+  return merged;
+}
+
+// Fix "rolling/scrolling" subtitle format that causes on-screen flashing.
+// Pattern: the same text appears in back-to-back entries with a tiny gap, and
+// short (<250 ms) transitional entries carry one line from the previous cue
+// and one from the next. Emby renders each entry independently so the 40 ms
+// gap causes a visible blink.
+export function derollSrt(entries) {
+  if (entries.length === 0) return entries;
+
+  // Pass 1: merge consecutive identical-text entries where the gap is < 250 ms.
+  const merged = mergeRepeats(entries);
 
   // Detect rolling format: >15 % of merged entries are very short (<250 ms).
   const shortCount = merged.filter((e) => e.endMs - e.startMs < 250).length;
@@ -157,11 +164,15 @@ export function derollSrt(entries) {
   return result;
 }
 
-// Subtitle geometry, shared with ASR's cue building: a cue is at most two
-// lines of this width. Splitting is done at sentence, then clause, then word
-// boundaries so a cue rarely ends mid-phrase.
+// Subtitle geometry, shared with ASR: lines are at most this wide. ASR cuts
+// its cues to fit two lines, at sentence, then clause, then word boundaries
+// so a cue rarely ends mid-phrase; other files' cues are never cut.
 export const MAX_LINE_CHARS = 60;
 export const MAX_CUE_CHARS = MAX_LINE_CHARS * 2;
+// The most lines a cue is balanced over; past this its lines are just filled.
+const MAX_WRAP_LINES = 3;
+// Splits this close to the most even one compete on punctuation.
+const NEAR_EVEN_CHARS = 8;
 // Break early at a sentence end once a cue is at least this full.
 export const SENTENCE_BREAK_MIN = 56;
 export const SENTENCE_END = /[.!?]["\')\]]?$/;
@@ -196,67 +207,85 @@ export function groupWords(words) {
   return groups;
 }
 
-// Wrap a cue onto two lines, preferring a break after punctuation and
-// otherwise the most even split.
+// Every way to put count words on n lines, as the word each later line starts at.
+function* lineStarts(count, n, from = 1) {
+  if (n === 1) return yield [];
+  for (let i = from; i <= count - n + 1; i++)
+    for (const rest of lineStarts(count, n - 1, i + 1)) yield [i, ...rest];
+}
+
+// Wrap a cue onto the fewest lines of MAX_LINE_CHARS, as even as they can be.
+// Among the splits within NEAR_EVEN_CHARS of the most even, the one ending
+// lines at a sentence, then at a clause, wins, then the one whose bottom line
+// is the widest, then the most even.
 export function wrapLines(words) {
   const text = words.join(" ");
   if (text.length <= MAX_LINE_CHARS || words.length < 2) return text;
-  let best = -1;
-  let bestScore = Infinity;
-  let len = 0;
-  for (let i = 0; i < words.length - 1; i++) {
-    len = len === 0 ? words[i].length : len + 1 + words[i].length;
-    const rest = words.slice(i + 1).join(" ").length;
-    if (len > MAX_LINE_CHARS || rest > MAX_LINE_CHARS) continue;
-    let score = Math.abs(len - rest);
-    if (SENTENCE_END.test(words[i])) score -= 40;
-    else if (CLAUSE_END.test(words[i])) score -= 20;
-    if (score < bestScore) {
-      bestScore = score;
-      best = i + 1;
+  const lineCount = Math.ceil(text.length / MAX_LINE_CHARS);
+  for (let n = lineCount; n <= MAX_WRAP_LINES; n++) {
+    const fits = [];
+    for (const starts of lineStarts(words.length, n)) {
+      const cuts = [0, ...starts, words.length];
+      const lines = starts
+        .concat(words.length)
+        .map((end, k) => words.slice(cuts[k], end).join(" "));
+      const lens = lines.map((l) => l.length);
+      const widest = Math.max(...lens);
+      if (widest > MAX_LINE_CHARS) continue;
+      const punct = starts.reduce(
+        (sum, i) =>
+          sum +
+          (SENTENCE_END.test(words[i - 1])
+            ? 0
+            : CLAUSE_END.test(words[i - 1])
+              ? 1
+              : 2),
+        0,
+      );
+      fits.push({
+        lines,
+        punct,
+        uneven: widest - Math.min(...lens),
+        topHeavy: lens[n - 1] < widest ? 1 : 0,
+      });
     }
+    if (!fits.length) continue;
+    const mostEven = Math.min(...fits.map((f) => f.uneven));
+    const pick = fits
+      .filter((f) => f.uneven <= mostEven + NEAR_EVEN_CHARS)
+      .sort(
+        (a, b) =>
+          a.punct - b.punct || a.topHeavy - b.topHeavy || a.uneven - b.uneven,
+      )[0];
+    return pick.lines.join("\n");
   }
-  if (best < 0) {
-    // no split leaves both lines within the limit, so take the most even one
-    // rather than emitting one over-long line
-    let even = Math.ceil(words.length / 2);
-    let evenDiff = Infinity;
-    let run = 0;
-    for (let i = 0; i < words.length - 1; i++) {
-      run = run === 0 ? words[i].length : run + 1 + words[i].length;
-      const diff = Math.abs(run - (text.length - run));
-      if (diff < evenDiff) {
-        evenDiff = diff;
-        even = i + 1;
-      }
-    }
-    best = even;
+  // ponytail: past MAX_WRAP_LINES (only junk blocks) or with a word wider than
+  // a line, lines are just filled; balance them if real cues ever get there
+  const lines = [];
+  for (const w of words) {
+    const last = lines.length - 1;
+    if (last >= 0 && lines[last].length + 1 + w.length <= MAX_LINE_CHARS)
+      lines[last] += " " + w;
+    else lines.push(w);
   }
-  return `${words.slice(0, best).join(" ")}\n${words.slice(best).join(" ")}`;
+  return lines.join("\n");
 }
 
-// Lay every cue out the way ASR's are: its lines joined into one, a cue over
-// MAX_CUE_CHARS cut into several by groupWords with its time shared out by
-// characters, and each wrapped by wrapLines.
+// Lay every cue out the way ASR's are, keeping its timing: its lines joined
+// into one and wrapped by wrapLines. A cue whose lines start new speakers'
+// "-" keeps one line per speaker when each fits.
 export function reflowSrt(entries) {
-  const out = [];
-  for (const e of entries) {
-    const words = e.text.split(/\s+/).filter(Boolean);
-    const total = words.join(" ").length;
-    const groups = total > MAX_CUE_CHARS ? groupWords(words) : [words];
-    const span = e.endMs - e.startMs;
-    let done = 0;
-    for (const group of groups) {
-      const len = group.join(" ").length;
-      out.push({
-        startMs: e.startMs + Math.round((done / total) * span),
-        endMs: e.startMs + Math.round(((done + len) / total) * span),
-        text: wrapLines(group),
-      });
-      done += len + 1;
-    }
-  }
-  return out;
+  return entries.map((e) => {
+    const parts = e.text
+      .split(/\n(?=\s*-)/)
+      .map((p) => p.split(/\s+/).filter(Boolean));
+    const speakers = parts.map((p) => p.join(" "));
+    const text =
+      speakers.length > 1 && speakers.every((s) => s.length <= MAX_LINE_CHARS)
+        ? speakers.join("\n")
+        : wrapLines(parts.flat());
+    return { ...e, text };
+  });
 }
 
 // Returns sanitized SRT string if anything changed, null if unchanged.
@@ -278,7 +307,9 @@ export function sanitizeSrt(raw) {
   const reordered = sorted.some((e, i) => e !== entries[i]);
   const changed =
     reordered || merged.length !== entries.length || stripped !== raw;
-  const out = serializeSrt(reflowSrt(derollSrt(merged)));
+  // repeats again after the reflow: the same words broken differently match
+  // only once joined
+  const out = serializeSrt(mergeRepeats(reflowSrt(derollSrt(merged))));
   if (changed || out !== serializeSrt(merged)) return out;
   return null;
 }

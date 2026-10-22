@@ -2311,6 +2311,34 @@ app.get(
   }),
 );
 
+// The glued words of the subtitle files of a show's videos split
+// (subPrepare.fixGluedSidecars; scripts/fix-glued-subs.js drives it, show by
+// show). With dryRun=1 nothing is written.
+app.get(
+  "/api/fixGluedSubs",
+  apiWrapper(async ({ showName, dryRun }) => {
+    const rec = tvdb.getAllTvdbSync()?.[showName];
+    if (!rec) throw new Error(`fixGluedSubs: no show ${showName}`);
+    const videos = [];
+    epd.forEachEpisode(rec.episodeData, (season, episode, ep) => {
+      if (!ep.file) return;
+      videos.push(
+        epd.getFullPath(
+          rec.episodeData,
+          showPaths.showFolderFor(showName, rec),
+          season,
+          episode,
+          tvDir,
+        ),
+      );
+    });
+    const files = [];
+    for (const video of videos)
+      files.push(...(await subPrepare.fixGluedSidecars(video, { dryRun: dryRun === "1" })));
+    return { videos: videos.length, files };
+  }),
+);
+
 app.post("/api/applySubOffset", async (req, res) => {
   const { videoPath, srtFile, offsetMs } = req.body || {};
   if (typeof videoPath !== "string" || !videoPath) {
@@ -4027,7 +4055,7 @@ watcher
       subFileChanged(filePath);
       subFileAdded(filePath);
       subPrepare
-        .subFileEvent(filePath, "add")
+        .subFileEvent(filePath, "add", subsQueue.NAMED_SIDECAR_RE.test(filePath))
         .then(() => {
           if (filePath.endsWith(".asr.srt")) asrLanded(filePath);
         })

@@ -321,7 +321,8 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
     or `comments` equal and not empty.
 - When a video or an S file lands on disk the watcher queues the video
   (`apps/srvr/src/subsQueue.js`): T and H copied out, an arriving `.srt`
-  named `S<n>`, then the subtitle checks above, and ASR when they leave
+  named `S<n>`, glued words split (below), then the subtitle checks above,
+  and ASR when they leave
   nothing that fits. Automatic ASR stops for the day at $20
   (`AUTO_ASR_DAILY_USD`); a video put off is not marked processed, so the
   sweep brings it back. Manual ASR from the ASR pane is not limited by
@@ -362,6 +363,39 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   beside such a video. `subs.db`'s `retimes` table records each pass, and the
   queue does not repeat one by itself. A good `+` file is the start pick
   only when no good file of another type is there.
+- Glued words (`apps/srvr/src/subGlue.js`): words run together where a
+  release's converter dropped a line break ("thisbefore") are split, in
+  every sidecar but `+`. A word that is not common itself is split into the
+  likeliest common words it can be read as, by counts from OpenSubtitles'
+  English text (`data/glueWords.txt` on hahnca.com, built by
+  `scripts/glue-words.js` from `data/glue-src/`), when all of:
+  - it is not capitalized mid-sentence, nor anywhere in its file so (a
+    name), unless its first word is "I"; not in capitals or with a capital
+    inside; not a dropped g ("stuffin'"), a stutter or a contraction that
+    is one ("C'mon", "I'ma"); and another word of its cue is very common
+    English, so other languages are left alone;
+  - it is not in an English dictionary (Debian's huge American and British
+    lists, names included);
+  - it turns up at most twice in its file and in no other episode's
+    subtitle files of the show: names, slang and compounds recur;
+  - the words apart are 100 times likelier than the word, or another
+    sidecar of the video has them apart within 10 s of the cue; a sibling
+    alone is not enough, since opn files have stray spaces of their own and
+    compounds are spelled both ways;
+  - no V or `+` file of the video has the word itself within 10 s of the
+    cue;
+  - and its file has at least 3 such words with a word as common as "the"
+    or "his" in them: a release that glues words glues many, and the other
+    files hold compounds ("airfreight").
+  "an" before a consonant or "a" before a vowel is never a split. A
+  video's sidecars are gone over again until none changes. A rewritten file
+  keeps its check (no timing moves), and the watcher's change event for it
+  is not a hand timing. It runs in a sub queue entry after the copy-out and
+  naming, before the checks, and from the watcher for a sidecar tv-srvr
+  named arriving later. `/api/fixGluedSubs?showName=[&dryRun=1]` does a
+  show; `scripts/fix-glued-subs.js [--dry]` drives it over the library.
+  The first pass (10-21) split 586 words in 76 files; their originals are in
+  `data/glue-backup/` on hahnca.com.
 - Movies get no subtitle processing.
 - Players: tvapp; tv-srvr's browser player (`play.html` at `/api/play`),
   opened by the info and map panes' Play and by the local pane's Play for an

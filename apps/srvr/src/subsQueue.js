@@ -34,7 +34,12 @@ import * as subs from "./subs.js";
 import { stillsBusy } from "./stills.js";
 import { getRecodePending } from "./recode.js";
 import { addBlockedName } from "./blockedNames.js";
-import { prepareVideoSubs, retimePass, needsRetime } from "./subPrepare.js";
+import {
+  prepareVideoSubs,
+  retimePass,
+  needsRetime,
+  fixGluedSidecars,
+} from "./subPrepare.js";
 
 // ---- hard-wired constants (no env vars per repo convention) ----
 const moviesDir = "/mnt/media/movies";
@@ -647,7 +652,8 @@ function doSubQueueNow() {
 }
 // What a video gets when it lands on disk, or when the sweep or the local
 // pane's Subs button names it: its text tracks copied out, new subtitle files
-// named, then every subtitle file checked against the video's audio and dealt
+// named, glued words split (subGlue.js), then every subtitle file checked
+// against the video's audio and dealt
 // with, an OpenSubtitles download that fits when none does, and ASR when no
 // download fits either (subPrepare.js).
 async function processSubQueueEntry() {
@@ -730,6 +736,8 @@ async function processSubQueueEntry() {
       setSubStage("naming subtitle files");
       await renameSFiles(videoFilePath, season, episode);
     }
+    setSubStage("splitting glued words");
+    await fixGluedSidecars(videoFilePath);
     // A check, search or download that fails throws: then the video is not
     // marked done, and the sweep brings it back.
     const prep = await prepareVideoSubs({

@@ -24,6 +24,8 @@ import { logHere, unilog, cleanSrt } from "@tv/share"
 import * as subs from "./subs.js";
 import * as sc from "./subSpotCheck.js";
 import { syncSubToAudio, asrOffset, shiftedSrt, sidecarVideo } from "./subSync.js";
+import { fixGlued } from "./subGlue.js";
+import { showNameFromFilePath } from "./showPaths.js";
 
 const TV_DIR = "/mnt/media/tv";
 
@@ -403,16 +405,18 @@ export async function prepareVideoSubs({
 // A sidecar came, changed or went (the file watcher). One that came is dealt
 // with like the video's others, from the clip transcripts stored for its
 // video, once whatever is dealing with the video now is done; videos never
-// checked are left alone. Clips that disagree are told apart from a file at
-// another rate by a middle clip, heard now when there is none, as in the
-// video's own checks. One changed by anything but these checks is judged as
-// timed by hand.
-export async function subFileEvent(file, kind) {
+// checked are left alone. One tv-srvr named (named) first has its glued words
+// split. Clips that disagree are told apart from a file at another rate by a
+// middle clip, heard now when there is none, as in the video's own checks. One
+// changed by anything but these checks and the glue fix is judged as timed by
+// hand.
+export async function subFileEvent(file, kind, named = false) {
   if (kind === "unlink") {
     subs.forgetCheckUnlessMisfit(file);
     return;
   }
   if (kind === "change") {
+    if (await glueRewrote(file)) return;
     await judgeHandTimed(file);
     return;
   }
@@ -423,6 +427,7 @@ export async function subFileEvent(file, kind) {
     return;
   }
   await notBusy(videoPath);
+  if (named) await fixGluedSidecars(videoPath, { only: file });
   const stored = subs.getClips(videoPath);
   if (subs.freshCheck(file)) return;
   // A video never checked: the arrival is only fitted to the .asr.srt, when
@@ -510,6 +515,64 @@ export async function reflowSidecars(videoPath) {
       rewritten++;
     }
     return rewritten;
+  } finally {
+    busy.delete(videoPath);
+  }
+}
+
+// ---- glued words ----
+
+// The files the glue fix rewrote, with the size and mtime it left each at,
+// until the watcher's change event for the rewrite.
+const glueRewrites = new Map();
+
+// Whether file is as the glue fix left it; its record goes either way.
+async function glueRewrote(file) {
+  const left = glueRewrites.get(file);
+  if (!left) return false;
+  glueRewrites.delete(file);
+  const st = await fsp.stat(file).catch(() => null);
+  return !!st && `${st.size} ${Math.round(st.mtimeMs)}` === left;
+}
+
+// The video's sidecars with their glued words split (subGlue.js), each read
+// beside the others, again until none changes, since a file split can show
+// where another's words go apart; only the file only, when given. ASR's are
+// never glued. No timing moves, so a file keeps its check, made current for
+// the rewritten file. With dryRun nothing is written. Returns [{file, fixes}]
+// for each file with glued words.
+export async function fixGluedSidecars(videoPath, { only = null, dryRun = false } = {}) {
+  await notBusy(videoPath);
+  busy.add(videoPath);
+  try {
+    const dir = path.dirname(videoPath);
+    const files = [];
+    for (const s of subs.listSidecars(videoPath)) {
+      const full = path.join(dir, s.file);
+      files.push({ ...s, full, text: await fsp.readFile(full, "utf8") });
+    }
+    const out = new Map();
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const f of files) {
+        if (f.type === "+" || (only && f.full !== only)) continue;
+        const siblings = files
+          .filter((g) => g !== f)
+          .map((g) => ({ text: g.text, outside: g.type === "V" || g.type === "+" }));
+        const r = await fixGlued(videoPath, f.text, siblings);
+        if (!r) continue;
+        changed = true;
+        out.set(f.file, [...(out.get(f.file) ?? []), ...r.fixes]);
+        f.text = r.text;
+        if (dryRun) continue;
+        await fsp.writeFile(f.full, r.text, "utf8");
+        subs.restatCheck(f.full);
+        const st = await fsp.stat(f.full);
+        glueRewrites.set(f.full, `${st.size} ${Math.round(st.mtimeMs)}`);
+        unilog(3023, `${showNameFromFilePath(videoPath)}: glued words split in ${f.file}: ${r.fixes.map((x) => `${x.from} → ${x.to}`).join(", ")}`);
+      }
+    }
+    return [...out].map(([file, fixes]) => ({ file, fixes }));
   } finally {
     busy.delete(videoPath);
   }

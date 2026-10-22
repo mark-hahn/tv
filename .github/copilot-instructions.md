@@ -210,6 +210,30 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 - The blocked-name list is data, `apps/srvr/data/blockedNames.txt` (tv-srvr
   writes it, tv-api and tv-down read it on each use). Forcing overrides it.
 
+## What tv-down downloads from usb
+
+- tv-down downloads only the file types in `downFileExtensions`
+  (`packages/share/src/videoFiles.js`): the videos tvapp's player can open
+  and seek (`downVideoExtensions`: mkv, webm, mp4, m4v, mov, avi, divx, ts,
+  mpeg, mpg), subtitles (`.srt`, `.ass`, `.ssa`) and `.nfo`. wmv, rm, ogv,
+  flv, 3gp and m2ts are never downloaded: Media3 can't read or seek them, or
+  the TV can't decode them.
+- Its usb scan (`find`) lists only those, the DVD pass's VOB/IFO/BUP files
+  and the `!unrar.lock` that qbt-unrar.sh keeps in a folder while it
+  unpacks; no other file comes over ssh. Forced files get the same filter.
+- A subtitle or `.nfo` file follows its episode's video: it is taken only
+  when that video is on disk or on its way, and skipped quietly when its
+  name has no season and episode (`tvshow.nfo`, a pack's own nfo). An `.nfo`
+  is taken only beside its own video: its name starts with the video's name
+  less the extension, compared without case, as tv-srvr's sidecar cleanup
+  (`oldFiles.js`) reads it. Another release's nfo never lands.
+- Before a torrent goes to qbt, the tor pane's Send, Hold and Force (tv-api's
+  download request, stage `skipped-files`) list its files tv-down will not
+  download, and the usb pane's Force lists them in its confirm. Release
+  extras (`isReleaseExtra`: sfv, srr, txt, xml, images, idx/sub, a rar's
+  parts, ...) are left out of the lists. Sent anyway, the listed files stay
+  on usb.
+
 ## Subtitles
 
 - Every subtitle is a sidecar `.srt` beside its video. Embedded tracks are
@@ -340,15 +364,17 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   `.old` or `.alt`, and a replacement does not inherit its subtitles.
   tv-down deletes the video a download replaces only after the new file has
   landed (`del-old.md`).
-- tv-down takes a `.srt` from usb when its episode's video is on disk or on
-  its way. Its scan does not exclude `.srt`. It lands `.SRT` as `.srt` and
-  cleans each file through `cleanSrt()` as it lands; the watcher renames any
-  other `.SRT` that arrives. An English file in a release's
-  `Subs/<episode>/<n>_<lang>.srt` layout is known as `<episode>/<name>`,
-  since tv-down keys by name and those share one, and lands as
-  `<episode>.<name>`. A `.srt` whose name and top folder give no season and
-  episode (the other languages in that layout) is skipped with a log line,
-  never an error entry.
+- tv-down takes a subtitle file (`.srt`, `.ass`, `.ssa`) from usb when its
+  episode's video is on disk or on its way. It lands `.SRT` as `.srt`, and
+  an `.ass` or `.ssa` under its `.srt` name, converted to SubRip by ffmpeg
+  as it lands (styling and placement are lost; one that won't convert is
+  deleted). It cleans each file through `cleanSrt()` as it lands; the
+  watcher renames any other `.SRT` that arrives. An English file in a
+  release's `Subs/<episode>/<n>_<lang>.srt` layout is known as
+  `<episode>/<name>`, since tv-down keys by name and those share one, and
+  lands as `<episode>.<name>`. A subtitle file whose name and top folder give
+  no season and episode (the other languages in that layout) is skipped with
+  a log line, never an error entry.
 - Retime (`retimePass()` in `subPrepare.js`): a video with an `.asr.srt` and
   no other file checked good gets one other file shifted by one offset to
   fit the `.asr.srt`, so one file has a real subtitle's wording and the
@@ -425,7 +451,6 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   per episode, the distinct OpenSubtitles releases, a hearing-impaired copy
   counting with its release. It searches 3 at a time, finds an IMDb id by
   show name when it has none, and writes nothing to `subs.db`.
-- `all-sub.md` describes all the subtitle logic in prose.
 
 ## tvapp and tvapprc
 

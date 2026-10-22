@@ -16,6 +16,8 @@ export const videoFileExtensions = [
   "wmv",
   "flv",
   "mpeg",
+  "mpg",
+  "webm",
   "3gp",
   "m4v",
   "ts",
@@ -24,6 +26,62 @@ export const videoFileExtensions = [
   "ogv",
   "divx",
 ];
+
+// The videos tv-down downloads from usb: the types above that tvapp's player
+// (Media3) can open and seek. Left out: wmv and rm (no Media3 reader), ogv
+// (Theora, no decoder on the TV), flv (can't seek), 3gp, and vob (tv-down's
+// DVD pass takes those).
+export const downVideoExtensions = [
+  "mkv",
+  "webm",
+  "mp4",
+  "m4v",
+  "mov",
+  "avi",
+  "divx",
+  "ts",
+  "mpeg",
+  "mpg",
+];
+
+// Every file tv-down downloads from usb by itself: those videos, subtitles
+// (.ass and .ssa ones converted to .srt as they land) and .nfo files. Any
+// other file of a torrent stays on usb.
+export const downFileExtensions = [
+  ...downVideoExtensions,
+  "srt",
+  "ass",
+  "ssa",
+  "nfo",
+];
+
+// Files that come with releases and nobody wants downloaded: checksums,
+// scene metadata, notes, images, image (VobSub) subtitles, and a rar's parts,
+// which are unpacked on usb. tv-down skips them like any file not in
+// downFileExtensions, but the questions about skipped files leave them out.
+const RELEASE_EXTRA_EXTS = new Set([
+  "nzb",
+  "sfv",
+  "srr",
+  "md5",
+  "txt",
+  "url",
+  "xml",
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "idx",
+  "sub",
+]);
+
+export function isReleaseExtra(name) {
+  const ext = String(name || "")
+    .split(".")
+    .pop()
+    .toLowerCase();
+  return RELEASE_EXTRA_EXTS.has(ext) || /^(rar|r\d\d|\d{3})$/.test(ext);
+}
 
 const VIDEO_EXT_SET = new Set(videoFileExtensions);
 

@@ -521,6 +521,7 @@ import {
   parseFileSeasonEpisode,
   parseTitleFromFilename,
 } from "../util.js";
+import { downFileExtensions, isReleaseExtra } from "@tv/share";
 import { unilog, logHere } from "../log.js";
 
 // info pane shows only the head of a text file
@@ -1729,20 +1730,15 @@ export default {
       const nameOf = (fe) =>
         fe.split("-").slice(0, -1).join("-").slice(11).split("/").pop() || "";
 
-      const shouldSkipExt = (ext) =>
-        ext.length === 6 ||
-        ext === "idx" ||
-        ext === "sub" ||
-        ext === "txt" ||
-        ext === "jpg" ||
-        ext === "gif" ||
-        ext === "jpeg" ||
-        ext === "part";
+      // tv-down downloads only downFileExtensions; DVD files go to its DVD
+      // pass. Release extras (nfo, sfv, images, ...) are dropped unlisted.
       files = files.filter((fe) => {
         const fn = nameOf(fe);
-        if (!shouldSkipExt((fn.split(".").pop() || "").toLowerCase()))
+        const ext = (fn.split(".").pop() || "").toLowerCase();
+        if (downFileExtensions.includes(ext) || fe.includes("/VIDEO_TS/"))
           return true;
-        skipped.push(`${fn} (ignored file type)`);
+        if (!isReleaseExtra(fn))
+          skipped.push(`${fn} (not a type tv-down downloads)`);
         return false;
       });
 

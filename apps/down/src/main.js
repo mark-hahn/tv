@@ -27,6 +27,8 @@ import {
   setUnilogSink,
   logHere,
   resolveShowFolderName,
+  downVideoExtensions,
+  downFileExtensions,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
@@ -42,6 +44,17 @@ const PRUNE_FREE_PCT = 20; // prune when usb free space falls below this percent
 const PRUNE_WINDOW_DAYS = 10; // delete everything within this many days of the oldest file
 const DOWNLOADS_CHANNEL_POLL_MS = 1000;
 const MOVIE_DOWNLOADS_CHANNEL_POLL_MS = 2000;
+// Besides downFileExtensions (the videos and .srt files the per-file pass
+// downloads), a usb scan lists the DVD files the DVD pass reads and the lock
+// qbt-unrar.sh keeps in a folder while it unpacks.
+const DVD_EXTS = ["vob", "ifo", "bup"];
+// A subtitle file tv-down takes. An .ass or .ssa one lands under its .srt
+// name, and the worker converts it to SubRip as it lands.
+const SUB_FILE_RE = /\.(srt|ass|ssa)$/i;
+// A file that follows its episode's video instead of being judged as one: a
+// subtitle file or an .nfo.
+const SIDECAR_FILE_RE = /\.(srt|ass|ssa|nfo)$/i;
+const UNRAR_LOCK = "!unrar.lock";
 
 let downChannelPeer = null;
 let downloadsChannelPollTimer = null;
@@ -293,16 +306,7 @@ async function main() {
   FAST_TEST = false;
   SKIP_DOWNLOAD = false; // Set to false to resume actual downloading
   PROCESS_INTERVAL_MS = FAST_TEST ? 30 * 1000 : 5 * 60 * 1000;
-  var videoFileExts = new Set([
-    ".mkv",
-    ".mp4",
-    ".avi",
-    ".mov",
-    ".m4v",
-    ".wmv",
-    ".ts",
-    ".m2ts",
-  ]);
+  var videoFileExts = new Set(downVideoExtensions.map((e) => `.${e}`));
   var isVideoEpisodeFile = function (name) {
     return videoFileExts.has(path.extname(String(name || "")).toLowerCase());
   };
@@ -1440,40 +1444,20 @@ async function main() {
     movieRsync.startCycling();
   })();
 
-  // Unfiltered on purpose: this one scan feeds both the per-file pass (which
-  // drops the excluded extensions locally via shouldSkipUsbLineByScanRules)
-  // and the DVD pass (which wants exactly the VOB/IFO/BUP lines the per-file
-  // pass drops).  Walking the USB tree twice per cycle cost more than the
-  // extra lines do.
-  findUsb = `ssh ${usbHost} \"find files -ignore_readdir_race -type f -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\"`;
+  // One scan feeds both the per-file pass and the DVD pass, so it lists the
+  // files either one uses and nothing else: a pack's rar parts, sfv, images
+  // and other extras never come over ssh. Walking the USB tree twice per cycle
+  // cost more than one walk for both.
+  var findNames = [...downFileExtensions, ...DVD_EXTS]
+    .map((e) => `-iname '*.${e}'`)
+    .concat(`-name '${UNRAR_LOCK}'`)
+    .join(" -o ");
+  findUsb = `ssh ${usbHost} \"find files -ignore_readdir_race -type f \\( ${findNames} \\) -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\"`;
 
-  var DVD_EXCLUDED_EXTENSIONS = new Set([
-    "srr",
-    "sfv",
-    "nfo",
-    "nzb",
-    "jpg",
-    "jpeg",
-    "png",
-    "txt",
-    "sub",
-    "idx",
-    "bup",
-    "ifo",
-    "vob",
-  ]);
-
-  var shouldSkipUsbLineByScanRules = function (line, force) {
-    var text = String(line || "").trim();
-    if (!text) return true;
-    var lineNoSize = text.split("-").slice(0, -1).join("-");
-    var relPath = lineNoSize.slice(11);
-    if (!relPath) return true;
-    if (/\.r\d\d$/i.test(relPath) || /\.rar$/i.test(relPath)) return true;
-    if (/screen\d+\.png$/i.test(relPath)) return true;
-    if (force) return false;
-    var ext = path.extname(relPath).toLowerCase().replace(/^\./, "");
-    return DVD_EXCLUDED_EXTENSIONS.has(ext);
+  // A scan line's file extension, lower case and without the dot.
+  var usbLineExt = function (line) {
+    var lineNoSize = String(line || "").trim().split("-").slice(0, -1).join("-");
+    return path.extname(lineNoSize).toLowerCase().replace(/^\./, "");
   };
 
   // Timestamps in tv-finished.json must be PST timezone.
@@ -2549,8 +2533,10 @@ async function main() {
     if (forcedFiles && forcedFiles.length > 0) {
       unilog(316, "checking forced files...", forcedFiles.length);
       processingForced = true;
+      // Forced files are every file of a torrent or a pick in the usb pane, so
+      // they get the scan's filter here.
       usbFiles = forcedFiles.filter(
-        (l) => l && l.trim().length && !shouldSkipUsbLineByScanRules(l, true),
+        (l) => l && l.trim().length && downFileExtensions.includes(usbLineExt(l)),
       );
       forcedFiles = null;
       // A forced cycle has no full USB scan, so there is nothing for the DVD
@@ -2578,8 +2564,8 @@ async function main() {
         findUsbFailing = true;
         findLines = [];
       }
-      // Split the single scan: DVD files for the DVD pass, everything the scan
-      // rules allow for the per-file pass.
+      // Split the single scan: DVD files for the DVD pass, the rest for the
+      // per-file pass.
       dvdScanFiles = [];
       for (var fi = 0; fi < findLines.length; fi++) {
         var fLine = String(findLines[fi] || "").trim();
@@ -2587,11 +2573,11 @@ async function main() {
         var fParts = fLine.split("-");
         var fBytes = parseInt(fParts.pop(), 10) || 0;
         var fRelPath = fParts.join("-").slice(11);
-        if (!fRelPath || !/\.(vob|ifo|bup)$/i.test(fRelPath)) continue;
+        if (!fRelPath || !DVD_EXTS.includes(usbLineExt(fLine))) continue;
         dvdScanFiles.push({ relPath: fRelPath, fileBytes: fBytes });
       }
       dvdScanFiles.sort((a, b) => (a.relPath < b.relPath ? -1 : 1));
-      usbFiles = findLines.filter((l) => !shouldSkipUsbLineByScanRules(l));
+      usbFiles = findLines.filter((l) => !DVD_EXTS.includes(usbLineExt(l)));
       if (_cycleTiming) _cycleTiming.afterFind = Date.now();
     }
 
@@ -2669,6 +2655,7 @@ async function main() {
         var _deKey = _deDir + "\x00" + _deSeStr.toUpperCase();
         (inProgressSeIndex[_deKey] ||= []).push({
           title: String(_de.title),
+          dest: _deTitle,
           fromFlex: !!_de.fromFlex,
           factors: fileFactors(_deTitle, _de.fileSize),
         });
@@ -2775,7 +2762,6 @@ async function main() {
   checkFile = () => {
     var blkName,
       cmd,
-      fext,
       guessItRes,
       j,
       len,
@@ -2816,7 +2802,7 @@ async function main() {
       if (
         parts.length >= 3 &&
         /^subs?$/i.test(parts[parts.length - 3]) &&
-        /\.srt$/i.test(fname) &&
+        SUB_FILE_RE.test(fname) &&
         /S\d{1,2}E\d{1,2}/i.test(parts[parts.length - 2]) &&
         SUBS_LAYOUT_ENGLISH_RE.test(fname)
       ) {
@@ -2868,34 +2854,6 @@ async function main() {
         parsedFolder = {};
       }
 
-      parts = fname.split(".");
-      fext = parts[parts.length - 1].toLowerCase();
-
-      const ALLOWED_EXTS = new Set([
-        "mkv",
-        "mp4",
-        "avi",
-        "ts",
-        "m2ts",
-        "wmv",
-        "srt",
-        "ass",
-        "ssa",
-        "asa",
-        "srr",
-        "nfo",
-        "jpg",
-        "png",
-      ]);
-
-      if (!ALLOWED_EXTS.has(fext)) {
-        unilog(
-          1195,
-          `Down: invalid extension .${fext} for "${fname}" (${title || "unknown show"})`,
-        );
-        process.nextTick(checkFile);
-        return;
-      }
       if (
         !processingForced &&
         tvJsonTitles &&
@@ -2946,12 +2904,13 @@ async function main() {
 
       // Provide a clear reason when the parser can't produce S/E.
       if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
-        // A subtitle file with no episode of its own is skipped, never an
-        // error entry: those share names like "2_eng,English.srt", so one
-        // entry would block every other file of that name.
-        if (/\.srt$/i.test(fname)) {
+        // A subtitle or .nfo file with no episode of its own is skipped,
+        // never an error entry: those share names like "2_eng,English.srt"
+        // or "tvshow.nfo", so one entry would block every other file of that
+        // name.
+        if (SIDECAR_FILE_RE.test(fname)) {
           if (skipLoggedOnce(usbFilePath))
-            unilog(2701, `${title || "unknown show"}: no season and episode for subtitle file "${usbFilePath}", skipping`);
+            unilog(3033, `${title || "unknown show"}: no season and episode for "${usbFilePath}", skipping`);
           return process.nextTick(checkFile);
         }
         var detailParts = [];
@@ -3392,8 +3351,8 @@ async function main() {
       destTitle = `${showFolderName} ${seStr}${fext}`;
     }
     // tv-srvr knows a subtitle file only by a lower-case ".srt".
-    if (/\.srt$/i.test(destTitle || fname) && !/\.srt$/.test(destTitle || fname))
-      destTitle = `${(destTitle || fname).slice(0, -".srt".length)}.srt`;
+    if (SUB_FILE_RE.test(destTitle || fname) && !/\.srt$/.test(destTitle || fname))
+      destTitle = `${(destTitle || fname).replace(SUB_FILE_RE, "")}.srt`;
 
     // usbPath is the folder containing the file on the USB host.
     // Example: "~/files/<torrent-folder>/"
@@ -3502,27 +3461,39 @@ async function main() {
       }
     }
 
-    // A subtitle file follows its episode's video: it is taken when that video
-    // is on disk or on its way, and none of the video gates below apply to it.
-    // tv-srvr names it as one of the video's S files once it lands.
-    var isSrtFile = /\.srt$/i.test(fname);
-    if (isSrtFile && !processingForced) {
+    // A subtitle or .nfo file follows its episode's video: it is taken when
+    // that video is on disk or on its way, and none of the video gates below
+    // apply to it. tv-srvr names a subtitle as one of the video's S files
+    // once it lands. An .nfo is taken only beside its own video: its name
+    // starts with the video's name less the extension, compared without
+    // case, as tv-srvr's sidecar cleanup (oldFiles.js) reads it, so another
+    // release's nfo never lands.
+    var isSidecarFile = SIDECAR_FILE_RE.test(fname);
+    if (isSidecarFile && !processingForced) {
       var srtSeStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
       var srtSeRe = new RegExp(srtSeStr, "i");
-      var srtVideoOnDisk =
-        fs.existsSync(tvSeasonPath) &&
-        fs.readdirSync(tvSeasonPath).some(function (f) {
-          return srtSeRe.test(f) && isVideoEpisodeFile(f);
-        });
-      var srtVideoComing =
-        (inProgressSeIndex &&
-          String(tvSeasonPath).replace(/\/+$/, "") + "\x00" + srtSeStr in
-            inProgressSeIndex) ||
-        (cycleSeMap && cycleSeMap[(seriesName || "") + "\x00" + srtSeStr]);
-      if (!srtVideoOnDisk && !srtVideoComing) {
+      // The landed names of the episode's videos, on disk and on their way.
+      var epVideos = (
+        fs.existsSync(tvSeasonPath) ? fs.readdirSync(tvSeasonPath) : []
+      ).filter((f) => srtSeRe.test(f) && isVideoEpisodeFile(f));
+      var comingKey =
+        String(tvSeasonPath).replace(/\/+$/, "") + "\x00" + srtSeStr;
+      for (var coming of (inProgressSeIndex && inProgressSeIndex[comingKey]) || [])
+        epVideos.push(coming.dest);
+      var cycleVideo =
+        cycleSeMap && cycleSeMap[(seriesName || "") + "\x00" + srtSeStr];
+      if (cycleVideo) epVideos.push(cycleVideo.dest);
+      var nfoName = /\.nfo$/i.test(fname)
+        ? String(destTitle || fname).toLowerCase()
+        : null;
+      if (nfoName)
+        epVideos = epVideos.filter((v) =>
+          nfoName.startsWith(v.replace(/\.[^.]+$/, "").toLowerCase()),
+        );
+      if (!epVideos.length) {
         existsCount++;
         if (skipLoggedOnce(usbFilePath))
-          unilog(2688, `${seriesName || "unknown show"} ${srtSeStr}: no video for subtitle file "${fname}", skipping`);
+          unilog(3035, `${seriesName || "unknown show"} ${srtSeStr}: no ${nfoName ? "matching video" : "video"} for "${fname}", skipping`);
         return process.nextTick(checkFile);
       }
     }
@@ -3533,7 +3504,7 @@ async function main() {
     // on disk. One download runs per episode at a time.
     var fromFlex = !processingForced;
     var isEpisodeFile =
-      !isSrtFile &&
+      !isSidecarFile &&
       Number.isInteger(season) &&
       season > 0 &&
       Number.isInteger(episode) &&
@@ -3708,7 +3679,7 @@ async function main() {
       if (
         cycleSeMap &&
         fromFlex &&
-        !isSrtFile &&
+        !isSidecarFile &&
         Number.isInteger(season) &&
         season > 0 &&
         Number.isInteger(episode) &&
@@ -3716,6 +3687,7 @@ async function main() {
       ) {
         cycleSeMap[(seriesName || "") + "\x00" + flexSeStr] = {
           fname: fname,
+          dest: destTitle || fname,
           bytes: usbFileBytes,
         };
       }

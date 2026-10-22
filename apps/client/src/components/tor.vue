@@ -1407,6 +1407,9 @@ import {
 } from "@tv/share";
 import { unilog, logHere } from "../log.js";
 
+// The most file names the skipped-files question lists.
+const SKIPPED_FILES_SHOWN = 20;
+
 export default {
   name: "Torrents",
   components: { Stream },
@@ -4072,13 +4075,14 @@ export default {
           );
 
           try {
-            let result = await this.downloadTorrentInternal(torrent, {
-              forceDownload,
-            });
-            if (result?.retryForce) {
-              result = await this.downloadTorrentInternal(torrent, {
-                forceDownload: true,
-              });
+            // tv-api asks before a blocked name and before files tv-down
+            // will skip; each one confirmed is sent again with it answered.
+            let sendOpts = { forceDownload, skipOk: false };
+            let result = await this.downloadTorrentInternal(torrent, sendOpts);
+            while (result?.retryForce || result?.retrySkipOk) {
+              if (result.retryForce) sendOpts = { ...sendOpts, forceDownload: true };
+              if (result.retrySkipOk) sendOpts = { ...sendOpts, skipOk: true };
+              result = await this.downloadTorrentInternal(torrent, sendOpts);
             }
             if (result?.ok) {
               this.setDownloadStatus(torrent, "ok", result?.message || "");
@@ -4120,6 +4124,7 @@ export default {
 
       const opts = options && typeof options === "object" ? options : {};
       const forceDownload = Boolean(opts.forceDownload);
+      const skipOk = Boolean(opts.skipOk);
 
       const torrentTitle = torrent?.raw?.title || "Unknown";
       const isAlreadyInQbtMessage = (msg) =>
@@ -4362,6 +4367,7 @@ export default {
               ? {
                   tl: { torrent },
                   ...(forceDownload ? { forceDownload: true } : {}),
+                  ...(skipOk ? { skipOk: true } : {}),
                   ...(dlShowName ? { showName: dlShowName } : {}),
                   ...(dlTvdbId ? { tvdbId: dlTvdbId } : {}),
                   ...(this.movieMode
@@ -4371,6 +4377,7 @@ export default {
               : {
                   torrent,
                   ...(forceDownload ? { forceDownload: true } : {}),
+                  ...(skipOk ? { skipOk: true } : {}),
                   ...(dlShowName ? { showName: dlShowName } : {}),
                   ...(dlTvdbId ? { tvdbId: dlTvdbId } : {}),
                   ...(this.movieMode
@@ -4525,6 +4532,24 @@ export default {
                 };
               }
 
+              if (payload?.stage === "skipped-files") {
+                const files = Array.isArray(payload.skippedFiles)
+                  ? payload.skippedFiles
+                  : [];
+                const more = files.length - SKIPPED_FILES_SHOWN;
+                const confirmed = await this.showConfirmDialog(
+                  `tv-down will not download these files of ${torrentTitle}:\n\n` +
+                    files.slice(0, SKIPPED_FILES_SHOWN).join("\n") +
+                    (more > 0 ? `\n...and ${more} more` : "") +
+                    "\n\nSend to qBittorrent anyway?",
+                );
+                return {
+                  ok: false,
+                  message: String(errorMsg),
+                  retrySkipOk: confirmed && !skipOk,
+                };
+              }
+
               if (isAlreadyInQbtMessage(errorMsg)) {
                 if (forceDownload) {
                   // Force: delete then re-add
@@ -4643,6 +4668,7 @@ export default {
             body: JSON.stringify({
               torrent,
               ...(forceDownload ? { forceDownload: true } : {}),
+              ...(skipOk ? { skipOk: true } : {}),
               ...(String(this.currentShow?.name || "").trim()
                 ? { showName: String(this.currentShow?.name || "").trim() }
                 : {}),

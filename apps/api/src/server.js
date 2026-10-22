@@ -51,7 +51,12 @@ import {
 import * as reviews from "./reviews.js";
 import { checkFiles as tvProcCheckFiles } from "./tv-proc.js";
 import { getActorCredits } from "./actor-credits.js";
-import { parseFileSeasonEpisode, parseTitleFromFilename } from "@tv/share";
+import {
+  parseFileSeasonEpisode,
+  parseTitleFromFilename,
+  downFileExtensions,
+  isReleaseExtra,
+} from "@tv/share";
 import { ChannelPeer } from "@tv/share/channelPeer";
 import { unilog, setUnilogSink, logHere } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
@@ -1746,6 +1751,33 @@ async function handleDownloadRequest(req, res) {
           : tvProcResult,
       );
       return;
+    }
+
+    // The torrent's files tv-down won't download (not downFileExtensions) are
+    // listed for the user to confirm before it goes to qbt; the client sends
+    // it again with skipOk. DVD files go to tv-down's DVD pass, and release
+    // extras (nfo, sfv, images, a rar's parts, ...) are not worth asking about.
+    if (!isMovieDownload && body.skipOk !== true) {
+      const skippedFiles = download
+        .extractTorrentFileDetails(fetched.torrentData)
+        .map((f) => f.path)
+        .filter(
+          (p) =>
+            !isReleaseExtra(p) &&
+            !downFileExtensions.includes(
+              path.extname(p).slice(1).toLowerCase(),
+            ),
+        );
+      if (skippedFiles.length > 0) {
+        res.json({
+          ...baseWrapper,
+          success: false,
+          stage: "skipped-files",
+          error: `tv-down skips ${skippedFiles.length} file${skippedFiles.length === 1 ? "" : "s"} of this torrent`,
+          skippedFiles,
+        });
+        return;
+      }
     }
 
     const hint =

@@ -105,6 +105,17 @@ const postUpdate = (type) => {
   } catch {}
 };
 
+// An ASS or SSA subtitle file's cues as SubRip text. ffmpeg reads one that
+// isn't ASS as no cues at all, without an error.
+const assToSrt = async (file) => {
+  const { stdout } = await promisify(execFile)(
+    "ffmpeg",
+    ["-v", "error", "-f", "ass", "-i", file, "-f", "srt", "-"],
+    { maxBuffer: 64 * 1024 * 1024 },
+  );
+  return stdout;
+};
+
 const summarizeStderr = (stderrText) => {
   const s = String(stderrText || "").trim();
   if (!s) return "";
@@ -409,12 +420,24 @@ const main = () => {
 
   // A subtitle file is written through cleanSrt like every other one. It is
   // rewritten at once, while tv-srvr's watcher still waits for it to settle.
+  // An .ass or .ssa file landed under its .srt name and is converted to
+  // SubRip first. One that won't convert is deleted, so tv-srvr never reads
+  // it as SubRip.
   const cleanLandedSrt = async (dst) => {
     if (!/\.srt$/i.test(dst)) return;
     try {
-      const raw = await fs.promises.readFile(dst, "utf8");
+      const onDisk = await fs.promises.readFile(dst, "utf8");
+      let raw = onDisk;
+      if (/\.(ass|ssa)$/i.test(title)) {
+        raw = await assToSrt(dst).catch((e) => e);
+        if (raw instanceof Error || !raw.trim()) {
+          await fs.promises.unlink(dst);
+          unilog(3032, `could not convert ${title} to SubRip, deleted it: ${raw instanceof Error ? raw.message : "no cues"}`);
+          return;
+        }
+      }
       const clean = cleanSrt(raw);
-      if (clean !== raw) await fs.promises.writeFile(dst, clean, "utf8");
+      if (clean !== onDisk) await fs.promises.writeFile(dst, clean, "utf8");
     } catch (e) {
       unilog(2881, `could not clean subtitle file ${path.basename(dst)}: ${e.message}`);
     }

@@ -2285,16 +2285,17 @@ app.get(
   }),
 );
 
-// The subtitle files of a show's unwatched episodes laid out again by
-// cleanSrt (scripts/reflow-subs.js drives it, show by show).
+// The subtitle files of a show's unwatched episodes, or with watched=1 its
+// watched ones, laid out again by cleanSrt (scripts/reflow-subs.js drives it,
+// show by show).
 app.get(
   "/api/reflowSubs",
-  apiWrapper(async ({ showName }) => {
+  apiWrapper(async ({ showName, watched }) => {
     const rec = tvdb.getAllTvdbSync()?.[showName];
     if (!rec) throw new Error(`reflowSubs: no show ${showName}`);
     const videos = [];
     epd.forEachEpisode(rec.episodeData, (season, episode, ep) => {
-      if (ep.watched || !ep.file) return;
+      if (!!ep.watched !== (watched === "1") || !ep.file) return;
       videos.push(
         epd.getFullPath(
           rec.episodeData,

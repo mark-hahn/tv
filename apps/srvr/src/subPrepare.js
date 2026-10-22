@@ -408,15 +408,15 @@ export async function prepareVideoSubs({
 // checked are left alone. One tv-srvr named (named) first has its glued words
 // split. Clips that disagree are told apart from a file at another rate by a
 // middle clip, heard now when there is none, as in the video's own checks. One
-// changed by anything but these checks and the glue fix is judged as timed by
-// hand.
+// changed by anything but these checks, the glue fix and the re-layout is
+// judged as timed by hand.
 export async function subFileEvent(file, kind, named = false) {
   if (kind === "unlink") {
     subs.forgetCheckUnlessMisfit(file);
     return;
   }
   if (kind === "change") {
-    if (await glueRewrote(file)) return;
+    if (await rewroteHere(file)) return;
     await judgeHandTimed(file);
     return;
   }
@@ -512,6 +512,7 @@ export async function reflowSidecars(videoPath) {
       if (clean === raw) continue;
       await fsp.writeFile(full, clean, "utf8");
       subs.restatCheck(full);
+      await noteRewrite(full);
       rewritten++;
     }
     return rewritten;
@@ -522,15 +523,21 @@ export async function reflowSidecars(videoPath) {
 
 // ---- glued words ----
 
-// The files the glue fix rewrote, with the size and mtime it left each at,
-// until the watcher's change event for the rewrite.
-const glueRewrites = new Map();
+// The files the glue fix and the re-layout rewrote, with the size and mtime
+// each was left at, until the watcher's change event for the rewrite.
+const ownRewrites = new Map();
 
-// Whether file is as the glue fix left it; its record goes either way.
-async function glueRewrote(file) {
-  const left = glueRewrites.get(file);
+async function noteRewrite(file) {
+  const st = await fsp.stat(file);
+  ownRewrites.set(file, `${st.size} ${Math.round(st.mtimeMs)}`);
+}
+
+// Whether file is as the glue fix or the re-layout left it; its record goes
+// either way.
+async function rewroteHere(file) {
+  const left = ownRewrites.get(file);
   if (!left) return false;
-  glueRewrites.delete(file);
+  ownRewrites.delete(file);
   const st = await fsp.stat(file).catch(() => null);
   return !!st && `${st.size} ${Math.round(st.mtimeMs)}` === left;
 }
@@ -567,8 +574,7 @@ export async function fixGluedSidecars(videoPath, { only = null, dryRun = false 
         if (dryRun) continue;
         await fsp.writeFile(f.full, r.text, "utf8");
         subs.restatCheck(f.full);
-        const st = await fsp.stat(f.full);
-        glueRewrites.set(f.full, `${st.size} ${Math.round(st.mtimeMs)}`);
+        await noteRewrite(f.full);
         unilog(3023, `${showNameFromFilePath(videoPath)}: glued words split in ${f.file}: ${r.fixes.map((x) => `${x.from} → ${x.to}`).join(", ")}`);
       }
     }

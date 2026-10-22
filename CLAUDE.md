@@ -831,6 +831,7 @@ actor filter → filter text → top of list. At the top Back goes to the TV's h
 | `j,<up\|down>` | skip: by letter in alpha order, by page otherwise; list only |
 | `b` | back one level; the TV's home screen at the top |
 | `e` | play |
+| `pa` | pause the video if one is up and playing, else nothing (tv-tv's `/tv/pausetvapp`, for other apps) |
 | `r` | clear to the plain show list |
 | `x` | exit |
 | `f,<text>` | filter text |

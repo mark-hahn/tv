@@ -114,6 +114,7 @@ const MSG_TVAPP_DOWN = "d"; // bridge -> phone: tvapp has closed
 // connected at all.
 const CMD_BACK = "b"; // back one level; at tvapp's top level it stays put
 const CMD_PLAY = "e"; // play what tvapp's cursor is on, else its show's next-up
+const CMD_PAUSE = "pa"; // pause tvapp's video if one is up and playing, else nothing
 const CMD_SELECT_SHOW = "s"; // select a show by name
 const CMD_PLAY_EPISODE = "p"; // play one specific episode of the selected show: p,<season>,<episode>
 const CMD_CLEAR_STATE = "r"; // back to a bare show list
@@ -1537,6 +1538,14 @@ app.get("/tv/movieintvapp", async (req, res) => {
   sock.send(`${CMD_PLAY_MOVIE},${fps},${lines},${url}`);
   sock.close();
   res.json({ ok: true });
+});
+
+// For other apps: pause tvapp's video. With tvapp down, no video up, or the
+// video already paused it does nothing, and that is still ok.
+app.post("/tv/pausetvapp", async (req, res) => {
+  const tvappOpen = await sendTvappCommand(CMD_PAUSE);
+  unilog(3030, `pausetvapp from ${client(req)}, tvapp ${tvappOpen ? "open" : "not open"}`);
+  res.json({ ok: true, tvappOpen });
 });
 
 app.post("/tv/tvapprc/back", async (req, res) => {

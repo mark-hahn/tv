@@ -1280,6 +1280,12 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
         });
   }
 
+  /** tv-tv's pause: a video that is up and playing pauses; anything else stays. */
+  @Override
+  public void onPauseVideo() {
+    ui.post(video::pause);
+  }
+
   /**
    * The remote's hide key, which acts on whatever the screen is on: the episode
    * under the map's cursor, else the selected show. The remote cannot tell

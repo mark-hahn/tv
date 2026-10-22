@@ -20,7 +20,9 @@ import org.java_websocket.server.WebSocketServer;
  *                  been auto-repeating fast long enough to enter skip mode
  *   b              back, one level out at a time; at the top it stays put
  *   e              play what the cursor is on, else the active show's next-up
- *   r              clear the screen state: the show list focused and nothing
+ *   pa             pause the video if one is up and playing, else nothing --
+ *                  sent by tv-tv itself, on another app's behalf
+ *   r             clear the screen state: the show list focused and nothing
  *                  else, cardMisc back to its description, filters off
  *   x              close tvapp
  *   f,&lt;text&gt;    show-list filter text
@@ -70,6 +72,7 @@ class CtrlServer extends WebSocketServer {
   private static final String CMD_KEY_LETTER = "j";
   private static final String CMD_BACK = "b";
   private static final String CMD_PLAY = "e";
+  private static final String CMD_PAUSE = "pa";
   private static final String CMD_CLEAR_STATE = "r";
   private static final String CMD_EXIT = "x";
   private static final String CMD_FILTER = "f";
@@ -117,6 +120,8 @@ class CtrlServer extends WebSocketServer {
     void onBack();
 
     void onPlay();
+
+    void onPauseVideo();
 
     void onClearState();
 
@@ -298,6 +303,8 @@ class CtrlServer extends WebSocketServer {
       listener.onBack();
     } else if (CMD_PLAY.equals(message)) {
       listener.onPlay();
+    } else if (CMD_PAUSE.equals(message)) {
+      listener.onPauseVideo();
     } else if (CMD_CLEAR_STATE.equals(message)) {
       listener.onClearState();
     } else if (CMD_EXIT.equals(message)) {

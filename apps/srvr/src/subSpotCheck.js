@@ -8,20 +8,32 @@
 // of the files MIN_PAIRS pairs (music, or a scene in another language) is
 // tried once more at the next busiest stretch of its third.
 //
+// Cover clips then sample the rest of the video, the busiest CLIP_S stretch
+// of each COVER_S part of the first file's cues, the cold open and the last
+// scene included, so a file that fits the two clips but not the parts between
+// or around them is caught: another cut differs in steps at act breaks and
+// title sequences, which two or three clips can miss or take for another
+// rate. Videos checked before cover clips (whose sets may have one middle
+// clip instead) get them when a file of theirs is next judged.
+//
 // Per clip, each cue near it whose first words occur exactly once in the
 // clip's words pairs with them, and the median of (word start - cue start) is
 // the clip's offset: positive when the captions come before the words. A clip
 // is solid for a file with MIN_PAIRS pairs whose median is pinned to within
 // MAX_UNCERTAINTY_MS (their median distance from it over the square root of
-// their count).
+// their count). A cover clip looks for its cues where the two clips' offsets
+// put them, and when they do not pair there, anywhere in the file. A clip
+// whose pairs scatter more than MAX_SPREAD_MS shows the file's timing jumps
+// about within it.
 //
 // Verdicts:
 //   good       the clips agree within AGREE_MS, on an offset from
 //              -GOOD_LATE_MS to GOOD_EARLY_MS
-//   fixable    the clips agree on an offset outside that, or a third clip in
-//              the middle shows the file runs at another rate, which a stretch
-//              fixes
-//   wrong cut  both clips solid but disagreeing: no single shift fits
+//   fixable    the clips agree on an offset outside that, or the clips all lie
+//              within AGREE_MS of one line, a file at another rate, which a
+//              stretch fixes
+//   wrong cut  both clips solid but no one shift or stretch fits all the
+//              solid clips, or a clip's pairs scatter
 //   can't tell a clip is not solid
 //   unusable   too little dialogue (a signs track), or not in English
 //
@@ -86,6 +98,13 @@ const AGREE_MS = 250;
 // much after them.
 const GOOD_EARLY_MS = 500;
 const GOOD_LATE_MS = 250;
+// Cover clips: one in each part of about this long.
+const COVER_S = 180;
+// A clip whose pairs lie further than this from their median, half of them,
+// shows the file's timing jumps about within it.
+const MAX_SPREAD_MS = 400;
+// Clips sent to ASR at once.
+const TRANSCRIBE_AT_ONCE = 8;
 
 const execFileP = promisify(cp.execFile);
 
@@ -283,7 +302,9 @@ async function hear(videoFile, track, froms, timing) {
       flacs.push(flac);
     }
     const cutAt = Date.now();
-    const heard = await Promise.all(flacs.map(transcribe));
+    const heard = [];
+    for (let i = 0; i < flacs.length; i += TRANSCRIBE_AT_ONCE)
+      heard.push(...(await Promise.all(flacs.slice(i, i + TRANSCRIBE_AT_ONCE).map(transcribe))));
     timing.cutMs += cutAt - startedAt;
     timing.asrMs += Date.now() - cutAt;
     return heard;
@@ -293,12 +314,15 @@ async function hear(videoFile, track, froms, timing) {
 }
 
 // The clip offset of these cues: {ms, pairs, spreadMs}, ms null with no pair.
-function clipOffset(cues, clip) {
-  const fromMs = clip.fromS * 1000;
+// The cues are looked for within nearS of where an offset of aroundMs puts
+// the clip.
+function clipOffset(cues, clip, aroundMs = 0, nearS = NEAR_S) {
+  const atMs = clip.fromS * 1000;
+  const fromMs = atMs - aroundMs;
   const near = cues.filter(
     (c) =>
-      c.startMs >= fromMs - NEAR_S * 1000 &&
-      c.startMs < fromMs + (CLIP_S + NEAR_S) * 1000,
+      c.startMs >= fromMs - nearS * 1000 &&
+      c.startMs < fromMs + (CLIP_S + nearS) * 1000,
   );
   const prefix = (c) => c.words.slice(0, PREFIX_WORDS);
   const count = new Map();
@@ -313,7 +337,7 @@ function clipOffset(cues, clip) {
     const hits = [];
     for (let i = 0; i + p.length <= clip.heard.length; i++)
       if (p.every((w, j) => clip.heard[i + j].w === w)) hits.push(i);
-    if (hits.length === 1) offsets.push(fromMs + clip.heard[hits[0]].ms - c.startMs);
+    if (hits.length === 1) offsets.push(atMs + clip.heard[hits[0]].ms - c.startMs);
   }
   if (offsets.length === 0) return { ms: null, pairs: 0, spreadMs: null };
   offsets.sort((a, b) => a - b);
@@ -325,11 +349,23 @@ function clipOffset(cues, clip) {
 const solid = (c) =>
   c.pairs >= MIN_PAIRS && c.spreadMs / Math.sqrt(c.pairs) <= MAX_UNCERTAINTY_MS;
 
+const scattered = (c) => c.pairs >= MIN_PAIRS && c.spreadMs > MAX_SPREAD_MS;
+
+// The offset of these cues at a cover clip, looked for around aroundMs, else
+// anywhere in the file: a part of another cut can sit further off than
+// NEAR_S, and is caught by the offset it pairs at.
+function coverOffset(cues, clip, aroundMs) {
+  const r = clipOffset(cues, clip, aroundMs);
+  if (solid(r)) return r;
+  const anywhere = clipOffset(cues, clip, aroundMs, Infinity);
+  return solid(anywhere) ? anywhere : r;
+}
+
 const centerMs = (clip) => clip.fromS * 1000 + (CLIP_S * 1000) / 2;
 
 // The two clips for a video, placed by the first of files and retried as
-// above: {clips: [{fromS, heard}, {fromS, heard}], middle: null}. Adds the
-// time it took and the retries to timing.
+// above: {clips: [{fromS, heard}, {fromS, heard}], middle: null, cover:
+// null}. Adds the time it took and the retries to timing.
 export async function hearClips(videoFile, track, files, timing) {
   const placer = files[0];
   const part = Math.ceil(placer.cues.length / 3);
@@ -349,53 +385,101 @@ export async function hearClips(videoFile, track, files, timing) {
     clips[i] = { fromS: next, heard: words };
     timing.retries = (timing.retries ?? 0) + 1;
   }
-  return { clips, middle: null };
+  return { clips, middle: null, cover: null };
 }
 
-// A third clip, at the busiest stretch of the middle third of the first of
-// files' cues that the other two do not cover, or null when there is none.
-export async function hearMiddle(videoFile, track, files, set, timing) {
+// The cover clips for set: the first of files' cues, from its first to its
+// last within the video's durS, cut into parts of about COVER_S, and in each
+// part no clip of set sits in, the busiest CLIP_S stretch at least CLIP_S
+// from the other clips that starts a minute or more before the end. [] when
+// there is none.
+export async function hearCover(videoFile, track, files, set, durS, timing) {
   const cues = files[0].cues;
-  const part = Math.ceil(cues.length / 3);
-  const fromS = windowsByCount(cues, cues.slice(part, -part)).find((s) =>
-    set.clips.every((c) => Math.abs(s - c.fromS) >= CLIP_S),
-  );
-  if (fromS === undefined) return null;
-  const [heard] = await hear(videoFile, track, [fromS], timing);
-  return { fromS, heard };
+  const firstMs = cues[0].startMs;
+  const lastMs = Math.min(cues.at(-1).endMs, durS * 1000);
+  const parts = Math.max(1, Math.round((lastMs - firstMs) / (COVER_S * 1000)));
+  const partMs = (lastMs - firstMs) / parts;
+  const have = [...set.clips, ...(set.middle ? [set.middle] : [])];
+  const froms = [];
+  for (let i = 0; i < parts; i++) {
+    const lo = firstMs + i * partMs;
+    const hi = lo + partMs;
+    if (have.some((c) => centerMs(c) >= lo && centerMs(c) < hi)) continue;
+    const inPart = cues.filter((c) => c.startMs >= lo && c.startMs < hi);
+    const fromS = windowsByCount(cues, inPart).find(
+      (s) =>
+        s <= durS - CLIP_S / 2 &&
+        [...have.map((c) => c.fromS), ...froms].every((t) => Math.abs(s - t) >= CLIP_S),
+    );
+    if (fromS !== undefined) froms.push(fromS);
+  }
+  if (froms.length === 0) return [];
+  const heard = await hear(videoFile, track, froms, timing);
+  return froms.map((fromS, i) => ({ fromS, heard: heard[i] }));
 }
 
 const offsetVerdict = (offsetMs) =>
   offsetMs >= -GOOD_LATE_MS && offsetMs <= GOOD_EARLY_MS ? "good" : "fixable";
 
+// The least-squares line through points [[ms, offsetMs]], as a function of
+// ms.
+function fitLine(points) {
+  const n = points.length;
+  const mt = points.reduce((s, [t]) => s + t, 0) / n;
+  const mo = points.reduce((s, [, o]) => s + o, 0) / n;
+  const stt = points.reduce((s, [t]) => s + (t - mt) ** 2, 0);
+  const sto = points.reduce((s, [t, o]) => s + (t - mt) * (o - mo), 0);
+  return (t) => mo + (sto / stt) * (t - mt);
+}
+
+const fmtAt = (ms) => {
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
 // The verdict for a file with these cues against the clips:
-// {verdict, offsetMs, fix, clips, needsMiddle}. fix moves the cues to fit
-// (see fixedText); needsMiddle says a middle clip could tell whether a file
-// from another cut only runs at another rate.
+// {verdict, offsetMs, fix, clips, needsCover, why}. fix moves the cues to fit
+// (see fixedText); needsCover says the set has no cover clips yet, which
+// could find a file the two clips pass is from another cut, or tell one from
+// another cut from one at another rate.
 export function judge(cues, set) {
   const [a, b] = set.clips.map((c) => clipOffset(cues, c));
   const clips = [a, b];
+  const scatterWhy = (c, atMs) => `its timing scatters ±${c.spreadMs} ms at ${fmtAt(atMs)}`;
+  const [ca, cb] = set.clips.map(centerMs);
+  if (scattered(a) || scattered(b)) {
+    const [c, at] = scattered(a) ? [a, ca] : [b, cb];
+    return { verdict: "wrong cut", clips, why: scatterWhy(c, at) };
+  }
   if (!solid(a) || !solid(b)) return { verdict: "can't tell", clips };
+  const onLine = (t) => a.ms + ((b.ms - a.ms) * (t - ca)) / (cb - ca);
+  const more = [set.middle, ...(set.cover ?? [])].filter(Boolean).map((clip) => ({
+    ...coverOffset(cues, clip, onLine(centerMs(clip))),
+    atMs: centerMs(clip),
+  }));
+  clips.push(...more.map(({ ms, pairs, spreadMs }) => ({ ms, pairs, spreadMs })));
+  const needsCover = !set.cover;
+  const jumpy = more.find(scattered);
+  if (jumpy)
+    return { verdict: "wrong cut", clips, needsCover, why: scatterWhy(jumpy, jumpy.atMs) };
+  const points = [[ca, a.ms], [cb, b.ms], ...more.filter(solid).map((m) => [m.atMs, m.ms])];
   if (Math.abs(a.ms - b.ms) <= AGREE_MS) {
     const offsetMs = Math.round((a.ms + b.ms) / 2);
-    return { verdict: offsetVerdict(offsetMs), offsetMs, fix: { offsetMs }, clips };
+    if (points.every(([, ms]) => Math.abs(ms - offsetMs) <= AGREE_MS))
+      return { verdict: offsetVerdict(offsetMs), offsetMs, fix: { offsetMs }, clips, needsCover };
   }
-  if (set.middle) {
-    const m = clipOffset(cues, set.middle);
-    clips.push(m);
-    if (solid(m)) {
-      const [ca, cb, cm] = [set.clips[0], set.clips[1], set.middle].map(centerMs);
-      const onLine = a.ms + ((b.ms - a.ms) * (cm - ca)) / (cb - ca);
-      if (Math.abs(m.ms - onLine) <= AGREE_MS)
-        return {
-          verdict: "fixable",
-          offsetMs: Math.round((a.ms + b.ms) / 2),
-          fix: { drift: [[ca, a.ms], [cb, b.ms]] },
-          clips,
-        };
-    }
+  if (points.length >= 3) {
+    const line = fitLine(points);
+    if (points.every(([t, ms]) => Math.abs(ms - line(t)) <= AGREE_MS))
+      return {
+        verdict: "fixable",
+        offsetMs: Math.round((a.ms + b.ms) / 2),
+        fix: { drift: [[ca, Math.round(line(ca))], [cb, Math.round(line(cb))]] },
+        clips,
+        needsCover,
+      };
   }
-  return { verdict: "wrong cut", clips, needsMiddle: !set.middle };
+  return { verdict: "wrong cut", clips, needsCover };
 }
 
 // The ms fix (see fixedText) moves a cue at ms by.
@@ -430,16 +514,17 @@ export function fixedText(srtText, fix) {
 }
 
 // Clips as stored in subs.db, and back.
+const clipToJson = (c) => ({ fromS: c.fromS, words: c.heard.map((h) => [h.w, h.ms]) });
 export const clipsToJson = (set) => ({
-  clips: set.clips.map((c) => ({ fromS: c.fromS, words: c.heard.map((h) => [h.w, h.ms]) })),
-  middle: set.middle
-    ? { fromS: set.middle.fromS, words: set.middle.heard.map((h) => [h.w, h.ms]) }
-    : null,
+  clips: set.clips.map(clipToJson),
+  middle: set.middle ? clipToJson(set.middle) : null,
+  cover: set.cover ? set.cover.map(clipToJson) : null,
 });
 const clipFromJson = (c) => ({ fromS: c.fromS, heard: c.words.map(([w, ms]) => ({ w, ms })) });
 export const clipsFromJson = (data) => ({
   clips: data.clips.map(clipFromJson),
   middle: data.middle ? clipFromJson(data.middle) : null,
+  cover: data.cover ? data.cover.map(clipFromJson) : null,
 });
 
 // The verdicts for the sidecars of the video at relPath (under TV_DIR), with
@@ -467,13 +552,11 @@ export async function spotCheckSubs({ path: relPath }) {
   if (usable.length > 0 && track >= 0) {
     const set = await hearClips(videoFile, track, usable, result);
     for (const f of usable) Object.assign(f, judge(f.cues, set));
-    if (usable.some((f) => f.needsMiddle)) {
-      set.middle = await hearMiddle(videoFile, track, usable, set, result);
-      if (set.middle) for (const f of usable) Object.assign(f, judge(f.cues, set));
+    if (usable.some((f) => f.needsCover)) {
+      set.cover = await hearCover(videoFile, track, usable, set, durS, result);
+      for (const f of usable) Object.assign(f, judge(f.cues, set));
     }
-    result.clipsFromS = [...set.clips, ...(set.middle ? [set.middle] : [])].map(
-      (c) => c.fromS,
-    );
+    result.clipsFromS = [...set.clips, ...(set.cover ?? [])].map((c) => c.fromS);
   } else
     for (const f of usable) {
       const srtPath = path.join(path.dirname(relPath), f.file);

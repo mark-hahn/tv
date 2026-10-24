@@ -295,12 +295,10 @@ async function prepareByAsr(videoPath, durS, track, o) {
     keep();
   }
   const judged = new Map(usable.map((f) => [f, sc.judgeFile(f, set)]));
-  if (!set?.middle && [...judged.values()].some((r) => r.needsMiddle)) {
-    set.middle = await sc.hearMiddle(videoPath, track, usable, set, timing);
-    if (set.middle) {
-      keep();
-      for (const f of usable) judged.set(f, sc.judgeFile(f, set));
-    }
+  if ([...judged.values()].some((r) => r.needsCover)) {
+    set.cover = await sc.hearCover(videoPath, track, usable, set, durS, timing);
+    keep();
+    for (const f of usable) judged.set(f, sc.judgeFile(f, set));
   }
   let fit = false;
   for (const f of files) {
@@ -323,12 +321,10 @@ async function prepareByAsr(videoPath, durS, track, o) {
       keep();
     }
     let r = sc.judgeFile(f, set);
-    if (r.needsMiddle) {
-      set.middle = await sc.hearMiddle(videoPath, track, [f], set, timing);
-      if (set.middle) {
-        keep();
-        r = sc.judgeFile(f, set);
-      }
+    if (r.needsCover) {
+      set.cover = await sc.hearCover(videoPath, track, [f], set, durS, timing);
+      keep();
+      r = sc.judgeFile(f, set);
     }
     return act(videoPath, f, r, set, false, o.notes);
   });
@@ -406,8 +402,8 @@ export async function prepareVideoSubs({
 // with like the video's others, from the clip transcripts stored for its
 // video, once whatever is dealing with the video now is done; videos never
 // checked are left alone. One tv-srvr named (named) first has its glued words
-// split. Clips that disagree are told apart from a file at another rate by a
-// middle clip, heard now when there is none, as in the video's own checks. One
+// split. The video's cover clips (subSpotCheck.js) are heard now when it has
+// none, as in the video's own checks. One
 // changed by anything but these checks, the glue fix and the re-layout is
 // judged as timed by hand.
 export async function subFileEvent(file, kind, named = false) {
@@ -449,13 +445,11 @@ export async function subFileEvent(file, kind, named = false) {
     }
     const set = storedSet(videoPath);
     let r = f.unusable ? null : sc.judgeFile(f, set);
-    if (r?.needsMiddle) {
+    if (r?.needsCover) {
       const timing = { cutMs: 0, asrMs: 0 };
-      set.middle = await sc.hearMiddle(videoPath, set.track, [f], set, timing);
-      if (set.middle) {
-        subs.saveClips(videoPath, set.track, sc.clipsToJson(set));
-        r = sc.judgeFile(f, set);
-      }
+      set.cover = await sc.hearCover(videoPath, set.track, [f], set, durS, timing);
+      subs.saveClips(videoPath, set.track, sc.clipsToJson(set));
+      r = sc.judgeFile(f, set);
     }
     await act(videoPath, f, r, set, false, notes);
   } finally {
@@ -628,7 +622,7 @@ export async function measureSidecar({ videoPath, srtFile }) {
       ? { verdict: "unusable", offsetMs: null, why: `it can't be checked, ${f.why}` }
       : track < 0
         ? await measureByAudio(video, name)
-        : await measureByAsr(video, track, files, f);
+        : await measureByAsr(video, track, files, f, durS);
     unilog(2803, `${name} measured for Sync: ${out.verdict}, ${out.offsetMs == null ? out.why : fmtOfs(out.offsetMs)}`);
     return {
       ...out,
@@ -640,7 +634,7 @@ export async function measureSidecar({ videoPath, srtFile }) {
   }
 }
 
-async function measureByAsr(videoPath, track, files, f) {
+async function measureByAsr(videoPath, track, files, f, durS) {
   const usable = files.filter((x) => !x.unusable);
   const timing = { cutMs: 0, asrMs: 0 };
   let set = storedSet(videoPath);
@@ -651,12 +645,10 @@ async function measureByAsr(videoPath, track, files, f) {
     keep();
   }
   let r = sc.judgeFile(f, set);
-  if (r.needsMiddle) {
-    set.middle = await sc.hearMiddle(videoPath, track, usable, set, timing);
-    if (set.middle) {
-      keep();
-      r = sc.judgeFile(f, set);
-    }
+  if (r.needsCover) {
+    set.cover = await sc.hearCover(videoPath, track, usable, set, durS, timing);
+    keep();
+    r = sc.judgeFile(f, set);
   }
   if (r.fix?.drift)
     return { verdict: "other rate", offsetMs: null, why: "it runs at another rate, no one shift fits it" };

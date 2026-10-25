@@ -11,31 +11,38 @@
 //               found once in each; fewer than 10 pairs is bad; a line
 //               video time = a + b × file time fitted through them (RANSAC
 //               with a fixed seed, so verdicts repeat)
-//   3 spot      two pairs within 60 s of heard time, both more than 500 ms
-//               off the line and within 300 ms of each other, is bad
+//   3 spot      two pairs within 60 s of heard time, both off the line by
+//               more than 1200 ms early (the caption before its words) or
+//               600 ms late, and within 300 ms of each other, is bad
 //   4 refit     dense pairs, each caption's first 3 words against the one
 //               3-word run within 2 s of where the line puts it, and the line
 //               fitted again through them: the fix line
-//   5 minute    a dense pair and those in the 60 s after it, 8 or more, with
-//               a median more than 500 ms off the fix line, is bad
+//   5 minute    a dense pair and those in the 60 s after it, 6 or more, with
+//               a median more than 450 ms early or 300 ms late of the fix
+//               line, is bad
 //   6 missing   any 120 s, stepping 10 s, with 40 or more counted heard words
 //               and no caption start makes the file missing
 //   7 good
 //
 // Heard words after the file's last caption in the video's last 6 minutes
 // (end material) and inside another file's ♪ captions, padded 1 s, are not
-// counted. Every rule and constant here is vetting version 1: a change to
-// any of them raises VET_VERSION.
+// counted. Every rule and constant here is vetting version 2: a change to
+// any of them raises VET_VERSION. Version 2 (10-25) gave the spot and minute
+// rules separate early and late limits, from the user's ratings of 162 clips
+// (subs-observe.md): captions late bother about twice as much as early, and
+// a sustained shift from about 350 ms late. Version 1 failed either rule at
+// 500 ms either way, and the minute rule needed 8 pairs.
 //
 // The analysis that measured these rules (sub-analysis on hahnca.com,
-// evaluate.py's whole+refit+seg8+tol500+mend+mlyr+mslide and planted/fill.py)
-// is matched step for step, down to Python's random draws (pyRandom.js),
-// its float sums (pySum) and its rounding (pyRound).
+// evaluate.py's whole+refit+mend+mlyr+mslide+segMin6+segE450+segL300+
+// spotE1200+spotL600 and planted/fill.py) is matched step for step, down to
+// Python's random draws (pyRandom.js), its float sums (pySum) and its
+// rounding (pyRound).
 
 import { cleanSrt, msToSrtTime, parseSrt, serializeSrt, srtTimeToMs, wrapLines } from "@tv/share";
 import { PyRandom } from "./pyRandom.js";
 
-export const VET_VERSION = 1;
+export const VET_VERSION = 2;
 
 // step 1
 const MIN_CAPTIONS_PER_MIN = 3;
@@ -63,14 +70,17 @@ const RANSAC_SEED = 1;
 const RANSAC_REFITS = 2;
 // step 3
 const SPOT_WINDOW_MS = 60000;
-const SPOT_OFF_MS = 500;
+// a residual above 0 is a caption before its words (early), below 0 late
+const SPOT_EARLY_MS = 1200;
+const SPOT_LATE_MS = 600;
 const SPOT_AGREE_MS = 300;
 // step 4
 const DENSE_MS = 2000;
 // step 5
 const MINUTE_MS = 60000;
-const MINUTE_MIN_PAIRS = 8;
-const MINUTE_OFF_MS = 500;
+const MINUTE_MIN_PAIRS = 6;
+const MINUTE_EARLY_MS = 450;
+const MINUTE_LATE_MS = 300;
 // step 6
 const MISSING_WINDOW_MS = 120000;
 const MISSING_STEP_MS = 10000;
@@ -393,19 +403,23 @@ function densePairs(caps, heard, line) {
 
 const fmtMin = (ms) => `${(Math.round(ms / 6000) / 10).toFixed(1)} min`;
 
-// Two pairs within SPOT_WINDOW_MS, both more than SPOT_OFF_MS off the line
-// and within SPOT_AGREE_MS of each other: why, or null.
+// Whether a residual is off: more than SPOT_EARLY_MS early or SPOT_LATE_MS
+// late.
+const spotOff = (r) => r > SPOT_EARLY_MS || r < -SPOT_LATE_MS;
+
+// Two pairs within SPOT_WINDOW_MS, both off the line and within
+// SPOT_AGREE_MS of each other: why, or null.
 function spotWhy(pairs, { a, b }) {
   const res = pairs
     .map(([x, y]) => [y, y - (a + b * x)])
     .sort((p, q) => p[0] - q[0] || p[1] - q[1]);
   for (let i = 0; i < res.length; i++) {
     const [u, r] = res[i];
-    if (Math.abs(r) <= SPOT_OFF_MS) continue;
+    if (!spotOff(r)) continue;
     for (let j = i + 1; j < res.length; j++) {
       const [v, q] = res[j];
       if (v - u > SPOT_WINDOW_MS) break;
-      if (Math.abs(q) > SPOT_OFF_MS && Math.abs(q - r) <= SPOT_AGREE_MS)
+      if (spotOff(q) && Math.abs(q - r) <= SPOT_AGREE_MS)
         return `spot: ${Math.round(r)} ms off the line at ${fmtMin(u)}`;
     }
   }
@@ -413,8 +427,8 @@ function spotWhy(pairs, { a, b }) {
 }
 
 // A dense pair and those in the MINUTE_MS of heard time after it, at least
-// MINUTE_MIN_PAIRS, whose median is more than MINUTE_OFF_MS off: why, or
-// null.
+// MINUTE_MIN_PAIRS, whose median is more than MINUTE_EARLY_MS early or
+// MINUTE_LATE_MS late: why, or null.
 function minuteWhy(pairs, { a, b }) {
   const res = pairs
     .map(([s, u]) => [u, u - (a + b * s)])
@@ -425,7 +439,7 @@ function minuteWhy(pairs, { a, b }) {
     const to = bisectLeft(heardAt, u + MINUTE_MS);
     if (to - i < MINUTE_MIN_PAIRS) continue;
     const m = median(res.slice(i, to).map(([, r]) => r));
-    if (Math.abs(m) > MINUTE_OFF_MS) return `minute: ${Math.round(m)} ms off at ${fmtMin(u)}`;
+    if (m > MINUTE_EARLY_MS || m < -MINUTE_LATE_MS) return `minute: ${Math.round(m)} ms off at ${fmtMin(u)}`;
   }
   return null;
 }

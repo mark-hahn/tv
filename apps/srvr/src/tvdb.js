@@ -57,6 +57,8 @@ const WIKI_SIMILARITY_MIN = 0.8; // wikipedia button kept if similarity > this
 const VERIFY_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
+// wikimedia's robot policy 403s a bare agent; it wants contact info in it
+const WIKI_API_UA = "tv-app/1.0 (https://hahnca.com)";
 
 function buildTvdbUrl(tvdbPath, query) {
   const safePath = String(tvdbPath || "").replace(/^\/+/, "");
@@ -1044,7 +1046,7 @@ const getRemote = async (id, type, showName) => {
           `&srsearch=${escShow}&format=json&srlimit=5&origin=*`;
         try {
           const resp = await fetch(wikiApiUrl, {
-            headers: { "User-Agent": "tv-app/1.0" },
+            headers: { "User-Agent": WIKI_API_UA },
             signal: AbortSignal.timeout(8000),
           });
           if (!resp.ok) {

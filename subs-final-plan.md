@@ -1,5 +1,14 @@
 # Subtitle vetting from a complete ASR: implementation plan
 
+**Status (10-25):** built and live, now at vetting version 4. This plan is
+version 1's design; later versions changed the judge's rules (version 2:
+the spot and minute rules got separate early and late limits; 3: the
+incomplete step and cheap vetting's truncated mark, `subs-coverage.md`; 4:
+the minute rule 900 ms early / 600 ms late), and verdicts now carry the
+version they were made under, so a version change judges old ones again.
+CLAUDE.md's Subtitles section and the header of `apps/srvr/src/subJudge.js`
+describe the rules as they are.
+
 Written 10-24. This replaces the clip-based subtitle checks. Episodes move to it slowly, at two levels:
 - **Full vetting:** a complete word-timed ASR, then every subtitle file judged against the transcript by the rules below and either kept or deleted. Every kept file is retimed by its fix line; a file whose only fault is missing stretches is retimed and then has those stretches filled from the transcript.
 - **Cheap vetting:** no ASR. The episode gets its subtitle files, cleaned but not judged.

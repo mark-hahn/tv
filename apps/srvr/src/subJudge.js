@@ -18,7 +18,7 @@
 //               3-word run within 2 s of where the line puts it, and the line
 //               fitted again through them: the fix line
 //   5 minute    a dense pair and those in the 60 s after it, 6 or more, with
-//               a median more than 450 ms early or 300 ms late of the fix
+//               a median more than 900 ms early or 600 ms late of the fix
 //               line, is bad
 //   6 incomplete of the counted heard words, fillers aside, under 77% are in
 //               a caption within 3 s of them (fixed by the fix line), and
@@ -31,8 +31,12 @@
 //
 // Heard words after the file's last caption in the video's last 6 minutes
 // (end material) and inside another file's ♪ captions, padded 1 s, are not
-// counted. Every rule and constant here is vetting version 3: a change to
-// any of them raises VET_VERSION. Version 3 (10-25) added the incomplete
+// counted. Every rule and constant here is vetting version 4: a change to
+// any of them raises VET_VERSION. Version 4 (10-25) made the minute rule
+// half as strict, 900 ms early or 600 ms late: watching whole episodes, the
+// user found files rejected just past version 2's limits fine, and judged
+// the clip ratings too strict for what bothers them over an episode. The
+// spot rule kept its limits. Version 3 (10-25) added the incomplete
 // step (subs-coverage.md): a file whose captions are on time but carry only
 // part of the speech (cut to their first line, or another script's wording)
 // passed before. Its runs part spares foreign dialogue the ASR hears as
@@ -44,16 +48,15 @@
 // minute rule needed 8 pairs.
 //
 // The analysis that measured these rules (sub-analysis on hahnca.com,
-// evaluate.py's whole+refit+mend+mlyr+mslide+segMin6+segE450+segL300+
+// evaluate.py's whole+refit+mend+mlyr+mslide+segMin6+segE900+segL600+
 // spotE1200+spotL600+incShare77+incRuns15 and planted/fill.py) is matched
-// step for step, down to
-// Python's random draws (pyRandom.js), its float sums (pySum) and its
-// rounding (pyRound).
+// step for step, down to Python's random draws (pyRandom.js), its float sums
+// (pySum) and its rounding (pyRound).
 
 import { cleanSrt, msToSrtTime, parseSrt, serializeSrt, srtTimeToMs, wrapLines } from "@tv/share";
 import { PyRandom } from "./pyRandom.js";
 
-export const VET_VERSION = 3;
+export const VET_VERSION = 4;
 
 // step 1
 const MIN_CAPTIONS_PER_MIN = 3;
@@ -90,8 +93,8 @@ const DENSE_MS = 2000;
 // step 5
 const MINUTE_MS = 60000;
 const MINUTE_MIN_PAIRS = 6;
-const MINUTE_EARLY_MS = 450;
-const MINUTE_LATE_MS = 300;
+const MINUTE_EARLY_MS = 900;
+const MINUTE_LATE_MS = 600;
 // step 6
 const COVER_NEAR_MS = 3000;
 const COVER_RUN_WORDS = 2;

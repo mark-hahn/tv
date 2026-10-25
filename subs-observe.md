@@ -101,6 +101,14 @@ thresholds, direction-aware.
 
 ## Use of the ratings
 
+**10-25, later:** watching whole episodes, the user found files just past
+the limits drawn from these ratings fine (Old Christine S02E02 `opnCA5YW`,
+301 ms late over a minute) and judged the ratings too strict: they measure
+what can be noticed in a short clip, not what bothers over an episode.
+Vetting version 4 (15:25) halved the minute rule to 900 ms early / 600 ms
+late and left the spot rule; truth `credits5` doubles the eye's limits. The
+steps below record how the version 2 limits were reached.
+
 1. **Done 10-25: the truth credits4 in `evaluate.py`** (`eye_truth`,
    `--truth credits4`). A file is bad when any 60 s of caption time with 6
    or more agreeing pairs has a median more than 500 ms early or 350 ms late

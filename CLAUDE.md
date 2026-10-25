@@ -264,51 +264,59 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
     found videos, so a disk outage clears nothing.
   - `picks`: the sidecar each episode showed at its last stop.
   - `processed`: videos the add-to-disk steps have handled.
-  - `clips`: the ASR clip transcripts of each checked video, and its audio
-    track (-1: no English audio). `checks`: each sidecar's verdict, valid
-    while the file keeps its size and mtime. `subs.unfitFor` marks a result
-    found not to fit a video, `subs.hashFor` one OpenSubtitles made for it
-    (moviehash).
-- Subtitle checks (`apps/srvr/src/subPrepare.js`, `subSpotCheck.js`,
-  `srt-fix.md`): each sidecar's timing is checked against the words of the
-  video's English audio, heard by ASR (Speechmatics) on two 2-minute clips
-  at the busiest dialogue of the first and last third, about 2.5 cents.
-  - Per clip, cues pair with the clip's words by their first 5 words, and
-    the median of the pairs is the offset (positive: captions early).
-  - good: both clips agree within 250 ms on −250..+500 ms. fixable: they
-    agree on anything else (shifted), or a middle clip shows the file runs
-    at another rate (stretched). wrong cut: they disagree, or a file that
-    can't be told ends over 5 s past the video. can't tell: a clip has too
-    few pairs. unusable: under 3 dialogue cues a minute, or not English.
-  - A fixed file is judged again. A file that is unusable or from another
-    cut is deleted, an opn file also marked unfit; its verdict is kept as
-    the memory of why, so the track is not copied out again. Only an
-    unusable asr file stays, so ASR does not run again for the video.
-  - With nothing good, OpenSubtitles candidates are downloaded one at a time
-    and judged, up to 5; with none fitting, a complete ASR is queued.
-  - A video with no English audio track: T and H are presumed good, the
-    others are checked by whole-file audio matching (ffsubsync), no ASR.
-  - It runs after the add-to-disk steps, and from the remotes' Sync. The
-    watcher judges a sidecar that arrives or changes later from the stored
-    clips, at no cost unless it has to hear a middle clip, waiting while the
-    video's checks run; a deleted video's checks go with it.
-  - A video counts as checked (`needsCheck`) by its path: a replacement or
-    rename is checked again.
-- OpenSubtitles downloads happen in the checks above, in `getPlayUrl`
+  - `transcripts`: each fully vetted video's complete word-timed ASR of its
+    English track (Speechmatics), gzipped. Made once per video and used by
+    every later vetting, Sync and hand timing; a replaced video's goes with
+    it.
+  - `checks`: each sidecar's verdict, valid while the file keeps its size
+    and mtime. `method`: `vet` (full vetting, by the transcript), `vet-cheap`
+    (cheap vetting: by an old `+` file, or `truncated`), `vet-audio` (no
+    English audio), or the older checks' `asr`, `retime`, `match`. `version`:
+    the vetting version a `vet` or `vet-cheap` verdict was made under.
+    `lyrics`: a vetted file's ♪ captions in video time, kept after the file
+    is deleted, for judging its siblings.
+  - `subs.unfitFor` marks a result found not to fit a video, and `unfitVer`
+    the vetting version that found it (null: the older checks or audio
+    matching, under every version). `subs.hashFor` marks one OpenSubtitles
+    made for the video (moviehash).
+  - `clips` and `retimes`: left from the older clip checks and retime pass,
+    no longer made. Sync still reads a video's stored clips.
+- When a video or an S file lands on disk the watcher queues the video
+  (`apps/srvr/src/subsQueue.js`) for the add-to-disk steps: T and H copied
+  out (not a copy that full vetting deleted under this version, or that the
+  older checks found unusable or from another cut), an arriving `.srt`
+  named `S<n>`, and glued words split (below). Nothing is judged and no ASR
+  runs: vetting does that later. A video rewritten in place under the same
+  name (a forced download, tv-down's remux) is queued as another file: what
+  was learned about the old one, its transcript included, is forgotten, its
+  T and H are copied out again, and its other sidecars are judged against
+  it at its next vetting.
+- The 6-hourly sweep queues library videos, watched or not, that have not
+  been through those steps. Its entries, like cheap vetting's, come after
+  all other batch work: none starts while a stills build, a recode or ASR is
+  running or queued.
+- ASR runs only for full vetting (below) and from the ASR pane. What it
+  costs is Speechmatics' own job durations (`apps/srvr/src/asrCost.js`,
+  `data/asrjobs.db`), shown in the ASR pane's Cost chart; nothing estimates
+  it. There is no daily limit. Before 08-29 ASR was Mistral's voxtral-mini,
+  whose `+` files have coarse segment-level times.
+- OpenSubtitles downloads happen in vetting (below), in `getPlayUrl`
   (`subsBeforePlay`), for tvapp and the browser player alike, and ahead of a
   play (`prefetchNextSubs`):
   - Ahead of a play: once a play's own downloads are done, the next unwatched
     episode's; and whenever tv-srvr refreshes a library show played in the
     last 30 days, its next-up episode's. Nothing waits on these.
   - At play and ahead of one, only when the episode has fewer than 3
-    downloaded and no file but its `.asr.srt` checked good: search, then
+    downloaded and no file but its `+` file with vetting's ✓: search, then
     download all it still needs at once (`fetchSubs`), then replacements
     for any that failed, until it has 3, 3 have failed, or no candidate is
-    left. The watcher checks each one that lands.
+    left. Nothing judges them as they land; vetting does later (a fully
+    vetted episode's at its show's next update).
   - A candidate is, in order: one made for the video by its hash, one from
     the video's release group, one from the same origin as a chosen file of
-    the show, else the first that is not foreign-parts-only. Results unfit
-    for the video are never candidates.
+    the show, else the first that is not foreign-parts-only. Results found
+    unfit for the video (by vetting under this version, or by the older
+    checks) are never candidates.
   - Play waits at most 5 s (`PLAY_WAIT_MS`). Slow, failed, or with no
     subtitle file at all after the wait ("no subtitles"), it plays anyway
     and `subError` puts one pop-up, problems joined by "; ", on the phones
@@ -319,11 +327,15 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
     is opened again.
   - The API allows 5 requests a second. A search or download answered 429 is
     retried after its `retry-after` (1 s). One play alone sends 4.
-  - There is no daily download quota check of our own; OpenSubtitles enforces
-    its 1000 a day, and past it downloads fail like any other.
-- What a play offers (`playList`): files checked good first, labelled with
-  a ✓, then T and H files that could not be judged, then unchecked files.
-  Files from another cut and unusable ones are left out.
+  - Only cheap vetting checks the day's quota (`cheapDownloadQuota`): it
+    downloads nothing while fewer than 200 are left, so plays keep theirs.
+    OpenSubtitles enforces its 1000 a day, and past it downloads fail like
+    any other.
+- What a play offers (`playList`): files with vetting's good or filled
+  verdict first, labelled with a ✓, then T and H files judged otherwise,
+  then unjudged files, then files cheap vetting marked truncated. Files the
+  older checks found unusable or from another cut are left out; their good
+  verdicts get no ✓.
 - Labels (`sidecarLabel()`) are made from the files each time a list is
   handed out, and nothing is stored: the type in lower case, then L when
   the file has ♪ lyrics and S when it has sound descriptions
@@ -333,7 +345,8 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   any): the file the episode last showed, else, among the files without S
   when there are any besides `+`, the type the show last showed (for V, the
   one from the same origin as a chosen one), else the first in the order
-  T, H, V, S, +.
+  T, H, V, S, +. A `+` file with a ✓ is the start only when no file of
+  another type has one.
 - The player sends the showing file as `sub` in `playProgress`. At a stop
   that is not an early stop it becomes the episode's pick and `chosen`.
 - Same origin (`sameOrigin()`): two results for different episodes match when
@@ -343,23 +356,6 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   - an anonymous or bot uploader (3282 os-auto, 119465 os_robot, 2 system):
     `release` equal once the episode marker and episode title are removed,
     or `comments` equal and not empty.
-- When a video or an S file lands on disk the watcher queues the video
-  (`apps/srvr/src/subsQueue.js`): T and H copied out, an arriving `.srt`
-  named `S<n>`, glued words split (below), then the subtitle checks above,
-  and ASR when they leave
-  nothing that fits. There is no daily limit on ASR. What it costs is
-  Speechmatics' own job durations (`apps/srvr/src/asrCost.js`,
-  `data/asrjobs.db`), shown in the ASR pane's Cost chart; nothing estimates
-  it. A request for the video being processed runs it again once that run
-  is done. A video rewritten in place under the same name (a forced
-  download, tv-down's remux) is queued as another file: what was learned
-  about the old one is forgotten, its T and H are copied out again, and its
-  other sidecars are judged against it.
-- The 6-hourly sweep queues library videos, watched or not, that have not
-  been through those steps, whatever subtitle files they already have. Its
-  entries come after all other batch work: none starts while a stills build,
-  a recode or ASR is running or queued. With `SUB_CHECK_BACKFILL` (off) it
-  also queues videos never checked.
 - A replaced or losing video is deleted with its sidecars, never kept as
   `.old` or `.alt`, and a replacement does not inherit its subtitles.
   tv-down deletes the video a download replaces only after the new file has
@@ -375,20 +371,8 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   lands as `<episode>.<name>`. A subtitle file whose name and top folder give
   no season and episode (the other languages in that layout) is skipped with
   a log line, never an error entry.
-- Retime (`retimePass()` in `subPrepare.js`): a video with an `.asr.srt` and
-  no other file checked good gets one other file shifted by one offset to
-  fit the `.asr.srt`, so one file has a real subtitle's wording and the
-  video's timing. The offset is the median of the start-time differences of
-  the phrases the two share (`asrOffset()` in `subSync.js`, the local pane's
-  Sync), with at least 10 matches and 80% of them within 250 ms of it, else
-  the file is from another cut. Files on disk are tried in order T, H, V, S,
-  then OpenSubtitles downloads, up to 5. The retimed file is checked good,
-  method "retime". It runs in a sub queue entry after the checks, alone from
-  an entry with the `retime` mark (an `.asr.srt` landing, the backfill
-  `scripts/retime-backfill.js`), and from the watcher for a file arriving
-  beside such a video. `subs.db`'s `retimes` table records each pass, and the
-  queue does not repeat one by itself. A good `+` file is the start pick
-  only when no good file of another type is there.
+- The retime pass and the clip checks are gone (10-24);
+  `scripts/retime-backfill.js` is obsolete and must not be run.
 - Glued words (`apps/srvr/src/subGlue.js`): words run together where a
   release's converter dropped a line break ("thisbefore") are split, in
   every sidecar but `+`. A word that is not common itself is split into the
@@ -417,29 +401,95 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   video's sidecars are gone over again until none changes. A rewritten file
   keeps its check (no timing moves), and the watcher's change event for it
   is not a hand timing. It runs in a sub queue entry after the copy-out and
-  naming, before the checks, and from the watcher for a sidecar tv-srvr
+  naming, before vetting, and from the watcher for a sidecar tv-srvr
   named arriving later. `/api/fixGluedSubs?showName=[&dryRun=1]` does a
   show; `scripts/fix-glued-subs.js [--dry]` drives it over the library.
   The first pass (10-21) split 586 words in 76 files; their originals are in
   `data/glue-backup/` on hahnca.com.
-- Subtitle vetting (planned in `subs-final-plan.md`, not built yet) will
-  replace the clip checks, at two levels:
-  - full: a complete ASR, then every subtitle file judged against it, and
-    kept and retimed, filled, or deleted;
-  - cheap: no ASR and nothing judged. Embedded tracks are copied out, files
-    cleaned, old files kept, and one OpenSubtitles download made only when
-    there is no embedded track;
-  - a video with an old `+` file is cheap, but its files are judged against
-    the `+` file's caption starts: good ones retimed with a ✓, bad ones kept
-    without one, gaps filled from the `+` file;
-  - when it runs: only in the tvdb update task's per-show step (the show's
-    next two episodes in full, the rest cheap) and at the end of a watch
-    (the next two in full). Never when files land, at play, or in the
-    sweep, and no backfill;
-  - ✓ means judged good by the new judge; the old clip checks' ✓s are
-    dropped, and the play list's order is unchanged;
+- Subtitle vetting (`apps/srvr/src/subVet.js`, the judge `subJudge.js`;
+  the design in `subs-final-plan.md`, the work log in `subs-test.md`)
+  decides which files a video keeps and which get a ✓. It replaced the older
+  clip checks (`subPrepare.js`, `subSpotCheck.js`) on 10-24.
+  - When: the tvdb update task's per-show step queues the show's next two
+    episodes (next-up and the one after) for full vetting and the rest for
+    cheap; selecting a show in the web client starts that step. The end of
+    a watch queues the next two in full. Never when files land, at play, or
+    in the sweep. Watched episodes are never vetted.
+  - Which (`episodesToVet`): a next-two episode in full unless it was fully
+    vetted under this version for its current video. A fully vetted episode
+    again in full when a file arrived since, a file has a verdict from an
+    older version, or a T/H copy was deleted under one; an episode fully
+    vetted under an older version in full again. The rest cheap when not
+    vetted, left with no subtitle file, or holding a verdict made against
+    its `+` file under an older version.
+  - Full: a complete ASR of the English audio (`apps/asr/asr.js`,
+    Speechmatics) unless the transcript is stored; it rewrites the `+` file
+    and stores the transcript. Every file is judged against it. A good one
+    is fixed by its fix line and gets a ✓. A bad one is deleted: a T/H
+    copy's check is kept as the memory, so it is not copied out again, and a
+    download is marked unfit. With none good, OpenSubtitles candidates are
+    downloaded and judged one at a time, up to 5. With still none good, the
+    first file whose only fault is missing stretches is filled from the
+    transcript (✓) and the others with missing stretches are deleted; with
+    none of those either, the `+` file is the episode's subtitle. A later
+    good file deletes an earlier filled one.
+  - A video with no English audio: at full level T and H are presumed fine
+    (no ✓) and the others checked by whole-file audio matching (ffsubsync,
+    a ✓ when one shift fits). No ASR.
+  - Cheap: no ASR, nothing deleted. Every file is cleaned and its glued
+    words split. A file cut to its captions' first lines (`truncatedWhy`:
+    mixed case, 100+ captions, 8% or more ending mid-sentence, at most 2%
+    longer than 42 characters; Kid Sister S02, Madam S01E01) is marked
+    `truncated`: no ✓, offered last, not counted as the video's own copy.
+    One OpenSubtitles download when the video has no embedded copy or
+    download that is not truncated, but not while fewer than 200 of the
+    day's downloads are left.
+    With a `+` file and no transcript, the files are judged against its
+    caption starts: good ones fixed with a ✓, ones with only missing
+    stretches filled from it, bad ones kept without a ✓. Most such `+` files
+    are Mistral's, whose times wander up to ±0.5 s, so these verdicts are
+    rough.
+  - The judge, version 4; the first step that fails decides:
+    1. unusable: under 3 captions a minute, or under 18% common English
+       words;
+    2. the line: captions whose first 3 words match a 3-word run heard once
+       (after a 1 s pause) pair with it; under 10 pairs is bad; a line, a
+       shift and a stretch, is fitted through them (RANSAC, fixed seed);
+    3. spot: two pairs within 60 s both more than 1200 ms early or 600 ms
+       late of the line, and within 300 ms of each other, is bad;
+    4. refit: every caption paired with the one heard run within 2 s of the
+       line, and the line fitted again through them: the fix line;
+    5. minute: 6 or more pairs within 60 s whose median is more than 900 ms
+       early or 600 ms late of the fix line is bad;
+    6. incomplete: under 77% of the counted heard words (fillers aside) in a
+       caption within 3 s, with runs of 2 or more uncarried words over 15% of
+       the captions, is bad (not judged against a `+` file);
+    7. missing: 120 s with 40 or more counted heard words and no caption;
+    8. good.
+    Heard words after the file's last caption in the video's last 6 minutes,
+    and inside another file's ♪ captions, are not counted. Timing is a
+    caption's start against when its first words are heard, relative to the
+    fitted line: a file off by the same amount throughout is fixed, not
+    rejected. End times are never judged.
+  - Versions (`VET_VERSION`): 1 (10-24); 2 (10-25 02:43): the minute rule
+    450 early / 300 late and the spot rule 1200 / 600, from the 10-24 clip
+    ratings (`subs-observe.md`); 3 (10-25 14:07): the incomplete step and
+    the truncated mark (`subs-coverage.md`); 4 (10-25 15:25): the minute
+    rule halved to 900 / 600, since the clip ratings measured what can be
+    noticed in a clip, which is stricter than what bothers over a whole
+    episode. Every `vet` or `vet-cheap` verdict and unfit mark carries its
+    version, and a version change judges the older ones again at each
+    episode's next vetting: T/H copies deleted under an older version are
+    copied out again, and downloads found unfit under one are candidates
+    again.
+  - A rules change: edit `subJudge.js`'s constants, raise `VET_VERSION`, set
+    the same in evaluate.py's `FINAL` (`scripts/vet-validate-ref.py`), check
+    930/930 with `vet-validate-ref.py` and `vet-validate.js` on hahnca.com,
+    and score the test sets (`sub-analysis/fresh100/README.md`). The
+    analysis data and scripts are in `apps/srvr/data/sub-analysis/` on
+    hahnca.com.
   - an episode that has been through it has its subtitles "vetted"; "vetted
-    v1" means vetted under rules version 1;
+    v4" means vetted under rules version 4;
   - say "vetting" and "vetted" alone only in subtitle contexts, and
     "subtitle vetting" or "subs vetted" anywhere else (log group "subs vet").
 - Episode subtitle-vetting fields, stored in tvdb `episodeData` whenever an
@@ -467,14 +517,16 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   keys) and from the browser player's Subs bar, and applied only by
   rewriting the `.srt` on disk (`/api/applySubOffset`). No offset is stored
   anywhere; `/api/subtitle` serves the file as it is. The rewritten file is
-  judged again, never moved back.
+  judged again as a hand timing (`judgeHandTimed`), never moved back: with
+  a transcript it keeps a ✓ only when good and within 250 ms as it is.
 - Sync: the remotes' panel Sync (`sy`) measures how far the showing file is
-  off the video's words (`/api/measureSub`, `measureSidecar()`); the answer
-  becomes the panel's offset, and nothing shifts until Apply. A file that
-  already fits gets its ✓ at once. It is off once the episode has been
-  checked (`getPlayUrl`'s `subsChecked`). The local pane's Sync shifts
-  one sidecar to fit its video, by the stored clips, else by its
-  `.asr.srt`.
+  off the video's words (`/api/measureSub`, `measureSidecar()`): by the
+  transcript, else by the clips the older checks stored, else by the `+`
+  file. The answer becomes the panel's offset, and nothing shifts until
+  Apply. A file that already fits gets its ✓ at once. It is off once every
+  file but `+` has a ✓ (`getPlayUrl`'s `subsChecked`). The local pane's
+  Sync shifts one sidecar by its fix line against the transcript, else by
+  the stored clips, else by its `.asr.srt`.
 - `/api/subsCountEpisodes` (the torrent pane's Chk Subs, through tv-api):
   per episode, the distinct OpenSubtitles releases, a hearing-impaired copy
   counting with its release. It searches 3 at a time, finds an IMDb id by
@@ -822,8 +874,8 @@ because the TV is unreachable from any wireless host here.
     `/api/measureSub` measure how far the showing file is off the video's
     words, and the answer becomes the offset, as if set with +/-; the
     panel's caption line shows where it puts the captions, and Apply shifts
-    the file. Sync is off while it or an Apply runs and once the episode has
-    been checked.
+    the file. Sync is off while it or an Apply runs and once every file but
+    `+` has a ✓.
   - Holding the Apps key in tvapprc mode sends `k,reload`, which reloads the
     playing video so an edited subtitle file is fetched again.
 - The camera overlay pauses a playing video. The video resumes when the

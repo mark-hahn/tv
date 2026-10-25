@@ -2,7 +2,9 @@
 
 Found 10-24 while building the subtitle observation page (`subs-observe.md`).
 The fix was built 10-25 as vetting version 3 (see "The fix" at the end),
-validated, and deployed 10-25 14:07. The first
+validated, and deployed 10-25 14:07. Vetting version 4 (15:25) changed
+only the minute rule; the incomplete step and the truncated mark are
+unchanged. The first
 measurements live on hahnca.com in `apps/srvr/data/sub-analysis/observe/`
 (`coverage.mjs`, `coverage.txt`, `coverage.tsv`, `lib/speech.mjs`), the
 fix's in `sub-analysis/coverage/` (its README).

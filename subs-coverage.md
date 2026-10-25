@@ -1,10 +1,11 @@
 # Subtitle files that pass vetting but don't carry the speech
 
 Found 10-24 while building the subtitle observation page (`subs-observe.md`).
-Nothing in production has been changed for it. This note is the record for
-fixing it later; the measurements and the measure live on hahnca.com in
-`apps/srvr/data/sub-analysis/observe/` (`coverage.mjs`, `coverage.txt`,
-`coverage.tsv`, `lib/speech.mjs`).
+The fix was built 10-25 as vetting version 3 (see "The fix" at the end),
+validated, and deployed 10-25 14:07. The first
+measurements live on hahnca.com in `apps/srvr/data/sub-analysis/observe/`
+(`coverage.mjs`, `coverage.txt`, `coverage.tsv`, `lib/speech.mjs`), the
+fix's in `sub-analysis/coverage/` (its README).
 
 ## The problem
 
@@ -105,3 +106,84 @@ the speech with runs under 25% of its captions (`MIN_FILE_COVERAGE`,
 `MAX_RUN_SHARE` in `prep.mjs`), and a clip with any uncaptioned phrase or
 2-word run is left out. Verified 10-24 over every kept moment, independently
 of prep: 0 of 83 had uncaptioned speech or a file under 85%.
+
+## The fix (10-25, vetting version 3, deployed 14:07)
+
+What each item above became:
+
+1. **Done: an incomplete step in the judge** (`subJudge.js` step 6, between
+   the minute rule and the missing check; evaluate.py `incShare77+incRuns15`).
+   With the file fixed by its line, the heard words the missing check counts
+   (end material and other files' ♪ lyrics exempt, fillers aside) are
+   measured: a word is carried when a caption within 3 s has it, and a run
+   is 2 or more in a row that none has. Under 77% carried **and** runs over
+   15% of the captions is bad, kind `incomplete`: full vetting deletes it
+   like any bad file (a T/H track's check kept as the memory, a download
+   marked unfit), then downloads and judges candidates, then fills, then
+   falls back to the `+` file. Not checked against an old `+` file (no word
+   times). The remotes' Sync answers "it leaves out much of what is said".
+   Kept, not filled: no per-phrase fill was built.
+2. **Done, by the runs part, not by a word exemption.** Foreign dialogue the
+   ASR hears as English comes in few long stretches (Shōgun S01E08: 72%
+   carried, runs 7–10% of captions); truncation, another script's wording
+   and condensing leave a short gap in caption after caption (33–111%). Only
+   Shōgun S01E08 could test this: no library Shōgun episode has a
+   transcript. The exemptions alone lifted Severance S02E10 from 80% to 93%.
+3. **Done, for cheap vetting** (`subVet.js` `truncatedWhy`, `markTruncated`).
+   On text as `cleanSrt()` leaves it (it joins every caption's lines when
+   they fit 60 chars, so "no two-line caption" can't be read on disk): mixed
+   case, 100+ captions, 8%+ ending mid-sentence, at most 2% longer than 42
+   chars. Such a file gets a `vet-cheap` check `truncated`: no ✓, offered
+   last in a play's list (`playList`'s fourth group), not judged against a
+   `+` file, not counted as the video's own copy or download, so cheap
+   vetting downloads one. Nothing is deleted. The copy-out is unchanged.
+   All-capitals broadcast captions (Childrens Hospital S04–S05, The Naked
+   Truth) split one line per caption and needed the mixed-case part.
+4. **Not done: OCR repair.** It is damage to the words, not missing
+   captions, and `cleanSrt()` writes every subtitle file. Spirited's files
+   are no longer vet-good files with a transcript, so they weren't measured
+   again.
+5. **Partly: a hand-labelled list instead of a truth.** A truth that is the
+   rule itself proves nothing. `coverage/labels.tsv` holds the 11 files or
+   groups looked at by eye with what they are; the step and the mark agree
+   with each one they reach (Kid Sister S02E01 T2 is already bad by timing).
+   Sirens S02E07 opnD2Z67 is rejected as incomplete for what is really a
+   timing fault (3–4 s early in places) that the minute rule misses: the
+   right outcome for another reason. Under credits4 the step changes nothing
+   in fresh100, and in test100 it throws away 2 files credits4 calls good
+   (Lazarus S02E07 opn-8496000, Stuart S01E06 opn-12757624). Both are
+   paraphrases with complete siblings, and no episode goes to ASR for them.
+6. **Done: library scans, read-only.**
+   - Videos with a stored transcript (321, the fully vetted ones): the rule
+     rejects 4 of 593 measured files. Lupin S01E01 T4 (two complete tracks
+     stay), Poldark S01E05 opnGQ65Q, Madam S01E01 T2 (truncated: "Oh, we'll
+     be so sad to say" for "... goodbye to Toby after he graduates") and
+     Sirens (2014) S02E07 opnD2Z67 (3–4 s early around 10 min, which the
+     timing rules miss). The last three are their episodes' only file, so
+     those episodes get downloads tried, else their `+` file. All four are
+     unwatched.
+   - Every sidecar (6578 files with the sets): the truncation mark holds for
+     Kid Sister S02E01–05 T2, Madam S01E01 T2 and the test copy of Kid
+     Sister S02E01, and no other. Kid Sister S02E01–05 are all watched, so
+     vetting never touches them; the user may want to replace those files
+     by hand.
+
+Where the line sits, and the files near it (77% / 15%):
+
+| File | Carried | Runs/captions | By eye | v3 |
+|---|---|---|---|---|
+| Stuart S01E06 opn-12757624 | 74.8% | 0.33 | another script | incomplete |
+| Sirens S02E07 opnD2Z67 | 72% | 0.21 | 3–4 s early in places | incomplete |
+| Shōgun S01E08 (5 files) | 72–75% | 0.07–0.10 | foreign dialogue | good |
+| Angel S02E16 (3 downloads) | 79.8% | 0.36–0.38 | condensed, faithful | good |
+| Angel S03E04 opn-1832834 | 81.4% | 0.36 | condensed | good |
+| Andy Barker S01E01 (3 files) | 85% | 0.23–0.24 | not looked at | good |
+
+The margins are about 2–3 points on either side of 77%. Raising the line
+would start deleting condensed files like Angel's, whose episodes have no
+other file and would fall back to their `+` file.
+
+What a deploy does: `VET_VERSION` 3 makes every unwatched episode unvetted,
+and with the version-aware vetting (10-25) every file is judged again at
+its show's next update: in full (from the stored transcript, no ASR) for
+the next two and every episode fully vetted before, cheap for the rest.

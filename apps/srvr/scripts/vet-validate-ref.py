@@ -19,7 +19,7 @@ import fill as F
 import plus as PL
 
 OUT = OUT_ARG[0]
-FINAL = "whole+refit+mend+mlyr+mslide+segMin6+segE450+segL300+spotE1200+spotL600"
+FINAL = "whole+refit+mend+mlyr+mslide+segMin6+segE450+segL300+spotE1200+spotL600+incShare77+incRuns15"
 
 
 def episode(job):

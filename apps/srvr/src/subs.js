@@ -35,6 +35,7 @@ import {
   srtContent,
 } from "./subOrigin.js";
 import { resFindEpisodeVideos, resIsSampleName } from "./videoFiles.js";
+import { VET_VERSION } from "./subJudge.js";
 
 const SUBS_DB_PATH = path.join(SRVR_DATA_DIR, "subs.db");
 // Downloads an episode gets, and how long a video waits for them: a search
@@ -56,6 +57,14 @@ export const VET_METHOD = "vet";
 export const VET_CHEAP_METHOD = "vet-cheap";
 export const VET_AUDIO_METHOD = "vet-audio";
 const VET_METHODS = [VET_METHOD, VET_CHEAP_METHOD, VET_AUDIO_METHOD];
+// The methods whose verdicts come from vetting's judge (subJudge.js): each
+// holds only under the VET_VERSION it was made under. Audio matching's do
+// not depend on the judge's rules.
+const VET_JUDGE_METHODS = [VET_METHOD, VET_CHEAP_METHOD];
+// tv-srvr started with vetting version 2 at 10-25 02:42:26 PDT. The judge's
+// checks and unfit marks from before versions were stored are version 1's
+// when older than this, else version 2's.
+const VET_V2_SINCE_MS = 1792921346177;
 // Cheap vetting downloads nothing while OpenSubtitles says fewer than this
 // are left for the day, so plays keep theirs.
 const CHEAP_DOWNLOAD_RESERVE = 200;
@@ -129,6 +138,15 @@ const checksCols = new Set(
   db.prepare(`PRAGMA table_info(checks)`).all().map((c) => c.name),
 );
 if (!checksCols.has("lyrics")) db.exec(`ALTER TABLE checks ADD COLUMN lyrics TEXT`);
+// checks.version: the VET_VERSION a judge's check (VET_JUDGE_METHODS) was
+// made under, null for any other check.
+if (!checksCols.has("version")) {
+  db.exec(`ALTER TABLE checks ADD COLUMN version INTEGER`);
+  db.prepare(
+    `UPDATE checks SET version = CASE WHEN ts >= ? THEN 2 ELSE 1 END
+      WHERE method IN (${VET_JUDGE_METHODS.map((m) => `'${m}'`).join(", ")})`,
+  ).run(VET_V2_SINCE_MS);
+}
 // subs.unfitFor: the video this file was found not to fit (another cut or
 // rate); it is never downloaded for that video again. subs.hashFor: the video
 // whose OpenSubtitles hash a search said this file was made for.
@@ -137,6 +155,24 @@ const subsCols = new Set(
 );
 if (!subsCols.has("unfitFor")) db.exec(`ALTER TABLE subs ADD COLUMN unfitFor TEXT`);
 if (!subsCols.has("hashFor")) db.exec(`ALTER TABLE subs ADD COLUMN hashFor TEXT`);
+// subs.unfitVer: the VET_VERSION a full vetting found the file unfit under;
+// the mark holds only under that version. Null for a mark of the older checks
+// or of audio matching, which holds under every version. A vetting's mark
+// from before the column takes the version of the deleted file's check.
+if (!subsCols.has("unfitVer")) {
+  db.exec(`ALTER TABLE subs ADD COLUMN unfitVer INTEGER`);
+  const marked = db
+    .prepare(`SELECT rowid, fileId, unfitFor FROM subs WHERE unfitFor IS NOT NULL`)
+    .all();
+  const markCheck = db.prepare(`SELECT method, version FROM checks WHERE file = ?`);
+  const setVer = db.prepare(`UPDATE subs SET unfitVer = ? WHERE rowid = ?`);
+  db.transaction(() => {
+    for (const r of marked) {
+      const check = markCheck.get(opnPath(r.unfitFor, r.fileId));
+      if (check?.method === VET_METHOD) setVer.run(check.version, r.rowid);
+    }
+  })();
+}
 
 const insertSub = db.prepare(`
   INSERT OR IGNORE INTO subs (showId, season, episode, fileId, hearingImpaired,
@@ -185,7 +221,9 @@ const insertProcessed = db.prepare(
   `INSERT OR IGNORE INTO processed (path) VALUES (?)`,
 );
 const deleteProcessed = db.prepare(`DELETE FROM processed WHERE path = ?`);
-const setUnfitFor = db.prepare(`UPDATE subs SET unfitFor = ? WHERE fileId = ?`);
+const setUnfitFor = db.prepare(
+  `UPDATE subs SET unfitFor = ?, unfitVer = ? WHERE fileId = ?`,
+);
 const setHashFor = db.prepare(
   `UPDATE subs SET hashFor = ? WHERE showId = ? AND season = ? AND episode = ? AND fileId = ?`,
 );
@@ -199,13 +237,14 @@ const deleteClipsRow = db.prepare(`DELETE FROM clips WHERE video = ?`);
 const fileCheck = db.prepare(`SELECT * FROM checks WHERE file = ?`);
 const upsertCheck = db.prepare(`
   INSERT INTO checks (file, video, size, mtimeMs, verdict, offsetMs, method,
-    detail, lyrics, ts)
+    detail, lyrics, version, ts)
   VALUES (@file, @video, @size, @mtimeMs, @verdict, @offsetMs, @method,
-    @detail, @lyrics, @ts)
+    @detail, @lyrics, @version, @ts)
   ON CONFLICT(file) DO UPDATE SET video = excluded.video, size = excluded.size,
     mtimeMs = excluded.mtimeMs, verdict = excluded.verdict,
     offsetMs = excluded.offsetMs, method = excluded.method,
-    detail = excluded.detail, lyrics = excluded.lyrics, ts = excluded.ts
+    detail = excluded.detail, lyrics = excluded.lyrics,
+    version = excluded.version, ts = excluded.ts
 `);
 const deleteCheckRow = db.prepare(`DELETE FROM checks WHERE file = ?`);
 // A deleted file's check stays when it says the file was unusable or from
@@ -217,6 +256,11 @@ const deleteMisfitlessCheck = db.prepare(
 const deleteVideoChecks = db.prepare(`DELETE FROM checks WHERE video = ?`);
 const videoMethodChecks = db.prepare(
   `SELECT file, lyrics FROM checks WHERE video = ? AND method = ?`,
+);
+const videoStaleChecks = db.prepare(
+  `SELECT * FROM checks WHERE video = ?
+    AND method IN (${VET_JUDGE_METHODS.map((m) => `'${m}'`).join(", ")})
+    AND (version IS NULL OR version != ?)`,
 );
 const transcriptRow = db.prepare(`SELECT * FROM transcripts WHERE video = ?`);
 const upsertTranscript = db.prepare(`
@@ -382,19 +426,21 @@ export function pickSidecar(showId, season, episode, sidecars, dir = null) {
 // What a play offers: the video's sidecars and the index of the one to start
 // on, -1 with none. Files vetting judged good (subVet.js) come first, marked
 // VERIFIED_MARK, then T and H files judged otherwise, which came out of the
-// video, then everything unjudged; files the older checks found from another
+// video, then everything unjudged, then files cheap vetting found cut to
+// their captions' first lines; files the older checks found from another
 // cut, and signs tracks, are left out. The older checks' good verdicts get no
 // mark: those files count as unjudged. The start is pickSidecar's choice
 // among the first of those groups that has any. With no checks this is just
 // labelSidecars and pickSidecar.
 export async function playList(showId, season, episode, videoPath) {
   const dir = path.dirname(videoPath);
-  const groups = [[], [], []];
+  const groups = [[], [], [], []];
   for (const s of await labelSidecars(videoPath)) {
     const check = freshCheck(path.join(dir, s.file));
     const verdict = check?.verdict;
     if (verdict === "wrong cut" || verdict === "unusable") continue;
-    if (isVetGood(check))
+    if (verdict === "truncated") groups[3].push(s);
+    else if (isVetGood(check))
       groups[0].push({ ...s, label: `${s.label} ${VERIFIED_MARK}` });
     else if (verdict && "TH".includes(s.type)) groups[1].push(s);
     else groups[2].push(s);
@@ -526,14 +572,18 @@ function releaseGroup(name) {
 }
 
 // The next file to download for the episode's video, or null, leaving out
-// files found not to fit it: one made for the video by its hash, else one
-// from the video's release group, else one from the same origin as a chosen
-// file of the show, else the first that is not foreign-parts-only.
+// files found not to fit it (by a full vetting, only under this version):
+// one made for the video by its hash, else one from the video's release
+// group, else one from the same origin as a chosen file of the show, else the
+// first that is not foreign-parts-only.
 function nextCandidate(showId, season, episode, failed, videoPath) {
   const rows = episodeSubs
     .all(showId, season, episode)
     .filter(
-      (r) => !r.downloaded && !failed.has(r.fileId) && r.unfitFor !== videoPath,
+      (r) =>
+        !r.downloaded &&
+        !failed.has(r.fileId) &&
+        !(r.unfitFor === videoPath && (r.unfitVer == null || r.unfitVer === VET_VERSION)),
     );
   const group = releaseGroup(videoStem(videoPath));
   const chosen = chosenSubs.all(showId);
@@ -836,7 +886,8 @@ export function freshCheck(file) {
     : null;
 }
 
-// lyrics: a vetted file's ♪ captions in video time, [[fromMs, toMs]].
+// lyrics: a vetted file's ♪ captions in video time, [[fromMs, toMs]]. A
+// judge's check is made under this version.
 export function saveCheck({ file, video, verdict, offsetMs = null, method = null, detail = null, lyrics = null }) {
   const st = fs.statSync(file);
   upsertCheck.run({
@@ -849,8 +900,22 @@ export function saveCheck({ file, video, verdict, offsetMs = null, method = null
     method,
     detail,
     lyrics: lyrics ? JSON.stringify(lyrics) : null,
+    version: VET_JUDGE_METHODS.includes(method) ? VET_VERSION : null,
     ts: Date.now(),
   });
+}
+
+// Whether a check is one of the judge's (VET_JUDGE_METHODS) made under this
+// version. One made under an older version no longer holds: its file is
+// judged again.
+export function isCurrentVet(check) {
+  return !!check && VET_JUDGE_METHODS.includes(check.method) && check.version === VET_VERSION;
+}
+
+// The judge's checks of the video's files, on disk or deleted, made under an
+// older version.
+export function staleVetChecks(video) {
+  return videoStaleChecks.all(video, VET_VERSION);
 }
 
 // Whether a check (freshCheck) is vetting's good or filled: the file gets the
@@ -892,15 +957,17 @@ export function forgetCheckUnlessMisfit(file) {
 }
 
 // Whether the file is remembered as unusable or from another cut, or as
-// deleted by a full vetting, on disk or not: one deleted for that is not made
-// again.
+// deleted by a full vetting under this version, on disk or not: one deleted
+// for that is not made again.
 export function misfitRemembered(file) {
   const check = fileCheck.get(file);
   const verdict = check?.verdict;
   return (
     verdict === "unusable" ||
     verdict === "wrong cut" ||
-    (check?.method === VET_METHOD && (verdict === "bad" || verdict === "missing"))
+    (check?.method === VET_METHOD &&
+      isCurrentVet(check) &&
+      (verdict === "bad" || verdict === "missing"))
   );
 }
 
@@ -935,8 +1002,9 @@ export function saveRetime(video, file) {
   upsertRetime.run(video, file, Date.now());
 }
 
-// The opn file with this suffix does not fit this video.
-export function markUnfit(videoPath, suffix) {
-  setUnfitFor.run(videoPath, tagFileId(suffix));
+// The opn file with this suffix does not fit this video: under vetting
+// version version, or under every version when it is null.
+export function markUnfit(videoPath, suffix, version = null) {
+  setUnfitFor.run(videoPath, version, tagFileId(suffix));
 }
 

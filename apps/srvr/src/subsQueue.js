@@ -398,7 +398,8 @@ async function extractEmbSrts(videoFilePath, fromUI) {
       if (fromUI) publishEmbLog(`exists: ${path.basename(outPath)}`);
       continue;
     }
-    // A copy deleted as unusable or from another cut is not made again.
+    // A copy deleted as unusable or from another cut, or by a full vetting
+    // under this version, is not made again.
     if (subs.misfitRemembered(outPath)) {
       if (fromUI) publishEmbLog(`skipped, a misfit: ${path.basename(outPath)}`);
       continue;

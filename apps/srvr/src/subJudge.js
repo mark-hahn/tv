@@ -20,29 +20,40 @@
 //   5 minute    a dense pair and those in the 60 s after it, 6 or more, with
 //               a median more than 450 ms early or 300 ms late of the fix
 //               line, is bad
-//   6 missing   any 120 s, stepping 10 s, with 40 or more counted heard words
+//   6 incomplete of the counted heard words, fillers aside, under 77% are in
+//               a caption within 3 s of them (fixed by the fix line), and
+//               their runs of 2 or more in a row that no caption has number
+//               over 15% of the captions: the file leaves out much of what is
+//               said, and is bad. Not checked against an old `+` file.
+//   7 missing   any 120 s, stepping 10 s, with 40 or more counted heard words
 //               and no caption start makes the file missing
-//   7 good
+//   8 good
 //
 // Heard words after the file's last caption in the video's last 6 minutes
 // (end material) and inside another file's ♪ captions, padded 1 s, are not
-// counted. Every rule and constant here is vetting version 2: a change to
-// any of them raises VET_VERSION. Version 2 (10-25) gave the spot and minute
-// rules separate early and late limits, from the user's ratings of 162 clips
-// (subs-observe.md): captions late bother about twice as much as early, and
-// a sustained shift from about 350 ms late. Version 1 failed either rule at
-// 500 ms either way, and the minute rule needed 8 pairs.
+// counted. Every rule and constant here is vetting version 3: a change to
+// any of them raises VET_VERSION. Version 3 (10-25) added the incomplete
+// step (subs-coverage.md): a file whose captions are on time but carry only
+// part of the speech (cut to their first line, or another script's wording)
+// passed before. Its runs part spares foreign dialogue the ASR hears as
+// English, which no file carries but which comes in few long runs. Version 2
+// (10-25) gave the spot and minute rules separate early and late limits,
+// from the user's ratings of 162 clips (subs-observe.md): captions late
+// bother about twice as much as early, and a sustained shift from about
+// 350 ms late. Version 1 failed either rule at 500 ms either way, and the
+// minute rule needed 8 pairs.
 //
 // The analysis that measured these rules (sub-analysis on hahnca.com,
 // evaluate.py's whole+refit+mend+mlyr+mslide+segMin6+segE450+segL300+
-// spotE1200+spotL600 and planted/fill.py) is matched step for step, down to
+// spotE1200+spotL600+incShare77+incRuns15 and planted/fill.py) is matched
+// step for step, down to
 // Python's random draws (pyRandom.js), its float sums (pySum) and its
 // rounding (pyRound).
 
 import { cleanSrt, msToSrtTime, parseSrt, serializeSrt, srtTimeToMs, wrapLines } from "@tv/share";
 import { PyRandom } from "./pyRandom.js";
 
-export const VET_VERSION = 2;
+export const VET_VERSION = 3;
 
 // step 1
 const MIN_CAPTIONS_PER_MIN = 3;
@@ -82,6 +93,15 @@ const MINUTE_MIN_PAIRS = 6;
 const MINUTE_EARLY_MS = 450;
 const MINUTE_LATE_MS = 300;
 // step 6
+const COVER_NEAR_MS = 3000;
+const COVER_RUN_WORDS = 2;
+// words subtitles leave out; they neither count nor break a run
+const COVER_FILLERS = new Set(
+  "um uh umm uhh hmm hmmm hm mm mmm mhm mmhmm ah ahh aah er erm eh oh ohh ooh huh".split(" "),
+);
+const INCOMPLETE_SHARE_PCT = 77;
+const INCOMPLETE_RUNS_PCT = 15;
+// step 7
 const MISSING_WINDOW_MS = 120000;
 const MISSING_STEP_MS = 10000;
 const MISSING_MIN_WORDS = 40;
@@ -444,7 +464,7 @@ function minuteWhy(pairs, { a, b }) {
   return null;
 }
 
-// ---- the missing check ----
+// ---- the incomplete and missing checks ----
 
 // spans [[lo, hi]] padded by LYRIC_PAD_MS and merged
 function lyricSpans(lyrics) {
@@ -469,6 +489,34 @@ function countedTest(lastStart, durMs, lyrics) {
     const i = bisectRight(los, t) - 1;
     return !(i >= 0 && t <= spans[i][1]);
   };
+}
+
+// Whether the file of captions caps, fixed by line, leaves out much of the
+// heard words counted (see step 6): why, or null.
+function incompleteWhy(caps, heard, line, counted, durMs) {
+  const spans = new Map();
+  for (const c of caps) {
+    const span = [line.a + line.b * c.start, line.a + line.b * c.end];
+    for (const w of new Set(c.words)) {
+      if (!spans.has(w)) spans.set(w, []);
+      spans.get(w).push(span);
+    }
+  }
+  let carried = 0;
+  let total = 0;
+  let runs = 0;
+  let run = 0;
+  for (const { s, e, w } of heard.fillWords) {
+    if (!(0 <= s && s < durMs) || COVER_FILLERS.has(w) || !counted(s)) continue;
+    total++;
+    if ((spans.get(w) ?? []).some(([cs, ce]) => cs < e + COVER_NEAR_MS && ce > s - COVER_NEAR_MS)) {
+      carried++;
+      run = 0;
+    } else if (++run === COVER_RUN_WORDS) runs++;
+  }
+  if (carried * 100 < INCOMPLETE_SHARE_PCT * total && runs * 100 > INCOMPLETE_RUNS_PCT * caps.length)
+    return `incomplete: carries ${Math.floor((carried * 100) / total)}% of the speech, ${runs} runs missing`;
+  return null;
 }
 
 // The windows [from, to] of MISSING_WINDOW_MS, stepping MISSING_STEP_MS from
@@ -506,7 +554,8 @@ const placeMusic = (srtText, line) =>
 // video's other judged files, placed in video time [[lo, hi]]. Returns
 // {verdict, kind, why, line, windows, lyrics, cleanPairs, densePairs}:
 //   verdict  "good", "missing" or "bad"
-//   kind     for a bad file: "unusable", "too few pairs", "spot" or "minute"
+//   kind     for a bad file: "unusable", "too few pairs", "spot", "minute" or
+//            "incomplete"
 //   line     the fix line {a, b}, video time = a + b × file time, for a good
 //            or missing file
 //   windows  for a missing file, the windows [from, to] the check failed
@@ -538,9 +587,11 @@ export function judge({ srtText, heard, durMs, lyrics = [] }) {
   out.densePairs = dense.length;
   const minute = minuteWhy(dense, line);
   if (minute) return bad("minute", minute);
-  out.line = line;
   const starts = caps.map((c) => line.a + line.b * c.start).sort((a, b) => a - b);
   const counted = countedTest(starts.at(-1), durMs, lyrics);
+  const incomplete = heard.plus ? null : incompleteWhy(caps, heard, line, counted, durMs);
+  if (incomplete) return bad("incomplete", incomplete);
+  out.line = line;
   const windows = emptyWindows(starts, heard.spoken.filter(counted), durMs);
   if (windows.length === 0) return { ...out, verdict: "good" };
   return {

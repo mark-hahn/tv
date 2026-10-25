@@ -10,12 +10,13 @@
 //          and the others with missing stretches are deleted. With none of
 //          those either, the `+` file is the episode's subtitle.
 //   cheap  no ASR and nothing judged: every file cleaned with its glued words
-//          split, and one OpenSubtitles download when the video has no
-//          embedded copy and no download. A video with an old `+` file (no
-//          stored transcript) has its files judged against that file's
-//          caption starts: good ones fixed with a ✓, ones with only missing
-//          stretches filled from it, bad ones kept without a ✓. Nothing is
-//          deleted.
+//          split, a file cut to its captions' first lines marked truncated
+//          (no ✓, offered last), and one OpenSubtitles download when the
+//          video has no embedded copy and no download that is not. A video
+//          with an old `+` file (no stored transcript) has its other files
+//          judged against that file's caption starts: good ones fixed with
+//          a ✓, ones with only missing stretches filled from it, bad ones
+//          kept without a ✓. Nothing is deleted.
 // A video with no English audio keeps the older path at full level: T and H
 // presumed good, the others by audio matching (subPrepare.vetByAudio).
 //
@@ -26,13 +27,20 @@
 // An episode counts as vetted v1 while subsVetted is 1 and subsVettedFile is
 // its file.
 //
+// Each verdict of the judge holds only under the version it was made under
+// (subs.isCurrentVet). After a version change an episode is vetted again:
+// its files judged under an older version are judged again, the copies of
+// its embedded tracks a full vetting deleted under one are copied out again
+// and judged, and the downloads one found unfit are candidates again.
+//
 // Sync and hand timings use the transcript too where the video has one; the
 // rest are subPrepare.js's.
 
+import fs from "fs";
 import fsp from "fs/promises";
 import * as path from "node:path";
 import * as epd from "@tv/share";
-import { logHere, unilog} from "@tv/share"
+import { logHere, unilog, cleanSrt, parseSrt } from "@tv/share"
 import * as tvdb from "./tvdb.js";
 import * as util from "./util.js";
 import * as subs from "./subs.js";
@@ -40,6 +48,7 @@ import { VET_METHOD, VET_CHEAP_METHOD, VET_AUDIO_METHOD } from "./subs.js";
 import * as sc from "./subSpotCheck.js";
 import * as sp from "./subPrepare.js";
 import { sidecarVideo } from "./subSync.js";
+import { sidecarType } from "./subOrigin.js";
 import { nextUpAfter } from "./derived.js";
 import { showFolderFor, showNameFromFilePath } from "./showPaths.js";
 import {
@@ -66,6 +75,20 @@ const ONE_OFFSET_MS = 250;
 // The order files are judged and filled in: embedded copies and arrived
 // files, then downloads.
 const JUDGE_ORDER = "THSV";
+// A file cut to its captions' first lines, as a converter that keeps only
+// the first text line of each caption makes it (subs-coverage.md: Kid Sister
+// S02, Madam S01E01), told without a transcript: at least TRUNC_MIN_CAPTIONS
+// captions, TRUNC_LOWER_PCT% or more of them with a lower-case letter (in
+// capitals every caption starts a capital), TRUNC_MID_PCT% or more ending
+// mid-sentence (a letter at the end, the next starting a capital) and at
+// most TRUNC_LONG_PCT% longer than one subtitle line of TRUNC_LINE_CHARS. On
+// 10-25 these held for those 6 files and for no other of the library's
+// sidecars or the test sets' files: the next file ended 3.9% mid-sentence.
+const TRUNC_MIN_CAPTIONS = 100;
+const TRUNC_LOWER_PCT = 50;
+const TRUNC_MID_PCT = 8;
+const TRUNC_LONG_PCT = 2;
+const TRUNC_LINE_CHARS = 42;
 
 // Called with the show's name once an episode's vetting fields change.
 let onVetted = () => {};
@@ -89,18 +112,19 @@ export function isVetted(ep, level = null) {
   );
 }
 
-// Whether a file's check is a full vetting's for a file it keeps. A file a
-// full vetting judged bad or missing, or unusable by its sound, is deleted;
-// one still on disk with such a check was being deleted when tv-srvr
-// stopped, and is judged and deleted again.
+// Whether a file's check is a full vetting's for a file it keeps, under this
+// version. A file a full vetting judged bad or missing, or unusable by its
+// sound, is deleted; one still on disk with such a check was being deleted
+// when tv-srvr stopped, and is judged and deleted again.
 function keptByFull(check) {
-  if (check?.method === VET_METHOD) return subs.isVetGood(check);
+  if (check?.method === VET_METHOD) return subs.isVetGood(check) && subs.isCurrentVet(check);
   return check?.method === VET_AUDIO_METHOD && check.verdict !== "unusable";
 }
 
 // Whether the video has a subtitle file other than its `+` file that a full
-// vetting has not judged as it is now (by its words, or by its sound for a
-// video with no English audio): one that arrived later.
+// vetting has not judged as it is now (by its words under this version, or
+// by its sound for a video with no English audio): one that arrived later,
+// or one judged under an older version.
 function hasUnjudged(videoPath) {
   const dir = path.dirname(videoPath);
   let sides;
@@ -113,16 +137,41 @@ function hasUnjudged(videoPath) {
   return sides.some((s) => s.type !== "+" && !keptByFull(subs.freshCheck(path.join(dir, s.file))));
 }
 
+// Whether a full vetting under an older version deleted a copy of one of the
+// video's embedded tracks: a full vetting copies it out again and judges it.
+function hasStaleTrack(videoPath) {
+  const stem = subs.videoStem(videoPath);
+  return subs.staleVetChecks(videoPath).some((c) => {
+    const suffix = path.basename(c.file).slice(stem.length + 1, -".srt".length);
+    return (
+      c.method === VET_METHOD &&
+      (c.verdict === "bad" || c.verdict === "missing") &&
+      "TH".includes(sidecarType(suffix)) &&
+      !fs.existsSync(c.file)
+    );
+  });
+}
+
+// Whether a file of the video, as it is on disk, has a verdict the judge made
+// under an older version, and the video has the `+` file a cheap vetting
+// judges against.
+function hasStaleJudged(videoPath) {
+  return subs.staleVetChecks(videoPath).some((c) => subs.freshCheck(c.file)) && !!asrFileOf(videoPath);
+}
+
 // The episodes of the show to vet now, [{videoPath, level, season, episode}],
 // the next two first. Watched episodes are never vetted. The next two
 // (next-up, the first unwatched episode with a video in story order, and the
 // first unwatched one with a video after it) get full vetting unless they
-// have had it for their current video. With nextTwoOnly (the end of a watch)
-// that is all. Otherwise a fully vetted episode with a file that arrived
-// since is vetted in full again, which judges that file against its stored
-// transcript, and every other unwatched episode with a video gets cheap
-// vetting when it is not vetted at either level, or had it and was left with
-// no subtitle file at all.
+// have had it for their current video under this version. With nextTwoOnly
+// (the end of a watch) that is all. Otherwise a fully vetted episode with a
+// file that arrived since, a file judged under an older version, or a copy
+// of an embedded track deleted under one, is vetted in full again, which
+// judges them against its stored transcript; an episode vetted in full under
+// an older version is vetted in full again too; and every other unwatched
+// episode with a video gets cheap vetting when it is not vetted at either
+// level, had it and was left with no subtitle file at all, or has a file
+// judged against its `+` file under an older version.
 export function episodesToVet(showName, rec, { nextTwoOnly = false } = {}) {
   if (!rec?.inLibrary || !Array.isArray(rec.episodeData)) return [];
   const ed = rec.episodeData;
@@ -139,17 +188,26 @@ export function episodesToVet(showName, rec, { nextTwoOnly = false } = {}) {
     if (!videoPath) return;
     const item = (level) => ({ videoPath, level, season, episode });
     const full = isVetted(ep, "full");
+    const fullAgain = () => hasUnjudged(videoPath) || hasStaleTrack(videoPath);
     if (isNext(season, episode)) {
       if (!full) nextOut.push(item("full"));
-      else if (!nextTwoOnly && hasUnjudged(videoPath)) nextOut.push(item("full"));
+      else if (!nextTwoOnly && fullAgain()) nextOut.push(item("full"));
       return;
     }
     if (nextTwoOnly) return;
     if (full) {
-      if (hasUnjudged(videoPath)) restOut.push(item("full"));
+      if (fullAgain()) restOut.push(item("full"));
       return;
     }
-    if (!isVetted(ep) || (ep.subsVetLevel === "cheap" && ep.subsVettedResult === "none"))
+    if (ep.subsVetLevel === "full" && ep.subsVettedFile === ep.file) {
+      restOut.push(item("full"));
+      return;
+    }
+    if (
+      !isVetted(ep) ||
+      (ep.subsVetLevel === "cheap" && ep.subsVettedResult === "none") ||
+      hasStaleJudged(videoPath)
+    )
       restOut.push(item("cheap"));
   });
   return [...nextOut, ...restOut];
@@ -221,6 +279,48 @@ async function readFiles(videoPath) {
 const asrFileOf = (videoPath) =>
   subs.listSidecars(videoPath).find((s) => s.type === "+");
 
+// Whether srtText is a file cut to its captions' first lines (see
+// TRUNC_MIN_CAPTIONS): why, or null.
+export function truncatedWhy(srtText) {
+  const caps = parseSrt(cleanSrt(srtText))
+    .map((c) => c.text.replace(/<[^>]+>|\{[^}]*\}/g, "").trim())
+    .filter(Boolean);
+  const n = caps.length;
+  if (n < TRUNC_MIN_CAPTIONS) return null;
+  let mid = 0;
+  for (let i = 0; i + 1 < n; i++)
+    if (/[A-Za-z]$/.test(caps[i]) && /^[A-Z]/.test(caps[i + 1].replace(/^[-–♪\s]+/, ""))) mid++;
+  const long = caps.filter((t) => t.replace(/\s+/g, " ").length > TRUNC_LINE_CHARS).length;
+  const lower = caps.filter((t) => /[a-z]/.test(t)).length;
+  if (lower * 100 < TRUNC_LOWER_PCT * n || mid * 100 < TRUNC_MID_PCT * n || long * 100 > TRUNC_LONG_PCT * n)
+    return null;
+  return `truncated: ${Math.floor((mid * 100) / n)}% of ${n} captions end mid-sentence, ${long} longer than a line`;
+}
+
+// The video's files not yet judged under this version that are cut to their
+// captions' first lines (truncatedWhy), marked truncated: no ✓, offered last
+// (subs.playList), and not judged against a `+` file. Returns the names of
+// every file of the video marked so.
+async function markTruncated(o, sides) {
+  const dir = path.dirname(o.videoPath);
+  const out = new Set();
+  for (const s of sides) {
+    if (s.type === "+") continue;
+    const full = path.join(dir, s.file);
+    const check = subs.freshCheck(full);
+    if (subs.isCurrentVet(check)) {
+      if (check.verdict === "truncated") out.add(s.file);
+      continue;
+    }
+    const why = truncatedWhy(await fsp.readFile(full, "utf8"));
+    if (!why) continue;
+    out.add(s.file);
+    o.notes.push(`${s.suffix} ${why}`);
+    if (!o.dryRun) subs.saveCheck({ file: full, video: o.videoPath, verdict: "truncated", method: VET_CHEAP_METHOD, detail: why });
+  }
+  return out;
+}
+
 const lineNote = ({ a, b }) =>
   `${a >= 0 ? "+" : ""}${Math.round(a)} ms${Math.abs(b - 1) >= 1e-5 ? ` ×${b.toFixed(5)}` : ""}`;
 
@@ -279,12 +379,13 @@ async function act(o, f, r, lyrics, held) {
 
 // A file a full vetting does not keep, deleted: its check stays as the memory
 // of why (subs.misfitRemembered), with its lyrics for the other files' judging,
-// and a download is marked so it is not downloaded for the video again.
+// and a download is marked so it is not downloaded for the video again under
+// this version.
 async function drop(o, f, verdict, why, lyrics) {
   o.notes.push(`${f.suffix} deleted (${why})`);
   if (o.dryRun) return;
   subs.saveCheck({ file: f.full, video: o.videoPath, verdict, method: VET_METHOD, detail: why, lyrics });
-  if (f.type === "V") subs.markUnfit(o.videoPath, f.suffix);
+  if (f.type === "V") subs.markUnfit(o.videoPath, f.suffix, VET_VERSION);
   await fsp.unlink(f.full);
   unilog(3047, `${o.showName} ${o.code}: ${f.file} deleted, ${why}`);
 }
@@ -310,17 +411,18 @@ async function fill(o, heard, { f, r, lyrics }) {
   });
 }
 
-// Judges the video's files not yet judged by o.method as they are now: each
-// file's own ♪ captions placed first, so each is judged with all the others'
-// (and those of the video's files judged before, deleted or not). The
-// missing ones go in held. Returns the placed ♪ captions known after it.
+// Judges the video's files not yet judged by o.method as they are now, under
+// this version: each file's own ♪ captions placed first, so each is judged
+// with all the others' (and those of the video's files judged before,
+// deleted or not). The missing ones go in held. Returns the placed ♪
+// captions known after it.
 async function judgeFiles(o, heard, held) {
   const { videoPath } = o;
   const files = await readFiles(videoPath);
   const isJudged = (f) => {
     const check = subs.freshCheck(f.full);
     if (o.method === VET_METHOD) return check?.method === VET_METHOD && keptByFull(check);
-    return check?.method === VET_CHEAP_METHOD || check?.method === VET_METHOD;
+    return subs.isCurrentVet(check);
   };
   for (const f of files) {
     if (!isJudged(f)) continue;
@@ -363,9 +465,13 @@ async function vetFull(o, transcript) {
       });
     }
   }
-  // a file filled before, from when the episode had no complete file
+  // a file filled before, from when the episode had no complete file; one
+  // filled under an older version and judged missing again is in held
   const filledBefore = (await readFiles(o.videoPath)).filter(
-    (f) => subs.freshCheck(f.full)?.method === VET_METHOD && subs.freshCheck(f.full)?.verdict === "filled",
+    (f) =>
+      !held.some((h) => h.f.full === f.full) &&
+      subs.freshCheck(f.full)?.method === VET_METHOD &&
+      subs.freshCheck(f.full)?.verdict === "filled",
   );
   if (good()) {
     for (const h of held) await drop(o, h.f, "missing", `${h.r.why}, and a complete file was found`, h.r.lyrics);
@@ -394,8 +500,10 @@ async function vetCheap(o) {
     await sp.fixGluedSidecars(videoPath);
   }
   let sides = subs.listSidecars(videoPath);
-  const embedded = sides.some((s) => s.type === "T" || s.type === "H");
-  const downloaded = sides.some((s) => s.type === "V");
+  let truncated = await markTruncated(o, sides);
+  const whole = (s) => !truncated.has(s.file);
+  const embedded = sides.some((s) => (s.type === "T" || s.type === "H") && whole(s));
+  const downloaded = sides.some((s) => s.type === "V" && whole(s));
   if (!embedded && !downloaded && o.canDownload) {
     const quota = await subs.cheapDownloadQuota();
     if (!quota.ok) {
@@ -409,6 +517,7 @@ async function vetCheap(o) {
       notes.push(file ? `downloaded ${path.basename(file)}` : "no download");
       if (file) await sp.fixGluedSidecars(videoPath, { only: file });
       sides = subs.listSidecars(videoPath);
+      truncated = await markTruncated(o, sides);
     }
   }
   const plus = asrFileOf(videoPath);
@@ -423,7 +532,7 @@ async function vetCheap(o) {
       for (const h of held) await fill(o, heard, h);
     });
   }
-  return resultOf(o.ticks, sides);
+  return resultOf(o.ticks, sides.filter(whole));
 }
 
 // Vets the subtitles of videoPath, the video of the show's episode, at level
@@ -566,6 +675,8 @@ function measured({ text, r }) {
   if (r.kind === "unusable") return { verdict: "unusable", offsetMs: null, why: `it can't be checked, ${r.why}` };
   if (r.kind === "too few pairs")
     return { verdict: "can't tell", offsetMs: null, why: "too few of its lines match the video's words" };
+  if (r.kind === "incomplete")
+    return { verdict: "incomplete", offsetMs: null, why: `it leaves out much of what is said (${r.why})` };
   if (r.kind) return { verdict: "wrong cut", offsetMs: null, why: `from another cut (${r.why}), no one shift fits it` };
   const [first, last] = shiftsOf(text, r.line);
   if (Math.abs(last - first) > ONE_OFFSET_MS)
@@ -621,6 +732,7 @@ export async function syncSidecar({ path: relPath }) {
   const { r, text } = j;
   if (r.kind === "unusable") throw new Error(`${name} is unusable: ${r.why}`);
   if (r.kind === "too few pairs") throw new Error(`only ${r.cleanPairs} phrases of ${name} match its video`);
+  if (r.kind === "incomplete") throw new Error(`${name} leaves out much of what is said: ${r.why}`);
   if (r.kind) throw new Error(`${name} is from another cut: ${r.why}`);
   return sp.withVideo(videoPath, async () => {
     await fsp.writeFile(file, fixedText(text, r.line), "utf8");

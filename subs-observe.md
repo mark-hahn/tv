@@ -221,11 +221,11 @@ thresholds, direction-aware.
      can't be judged again. **None of the flips is in a watched episode**,
      so nothing can be watched yet; `prep.mjs` adds them as episodes get
      watched (rerun it).
-   - What the deploy does with them: the 41 kept files are deleted when
-     their shows are next updated and re-vetted (vetting v2 judges the
-     files on disk). The 13 tracks do not come back by themselves: their
-     v1 checks are kept as the memory not to copy them out again. Both are
-     the user's call.
+   - What the deploy does with them: as deployed at 02:42 it did neither,
+     since vetting judged only files with no verdict yet. Since the
+     version-aware fix (10-25 12:11, `subs-test.md`), the 41 kept files are
+     judged again and deleted when their shows are next updated, and the
+     13 tracks are copied out again and judged.
 
 ## First step
 

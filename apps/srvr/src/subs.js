@@ -1,8 +1,10 @@
 // subs — a video's subtitle files and the OpenSubtitles side of them: every
 // search result ever returned, which of them were downloaded, the download a
 // video waits on before it plays, and which subtitle each episode last showed.
-// It also keeps what subPrepare.js learns: the clip transcripts of a checked
-// video, each sidecar's verdict, and what automatic ASR has cost each day.
+// It also keeps what subtitle vetting learns (subVet.js): each video's
+// complete word-timed transcript and each sidecar's verdict; and the clip
+// transcripts of the older checks
+// (subPrepare.js), no longer made.
 //
 // Every subtitle is a sidecar .srt beside its video; embedded tracks are
 // copied out to sidecars (subsQueue.js) and never shown themselves. Downloads
@@ -11,6 +13,7 @@
 
 import fs from "fs";
 import * as path from "node:path";
+import zlib from "zlib";
 import Database from "better-sqlite3";
 import fetch from "node-fetch";
 import { logHere, cleanSrt, unilog} from "@tv/share"
@@ -21,6 +24,7 @@ import {
   loadSubsLogin,
   normalizeImdbId,
   openSubtitlesDownloadWithRetry,
+  subsDownloadQuota,
   subsSearch,
   subsShowImdbIds,
 } from "./opensubtitles.js";
@@ -43,8 +47,21 @@ const TYPE_ORDER = "THVS+";
 const TAG_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 // Background downloads an episode with no fitting subtitle gets in one go.
 const MAX_FIT_DOWNLOADS = 5;
-// What a play's subtitle list marks a file checked against the audio with.
+// What a play's subtitle list marks a file vetting judged good with.
 const VERIFIED_MARK = "✓";
+// The check methods of subtitle vetting (subVet.js): a full vetting, a cheap
+// one judging against an old `+` file, and a video with no English audio
+// matched by its sound. Only their good and filled verdicts get the mark.
+export const VET_METHOD = "vet";
+export const VET_CHEAP_METHOD = "vet-cheap";
+export const VET_AUDIO_METHOD = "vet-audio";
+const VET_METHODS = [VET_METHOD, VET_CHEAP_METHOD, VET_AUDIO_METHOD];
+// Cheap vetting downloads nothing while OpenSubtitles says fewer than this
+// are left for the day, so plays keep theirs.
+const CHEAP_DOWNLOAD_RESERVE = 200;
+// The download quota OpenSubtitles last gave is asked for again after this
+// long, or at once when its count has started afresh.
+const QUOTA_FRESH_MS = 10 * 60 * 1000;
 // The OpenSubtitles hash reads this much from each end of the video.
 const HASH_CHUNK = 65536;
 
@@ -75,8 +92,7 @@ db.exec(`
 // clips: the ASR clip transcripts of a checked video (subPrepare.js), with the
 // audio track they came from; track -1 marks a video with no English audio,
 // checked by audio matching instead. checks: each sidecar's verdict, which
-// holds while the file keeps the size and mtime it had. asrSpend: what
-// automatic complete ASR was charged each day (PST).
+// holds while the file keeps the size and mtime it had.
 db.exec(`
   CREATE TABLE IF NOT EXISTS clips (
     video TEXT PRIMARY KEY, track INTEGER NOT NULL, json TEXT NOT NULL,
@@ -88,7 +104,6 @@ db.exec(`
     method TEXT, detail TEXT, ts INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS checksVideo ON checks (video);
-  CREATE TABLE IF NOT EXISTS asrSpend (day TEXT PRIMARY KEY, usd REAL NOT NULL);
 `);
 // retimes: when a video's retime pass (subPrepare.js) last ran and the file
 // it fitted to the .asr.srt, null when none did; the queue does not run a
@@ -98,6 +113,22 @@ db.exec(`
     video TEXT PRIMARY KEY, file TEXT, ts INTEGER NOT NULL
   );
 `);
+// transcripts: a video's complete word-timed ASR (asr.js) of audio track
+// `track`, words [[text, startMs, endMs]] as gzipped JSON, text as the `+`
+// file shows it.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS transcripts (
+    video TEXT PRIMARY KEY, track INTEGER NOT NULL, words BLOB NOT NULL,
+    ts INTEGER NOT NULL
+  );
+`);
+// checks.lyrics: a vetted file's ♪ captions placed in video time by its own
+// line, [[fromMs, toMs]] as JSON, kept after the file is deleted: the other
+// files of its video are judged with them (subJudge.js).
+const checksCols = new Set(
+  db.prepare(`PRAGMA table_info(checks)`).all().map((c) => c.name),
+);
+if (!checksCols.has("lyrics")) db.exec(`ALTER TABLE checks ADD COLUMN lyrics TEXT`);
 // subs.unfitFor: the video this file was found not to fit (another cut or
 // rate); it is never downloaded for that video again. subs.hashFor: the video
 // whose OpenSubtitles hash a search said this file was made for.
@@ -168,30 +199,38 @@ const deleteClipsRow = db.prepare(`DELETE FROM clips WHERE video = ?`);
 const fileCheck = db.prepare(`SELECT * FROM checks WHERE file = ?`);
 const upsertCheck = db.prepare(`
   INSERT INTO checks (file, video, size, mtimeMs, verdict, offsetMs, method,
-    detail, ts)
+    detail, lyrics, ts)
   VALUES (@file, @video, @size, @mtimeMs, @verdict, @offsetMs, @method,
-    @detail, @ts)
+    @detail, @lyrics, @ts)
   ON CONFLICT(file) DO UPDATE SET video = excluded.video, size = excluded.size,
     mtimeMs = excluded.mtimeMs, verdict = excluded.verdict,
     offsetMs = excluded.offsetMs, method = excluded.method,
-    detail = excluded.detail, ts = excluded.ts
+    detail = excluded.detail, lyrics = excluded.lyrics, ts = excluded.ts
 `);
 const deleteCheckRow = db.prepare(`DELETE FROM checks WHERE file = ?`);
+// A deleted file's check stays when it says the file was unusable or from
+// another cut, or when vetting made it.
 const deleteMisfitlessCheck = db.prepare(
-  `DELETE FROM checks WHERE file = ? AND verdict NOT IN ('unusable', 'wrong cut')`,
+  `DELETE FROM checks WHERE file = ? AND verdict NOT IN ('unusable', 'wrong cut')
+    AND (method IS NULL OR method NOT IN (${VET_METHODS.map((m) => `'${m}'`).join(", ")}))`,
 );
 const deleteVideoChecks = db.prepare(`DELETE FROM checks WHERE video = ?`);
+const videoMethodChecks = db.prepare(
+  `SELECT file, lyrics FROM checks WHERE video = ? AND method = ?`,
+);
+const transcriptRow = db.prepare(`SELECT * FROM transcripts WHERE video = ?`);
+const upsertTranscript = db.prepare(`
+  INSERT INTO transcripts (video, track, words, ts) VALUES (?, ?, ?, ?)
+  ON CONFLICT(video) DO UPDATE SET track = excluded.track,
+    words = excluded.words, ts = excluded.ts
+`);
+const deleteTranscript = db.prepare(`DELETE FROM transcripts WHERE video = ?`);
 const retimeRow = db.prepare(`SELECT * FROM retimes WHERE video = ?`);
 const upsertRetime = db.prepare(`
   INSERT INTO retimes (video, file, ts) VALUES (?, ?, ?)
   ON CONFLICT(video) DO UPDATE SET file = excluded.file, ts = excluded.ts
 `);
 const deleteRetime = db.prepare(`DELETE FROM retimes WHERE video = ?`);
-const spendRow = db.prepare(`SELECT usd FROM asrSpend WHERE day = ?`);
-const addSpend = db.prepare(`
-  INSERT INTO asrSpend (day, usd) VALUES (?, ?)
-  ON CONFLICT(day) DO UPDATE SET usd = usd + excluded.usd
-`);
 
 const fmtCode = (season, episode) =>
   `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
@@ -341,19 +380,21 @@ export function pickSidecar(showId, season, episode, sidecars, dir = null) {
 }
 
 // What a play offers: the video's sidecars and the index of the one to start
-// on, -1 with none. Files checked against the audio (subPrepare.js) come
-// first, marked VERIFIED_MARK, then T and H files that could not be judged,
-// which came out of the video, then everything unchecked; files from another
-// cut and signs tracks are left out. The start is pickSidecar's choice among
-// the first of those groups that has any. With no checks this is just
+// on, -1 with none. Files vetting judged good (subVet.js) come first, marked
+// VERIFIED_MARK, then T and H files judged otherwise, which came out of the
+// video, then everything unjudged; files the older checks found from another
+// cut, and signs tracks, are left out. The older checks' good verdicts get no
+// mark: those files count as unjudged. The start is pickSidecar's choice
+// among the first of those groups that has any. With no checks this is just
 // labelSidecars and pickSidecar.
 export async function playList(showId, season, episode, videoPath) {
   const dir = path.dirname(videoPath);
   const groups = [[], [], []];
   for (const s of await labelSidecars(videoPath)) {
-    const verdict = freshCheck(path.join(dir, s.file))?.verdict;
+    const check = freshCheck(path.join(dir, s.file));
+    const verdict = check?.verdict;
     if (verdict === "wrong cut" || verdict === "unusable") continue;
-    if (verdict === "good")
+    if (isVetGood(check))
       groups[0].push({ ...s, label: `${s.label} ${VERIFIED_MARK}` });
     else if (verdict && "TH".includes(s.type)) groups[1].push(s);
     else groups[2].push(s);
@@ -377,8 +418,7 @@ export async function playLabel(videoPath, file) {
   const found = listSidecars(videoPath).find((x) => x.file === file);
   if (!found) return null;
   const s = await labelled(dir, found);
-  const verdict = freshCheck(path.join(dir, file))?.verdict;
-  return verdict === "good" ? `${s.label} ${VERIFIED_MARK}` : s.label;
+  return isVetGood(freshCheck(path.join(dir, file))) ? `${s.label} ${VERIFIED_MARK}` : s.label;
 }
 
 // The video stopped with this subtitle file showing: it is the episode's
@@ -506,12 +546,28 @@ function nextCandidate(showId, season, episode, failed, videoPath) {
   );
 }
 
-// Returns how long the API took to hand out the link, in ms.
-// The downloads OpenSubtitles said were left for the day, with the last
-// download's answer; null before any.
+// The day's downloads as OpenSubtitles counts them, {remaining, resetAt, ts},
+// with allowed and used once its /infos/user has been asked: from that, and
+// kept current by each download's answer. null until known.
 let quota = null;
-export const downloadsRemaining = () => quota;
 
+// The download quota, asked of OpenSubtitles when it is not known, older
+// than QUOTA_FRESH_MS, or from before the count started afresh.
+export async function downloadQuota() {
+  const now = Date.now();
+  if (!quota || now >= quota.resetAt || now - quota.ts > QUOTA_FRESH_MS)
+    quota = { ...(await subsDownloadQuota()), ts: now };
+  return quota;
+}
+
+// Whether cheap vetting may download now: OpenSubtitles says at least
+// CHEAP_DOWNLOAD_RESERVE of the day's downloads are left. The quota, with ok.
+export async function cheapDownloadQuota() {
+  const q = await downloadQuota();
+  return { ...q, ok: q.remaining >= CHEAP_DOWNLOAD_RESERVE };
+}
+
+// Returns how long the API took to hand out the link, in ms.
 async function downloadSub(row, videoPath) {
   const login = loadSubsLogin();
   const startedAt = Date.now();
@@ -522,17 +578,25 @@ async function downloadSub(row, videoPath) {
   });
   const apiMs = Date.now() - startedAt;
   if (!dl.resp.ok) {
-    // 406: the day's downloads are used up, so nothing more lands today.
+    // 406: the day's downloads are used up, so nothing more lands today;
+    // the quota is asked for again when next wanted.
     const e = new Error(`OpenSubtitles download HTTP ${dl.resp.status}`);
     if (dl.resp.status === 406) {
-      quota = { remaining: 0, ts: Date.now() };
+      quota = null;
       e.quota = true;
     }
     throw e;
   }
   const link = typeof dl.body?.link === "string" ? dl.body.link.trim() : "";
-  if (Number.isInteger(dl.body?.remaining))
-    quota = { remaining: dl.body.remaining, ts: Date.now() };
+  const resetAt = Date.parse(dl.body?.reset_time_utc ?? "");
+  if (Number.isInteger(dl.body?.remaining) && Number.isFinite(resetAt))
+    quota = {
+      ...quota,
+      used: quota?.allowed == null ? quota?.used : quota.allowed - dl.body.remaining,
+      remaining: dl.body.remaining,
+      resetAt,
+      ts: Date.now(),
+    };
   if (!link) throw new Error("OpenSubtitles download gave no link");
   const resp = await fetch(link, { headers: { Accept: "*/*" } });
   if (!resp.ok) throw new Error(`subtitle file HTTP ${resp.status}`);
@@ -611,12 +675,12 @@ function fetchJob(rec, season, episode, videoPath) {
   return job;
 }
 
-// Whether the video has a file other than ASR's checked good: then it needs
-// no more downloads.
+// Whether the video has a file other than ASR's that vetting judged good:
+// then it needs no more downloads.
 function hasGoodSub(videoPath) {
   const dir = path.dirname(videoPath);
   return listSidecars(videoPath).some(
-    (s) => s.type !== "+" && freshCheck(path.join(dir, s.file))?.verdict === "good",
+    (s) => s.type !== "+" && isVetGood(freshCheck(path.join(dir, s.file))),
   );
 }
 
@@ -633,7 +697,7 @@ export function prefetchSubs(rec, season, episode, videoPath) {
 
 // Background downloads for a video with no subtitle that fits it: search,
 // then download candidates one at a time, best first, each judged by judge
-// (subPrepare.js), which returns "good" for a file that fits, as it is or once
+// (subVet.js), which returns "good" for a file that fits, as it is or once
 // fixed. Stops at the first good one, or after MAX_FIT_DOWNLOADS tries.
 // Returns that file's path, or null.
 export async function downloadUntilFit(rec, season, episode, videoPath, judge) {
@@ -658,6 +722,30 @@ export async function downloadUntilFit(rec, season, episode, videoPath, judge) {
     const verdict = await judge(file);
     unilog(2795, `${rec.name} ${code} downloaded opn${fileIdTag(row.fileId)} (${row.release}): ${verdict}`);
     if (verdict === "good") return file;
+  }
+  return null;
+}
+
+// Cheap vetting's one download (subVet.js): search, then the first candidate
+// that downloads, trying at most MAX_FIT_DOWNLOADS. Returns its path, or null
+// with no candidate or none that downloaded. Throws with the day's downloads
+// used up.
+export async function downloadFirst(rec, season, episode, videoPath) {
+  const showId = String(rec.id);
+  const code = fmtCode(season, episode);
+  await searchEpisode(rec, season, episode, videoPath);
+  const tried = new Set();
+  for (let n = 0; n < MAX_FIT_DOWNLOADS; n++) {
+    const row = nextCandidate(showId, season, episode, tried, videoPath);
+    if (!row) return null;
+    tried.add(row.fileId);
+    try {
+      await downloadSub(row, videoPath);
+      return opnPath(videoPath, row.fileId);
+    } catch (e) {
+      if (e.quota) throw e;
+      unilog(3054, `${rec.name} ${code} download of opn${fileIdTag(row.fileId)} failed: ${e.message}`);
+    }
   }
   return null;
 }
@@ -748,7 +836,8 @@ export function freshCheck(file) {
     : null;
 }
 
-export function saveCheck({ file, video, verdict, offsetMs = null, method = null, detail = null }) {
+// lyrics: a vetted file's ♪ captions in video time, [[fromMs, toMs]].
+export function saveCheck({ file, video, verdict, offsetMs = null, method = null, detail = null, lyrics = null }) {
   const st = fs.statSync(file);
   upsertCheck.run({
     file,
@@ -759,8 +848,28 @@ export function saveCheck({ file, video, verdict, offsetMs = null, method = null
     offsetMs,
     method,
     detail,
+    lyrics: lyrics ? JSON.stringify(lyrics) : null,
     ts: Date.now(),
   });
+}
+
+// Whether a check (freshCheck) is vetting's good or filled: the file gets the
+// mark.
+export function isVetGood(check) {
+  return (
+    !!check &&
+    VET_METHODS.includes(check.method) &&
+    (check.verdict === "good" || check.verdict === "filled")
+  );
+}
+
+// The placed ♪ captions of every file of the video judged by method, on disk
+// or deleted, but those of the files in except: [[fromMs, toMs]].
+export function vetLyrics(video, method, except = new Set()) {
+  return videoMethodChecks
+    .all(video, method)
+    .filter((c) => !except.has(c.file) && c.lyrics)
+    .flatMap((c) => JSON.parse(c.lyrics));
 }
 
 // The file was rewritten without moving its timing (a new line layout): its
@@ -782,11 +891,17 @@ export function forgetCheckUnlessMisfit(file) {
   deleteMisfitlessCheck.run(file);
 }
 
-// Whether the file is remembered as unusable or from another cut, on disk or
-// not: one deleted for that is not made again.
+// Whether the file is remembered as unusable or from another cut, or as
+// deleted by a full vetting, on disk or not: one deleted for that is not made
+// again.
 export function misfitRemembered(file) {
-  const verdict = fileCheck.get(file)?.verdict;
-  return verdict === "unusable" || verdict === "wrong cut";
+  const check = fileCheck.get(file);
+  const verdict = check?.verdict;
+  return (
+    verdict === "unusable" ||
+    verdict === "wrong cut" ||
+    (check?.method === VET_METHOD && (verdict === "bad" || verdict === "missing"))
+  );
 }
 
 // The video is gone: so is what was learned about it.
@@ -794,6 +909,20 @@ export function forgetVideo(video) {
   deleteVideoChecks.run(video);
   deleteClipsRow.run(video);
   deleteRetime.run(video);
+  deleteTranscript.run(video);
+}
+
+// ---- complete transcripts (subVet.js) ----
+
+// The video's transcript from audio track track: {track, words}, or null.
+export function getTranscript(video, track) {
+  const row = transcriptRow.get(video);
+  if (!row || row.track !== track) return null;
+  return { track, words: JSON.parse(zlib.gunzipSync(row.words).toString("utf8")) };
+}
+
+export function saveTranscript(video, track, words) {
+  upsertTranscript.run(video, track, zlib.gzipSync(JSON.stringify(words)), Date.now());
 }
 
 // ---- the retime pass (subPrepare.js) ----
@@ -811,13 +940,3 @@ export function markUnfit(videoPath, suffix) {
   setUnfitFor.run(videoPath, tagFileId(suffix));
 }
 
-const pstDay = () =>
-  new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
-
-export function asrSpentToday() {
-  return spendRow.get(pstDay())?.usd ?? 0;
-}
-
-export function addAsrSpend(usd) {
-  addSpend.run(pstDay(), usd);
-}

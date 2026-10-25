@@ -3013,12 +3013,7 @@ export default {
         }
       }
       const actors = Array.from(actorMap.values());
-      // Most shows first; ties fall back to alpha so the order is stable.
-      actors.sort(
-        (a, b) =>
-          b.actorCount - a.actorCount ||
-          a.displayName.localeCompare(b.displayName),
-      );
+      actors.sort((a, b) => a.displayName.localeCompare(b.displayName));
       return actors;
     },
 

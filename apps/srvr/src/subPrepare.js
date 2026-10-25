@@ -1,18 +1,10 @@
-// Subtitle preparation for playing (srt-fix.md). Every sidecar of a video is
-// checked against the words of the video's own audio (subSpotCheck.js) and
-// dealt with by its verdict, and a video left with nothing that fits gets an
-// OpenSubtitles download that does, else a complete ASR, which is left to the
-// caller. It all runs in the background: after the add-to-disk steps of a video
-// that lands (subsQueue.js), and for a sidecar that arrives or changes later
-// (the file watcher), judged from the clip transcripts stored for its video.
-//
-// A good file is kept and offered first. A fixable one is shifted, or
-// stretched when it runs at another rate, and judged again. One from another
-// cut, or a signs track, is never offered; an opn file of either kind is
-// deleted and marked so it is not downloaded for the video again, and so is
-// an ASR file from another cut, since ASR is never redone for a video that has
-// one. A file that cannot be judged is kept: a T or H one is presumed good,
-// having come out of the video, and the rest are offered after it.
+// The pieces of subtitle handling around subtitle vetting (subVet.js): the
+// lock that keeps one thing at a time at a video's sidecars, glued words split
+// and line layouts redone, a video with no English audio vetted by matching
+// its sound, and the remotes' and local pane's Sync and hand timings for an
+// episode with no complete transcript, from the clip transcripts the older
+// checks stored or from its .asr.srt. Those clip checks (srt-fix.md) no
+// longer run, and no clips are heard: what they stored is only read.
 //
 // A video with no English audio track has no words to match: its T and H
 // files are presumed good, the others checked by whole-file audio matching
@@ -22,6 +14,7 @@ import fsp from "fs/promises";
 import * as path from "node:path";
 import { logHere, unilog, cleanSrt } from "@tv/share"
 import * as subs from "./subs.js";
+import { VET_AUDIO_METHOD } from "./subs.js";
 import * as sc from "./subSpotCheck.js";
 import { syncSubToAudio, asrOffset, shiftedSrt, sidecarVideo } from "./subSync.js";
 import { fixGlued } from "./subGlue.js";
@@ -32,8 +25,8 @@ const TV_DIR = "/mnt/media/tv";
 // How often the watcher looks whether a video it waits for is free.
 const BUSY_WAIT_MS = 1000;
 
-// Videos whose sidecars are being dealt with here now; the watcher waits
-// until that is done.
+// Videos whose sidecars are being dealt with here or by vetting now; the
+// watcher waits until that is done.
 const busy = new Set();
 
 // Resolves once nothing here is dealing with the video.
@@ -42,6 +35,19 @@ async function notBusy(videoPath) {
     await new Promise((resolve) => {
       setTimeout(resolve, BUSY_WAIT_MS);
     });
+}
+
+// fn() run once nothing else is dealing with the video's sidecars, holding
+// them until it is done.
+export async function withVideo(videoPath, fn) {
+  // checked again with nothing in between before it is taken
+  while (busy.has(videoPath)) await notBusy(videoPath);
+  busy.add(videoPath);
+  try {
+    return await fn();
+  } finally {
+    busy.delete(videoPath);
+  }
 }
 
 const fmtOfs = (ms) => `${ms > 0 ? "+" : ""}${ms} ms`;
@@ -70,20 +76,9 @@ function asrFileOf(videoPath) {
   return s ? path.join(path.dirname(videoPath), s.file) : null;
 }
 
-// Whether a sidecar of the video other than its .asr.srt is checked good.
-function otherGood(videoPath) {
-  const dir = path.dirname(videoPath);
-  return subs
-    .listSidecars(videoPath)
-    .some((s) => s.type !== "+" && subs.freshCheck(path.join(dir, s.file))?.verdict === "good");
-}
-
-// Whether the video needs a retime: it has an .asr.srt and nothing else good.
-export const needsRetime = (videoPath) => !!asrFileOf(videoPath) && !otherGood(videoPath);
-
 // The sidecar f shifted to fit the video's .asr.srt, its verdict stored as
-// good. Returns true when it fits, else false, with why in notes. dryRun
-// writes nothing.
+// good (no mark: only vetting's verdicts get one). Returns true when it fits,
+// else false, with why in notes. dryRun writes nothing.
 async function retimeFile(videoPath, f, dryRun, notes) {
   const asrFile = asrFileOf(videoPath);
   if (!asrFile || f.type === "+") return false;
@@ -115,72 +110,6 @@ async function retimeFile(videoPath, f, dryRun, notes) {
   return true;
 }
 
-// The retime pass: one sidecar of the video other than its .asr.srt fitted
-// to it, when it has an .asr.srt and nothing else good. The files on disk are
-// tried in order (T, H, V, S), then, with canDownload, OpenSubtitles
-// candidates one at a time, each as it lands, up to MAX_FIT_DOWNLOADS. The
-// pass is skipped for a video that has had one unless force; its outcome is
-// stored (subs.saveRetime). Returns the file fitted, or null.
-export async function retimePass({
-  videoPath,
-  rec,
-  season,
-  episode,
-  canDownload = false,
-  force = false,
-  dryRun = false,
-  notes = [],
-}) {
-  if (!asrFileOf(videoPath)) return null;
-  if (!force && !dryRun && subs.getRetime(videoPath)) return null;
-  if (otherGood(videoPath)) {
-    if (!dryRun) subs.saveRetime(videoPath, null);
-    return null;
-  }
-  if (busy.has(videoPath))
-    throw new Error(`${path.basename(videoPath)} is being prepared already`);
-  busy.add(videoPath);
-  try {
-    const { durS } = await sc.videoInfo(videoPath);
-    const dir = path.dirname(videoPath);
-    const files = await sc.readSidecars(videoPath, durS);
-    let fitted = null;
-    for (const f of files) {
-      if (f.type === "+" || f.unusable) continue;
-      if (subs.freshCheck(path.join(dir, f.file))?.verdict === "good") continue;
-      if (await retimeFile(videoPath, f, dryRun, notes)) {
-        fitted = f.file;
-        break;
-      }
-    }
-    const download =
-      !fitted && canDownload && !!rec?.imdbId && Number.isInteger(season) && Number.isInteger(episode);
-    if (download && dryRun) notes.push("would download from OpenSubtitles to retime");
-    if (download && !dryRun) {
-      const got = await subs.downloadUntilFit(rec, season, episode, videoPath, async (file) => {
-        const f = sidecarOf(videoPath, await sc.readSidecars(videoPath, durS), file);
-        if (!f) return "gone";
-        if (f.unusable) {
-          await dropOrHide(videoPath, f, "unusable", f.why, "retime", false, notes);
-          return "unusable";
-        }
-        if (await retimeFile(videoPath, f, false, notes)) return "good";
-        await dropOrHide(videoPath, f, "wrong cut", "no one shift fits the .asr.srt", "retime", false, notes);
-        return "wrong cut";
-      });
-      if (got) fitted = path.basename(got);
-    }
-    if (!dryRun) subs.saveRetime(videoPath, fitted);
-    unilog(2883, `${showNameOf(videoPath)}: retime of ${path.basename(videoPath)}${dryRun ? " (dry)" : ""}: ${fitted ? `${fitted} fits its .asr.srt` : "nothing fits its .asr.srt"}; ${notes.join(", ") || "no files"}`);
-    return fitted;
-  } finally {
-    busy.delete(videoPath);
-  }
-}
-
-// The show folder's name, for the log.
-const showNameOf = (videoPath) => path.basename(path.dirname(path.dirname(videoPath)));
-
 // A file that is unusable or from another cut is deleted: its verdict is
 // kept as the memory of why, so it is not made again (the queue's copying
 // out of embedded tracks), and an opn file is marked unfit so it is not
@@ -198,70 +127,18 @@ async function dropOrHide(videoPath, f, verdict, why, method, dryRun, notes) {
   await fsp.unlink(file);
 }
 
-// Deals with one sidecar by its verdict r (sc.judge; none for an unusable
-// file) and returns its verdict now: "good" once a fix made it fit. notes
-// collects what was done, for the log.
-async function act(videoPath, f, r, set, dryRun, notes) {
-  if (f.unusable) {
-    await dropOrHide(videoPath, f, "unusable", f.why, "asr", dryRun, notes);
-    return "unusable";
-  }
-  const file = path.join(path.dirname(videoPath), f.file);
-  const suffix = suffixOf(videoPath, f.file);
-  const save = (verdict, offsetMs, detail) =>
-    subs.saveCheck({ file, video: videoPath, verdict, offsetMs, method: "asr", detail });
-  const pairs = r.clips
-    .map((c) => (c.ms == null ? "-" : `${fmtOfs(c.ms)} (${c.pairs})`))
-    .join(" | ");
-  if (r.verdict === "good") {
-    notes.push(`${suffix} good ${fmtOfs(r.offsetMs)}`);
-    if (!dryRun) save("good", r.offsetMs, pairs);
-    return "good";
-  }
-  if (r.verdict === "fixable") {
-    const how = r.fix.drift
-      ? `stretched ${fmtOfs(r.fix.drift[0][1])} to ${fmtOfs(r.fix.drift[1][1])}`
-      : `shifted ${fmtOfs(r.offsetMs)}`;
-    if (dryRun) {
-      notes.push(`${suffix} would be ${how}`);
-      return "fixable";
-    }
-    const text = sc.fixedText(await fsp.readFile(file, "utf8"), r.fix);
-    await fsp.writeFile(file, text, "utf8");
-    const again = sc.judge(sc.cuesOf(text), set);
-    notes.push(`${suffix} ${how}, now ${again.verdict}`);
-    if (again.verdict !== "good" && (await retimeFile(videoPath, f, false, notes))) return "good";
-    if (again.verdict === "wrong cut") {
-      await dropOrHide(videoPath, f, "wrong cut", `another cut once ${how}`, "asr", false, notes);
-      return "wrong cut";
-    }
-    save(again.verdict, again.offsetMs ?? null, how);
-    return again.verdict;
-  }
-  // Beside an .asr.srt, a file the clips do not find good is first fitted to
-  // it; only when that fails is it dealt with by its verdict.
-  if (await retimeFile(videoPath, f, dryRun, notes)) return "good";
-  if (r.verdict === "wrong cut") {
-    await dropOrHide(videoPath, f, "wrong cut", r.why ?? `another cut: ${pairs}`, "asr", dryRun, notes);
-    return "wrong cut";
-  }
-  notes.push(`${suffix} can't tell (${pairs})`);
-  if (!dryRun) save("can't tell", null, pairs);
-  return "can't tell";
-}
-
 // One sidecar of a video with no English audio: a T or H file is presumed
 // good, and any other is checked by audio matching, which shifts a file it
-// passes. Returns its verdict; notes as for act.
+// passes. Returns its verdict; notes collects what was done, for the log.
 async function actByAudio(videoPath, f, dryRun, notes) {
   if (f.unusable) {
-    await dropOrHide(videoPath, f, "unusable", f.why, "audio", dryRun, notes);
+    await dropOrHide(videoPath, f, "unusable", f.why, VET_AUDIO_METHOD, dryRun, notes);
     return "unusable";
   }
   const file = path.join(path.dirname(videoPath), f.file);
   const suffix = suffixOf(videoPath, f.file);
   const save = (verdict, detail) =>
-    subs.saveCheck({ file, video: videoPath, verdict, method: "audio", detail });
+    subs.saveCheck({ file, video: videoPath, verdict, method: VET_AUDIO_METHOD, detail });
   if ("TH".includes(f.type)) {
     notes.push(`${suffix} presumed good`);
     if (!dryRun) save("can't tell", "presumed good: from the video");
@@ -282,62 +159,24 @@ async function actByAudio(videoPath, f, dryRun, notes) {
   }
 }
 
-async function prepareByAsr(videoPath, durS, track, o) {
-  o.setStage("checking subtitles");
-  const timing = { cutMs: 0, asrMs: 0 };
-  const files = await sc.readSidecars(videoPath, durS);
-  const usable = files.filter((f) => !f.unusable);
-  let set = storedSet(videoPath);
-  if (set?.track !== track) set = null;
-  const keep = () => subs.saveClips(videoPath, track, sc.clipsToJson(set));
-  if (!set && usable.length > 0) {
-    set = { track, ...(await sc.hearClips(videoPath, track, usable, timing)) };
-    keep();
-  }
-  const judged = new Map(usable.map((f) => [f, sc.judgeFile(f, set)]));
-  if ([...judged.values()].some((r) => r.needsCover)) {
-    set.cover = await sc.hearCover(videoPath, track, usable, set, durS, timing);
-    keep();
-    for (const f of usable) judged.set(f, sc.judgeFile(f, set));
-  }
-  let fit = false;
-  for (const f of files) {
-    const verdict = await act(videoPath, f, judged.get(f), set, o.dryRun, o.notes);
-    if (verdict === "good" || (o.dryRun && verdict === "fixable")) fit = true;
-  }
-  if (fit || !o.canDownload) return fit;
-  if (o.dryRun) {
-    o.notes.push("would download from OpenSubtitles");
-    return false;
-  }
-  o.setStage("downloading subtitles");
-  const got = await subs.downloadUntilFit(o.rec, o.season, o.episode, videoPath, async (file) => {
-    const f = sidecarOf(videoPath, await sc.readSidecars(videoPath, durS), file);
-    if (!f) return "gone";
-    if (f.unusable) return act(videoPath, f, null, set, false, o.notes);
-    // With no sidecar before it, the first download places the clips.
-    if (!set) {
-      set = { track, ...(await sc.hearClips(videoPath, track, [f], timing)) };
-      keep();
-    }
-    let r = sc.judgeFile(f, set);
-    if (r.needsCover) {
-      set.cover = await sc.hearCover(videoPath, track, [f], set, durS, timing);
-      keep();
-      r = sc.judgeFile(f, set);
-    }
-    return act(videoPath, f, r, set, false, o.notes);
-  });
-  return !!got;
-}
-
-async function prepareByAudio(videoPath, durS, o) {
+// Full vetting of a video with no English audio track (subVet.js): its files
+// not yet judged this way (each T or H one presumed good, every other by
+// audio matching, which shifts one it passes) and, with none of them fitting,
+// OpenSubtitles downloads judged the same way until one does. o: {rec,
+// season, episode, canDownload, setStage, dryRun, notes}. The caller holds
+// the video (withVideo). Returns whether it has a file that fits.
+export async function vetByAudio(videoPath, durS, o) {
   o.setStage("checking subtitles by audio");
-  if (!o.dryRun) subs.saveClips(videoPath, -1, {});
-  const files = await sc.readSidecars(videoPath, durS);
+  const dir = path.dirname(videoPath);
   let fit = false;
-  for (const f of files) {
-    const verdict = await actByAudio(videoPath, f, o.dryRun, o.notes);
+  for (const f of await sc.readSidecars(videoPath, durS)) {
+    if (f.type === "+") continue;
+    // an unusable file still on disk was being deleted when tv-srvr stopped
+    const check = subs.freshCheck(path.join(dir, f.file));
+    const verdict =
+      check?.method === VET_AUDIO_METHOD && check.verdict !== "unusable"
+        ? check.verdict
+        : await actByAudio(videoPath, f, o.dryRun, o.notes);
     if (verdict === "good" || (!f.unusable && "TH".includes(f.type))) fit = true;
   }
   if (fit || !o.canDownload) return fit;
@@ -347,123 +186,39 @@ async function prepareByAudio(videoPath, durS, o) {
   }
   o.setStage("downloading subtitles");
   const got = await subs.downloadUntilFit(o.rec, o.season, o.episode, videoPath, async (file) => {
+    await glueSidecars(videoPath, { only: file });
     const f = sidecarOf(videoPath, await sc.readSidecars(videoPath, durS), file);
     return f ? actByAudio(videoPath, f, false, o.notes) : "gone";
   });
   return !!got;
 }
 
-// Prepares the subtitles of the video at videoPath, as above. rec, season and
-// episode are its show's record and its episode, for downloads; a video that
-// is no episode of a show with an imdb id gets none. setStage says what it is
-// doing, for the Queues pane. With dryRun nothing is written, deleted or
-// downloaded, though clip transcripts are made and kept. Returns {durS,
-// needsAsr, notes}: needsAsr when the video still has nothing that fits and a
-// complete ASR is the last thing to try. Throws when the video is being
-// prepared already.
-export async function prepareVideoSubs({
-  videoPath,
-  rec,
-  season,
-  episode,
-  setStage = () => {},
-  dryRun = false,
-}) {
-  if (busy.has(videoPath))
-    throw new Error(`${path.basename(videoPath)} is being prepared already`);
-  busy.add(videoPath);
-  const notes = [];
-  try {
-    const { durS, audioLangs } = await sc.videoInfo(videoPath);
-    const track = sc.englishTrack(audioLangs);
-    const o = {
-      rec,
-      season,
-      episode,
-      canDownload:
-        !!rec?.imdbId && Number.isInteger(season) && Number.isInteger(episode),
-      setStage,
-      dryRun,
-      notes,
-    };
-    const fit =
-      track < 0
-        ? await prepareByAudio(videoPath, durS, o)
-        : await prepareByAsr(videoPath, durS, track, o);
-    const needsAsr = !fit && track >= 0;
-    unilog(2791, `${path.basename(videoPath)} subtitles${dryRun ? " (dry)" : ""}: ${notes.join(", ") || "none"}${fit ? "" : needsAsr ? "; nothing fits, needs ASR" : "; nothing fits"}`);
-    return { durS, needsAsr, notes };
-  } finally {
-    busy.delete(videoPath);
-  }
-}
-
-// A sidecar came, changed or went (the file watcher). One that came is dealt
-// with like the video's others, from the clip transcripts stored for its
-// video, once whatever is dealing with the video now is done; videos never
-// checked are left alone. One tv-srvr named (named) first has its glued words
-// split. The video's cover clips (subSpotCheck.js) are heard now when it has
-// none, as in the video's own checks. One
-// changed by anything but these checks, the glue fix and the re-layout is
-// judged as timed by hand.
+// A sidecar came or went (the file watcher). One tv-srvr named (named) that
+// came has its glued words split, once whatever is dealing with its video now
+// is done; nothing is judged: vetting judges later arrivals at the show's
+// next update (subVet.js). One that went loses its check, unless the check
+// is the memory of why it is gone.
 export async function subFileEvent(file, kind, named = false) {
   if (kind === "unlink") {
     subs.forgetCheckUnlessMisfit(file);
     return;
   }
-  if (kind === "change") {
-    if (await rewroteHere(file)) return;
-    await judgeHandTimed(file);
-    return;
-  }
+  if (!named) return;
   let videoPath;
   try {
     videoPath = await sidecarVideo(file);
   } catch {
     return;
   }
-  await notBusy(videoPath);
-  if (named) await fixGluedSidecars(videoPath, { only: file });
-  const stored = subs.getClips(videoPath);
-  if (subs.freshCheck(file)) return;
-  // A video never checked: the arrival is only fitted to the .asr.srt, when
-  // the video has one and needs that.
-  if (!stored && !needsRetime(videoPath)) return;
-  busy.add(videoPath);
-  const notes = [];
-  try {
-    const { durS } = await sc.videoInfo(videoPath);
-    const f = sidecarOf(videoPath, await sc.readSidecars(videoPath, durS), file);
-    if (!f) return;
-    if (!stored) {
-      if (!f.unusable) await retimeFile(videoPath, f, false, notes);
-      return;
-    }
-    if (stored.track < 0) {
-      await actByAudio(videoPath, f, false, notes);
-      return;
-    }
-    const set = storedSet(videoPath);
-    let r = f.unusable ? null : sc.judgeFile(f, set);
-    if (r?.needsCover) {
-      const timing = { cutMs: 0, asrMs: 0 };
-      set.cover = await sc.hearCover(videoPath, set.track, [f], set, durS, timing);
-      subs.saveClips(videoPath, set.track, sc.clipsToJson(set));
-      r = sc.judgeFile(f, set);
-    }
-    await act(videoPath, f, r, set, false, notes);
-  } finally {
-    busy.delete(videoPath);
-    if (notes.length > 0)
-      unilog(2792, `${path.basename(videoPath)} subtitles: ${notes.join(", ")}`);
-  }
+  await fixGluedSidecars(videoPath, { only: file });
 }
 
-// A sidecar timed by hand (a panel's Apply, an edit) is judged from the clip
-// transcripts stored for its video, and keeps a verdict only when it fits, so
-// its check mark says whether it does; nothing shifts it. One that does not
-// fit, or cannot be judged, is unchecked. A file these checks wrote, already
-// judged as it is, is left alone.
+// A sidecar timed by hand (a panel's Apply, an edit), of a video with no
+// complete transcript (subVet.judgeHandTimed has the rest), is judged from
+// the clip transcripts the older checks stored for its video, and keeps a
+// verdict only when it fits; nothing shifts it. One that does not fit, or
+// cannot be judged, is unchecked. A file already judged as it is, is left
+// alone.
 export async function judgeHandTimed(file) {
   if (subs.freshCheck(file)) return;
   subs.forgetCheck(file);
@@ -495,9 +250,7 @@ export async function judgeHandTimed(file) {
 // layout. No timing moves, so each file keeps its check, made current for the
 // rewritten file, and the watcher leaves it alone. Returns how many changed.
 export async function reflowSidecars(videoPath) {
-  await notBusy(videoPath);
-  busy.add(videoPath);
-  try {
+  return withVideo(videoPath, async () => {
     let rewritten = 0;
     for (const { file } of subs.listSidecars(videoPath)) {
       const full = path.join(path.dirname(videoPath), file);
@@ -510,25 +263,24 @@ export async function reflowSidecars(videoPath) {
       rewritten++;
     }
     return rewritten;
-  } finally {
-    busy.delete(videoPath);
-  }
+  });
 }
 
 // ---- glued words ----
 
-// The files the glue fix and the re-layout rewrote, with the size and mtime
-// each was left at, until the watcher's change event for the rewrite.
+// The files the glue fix, the re-layout and vetting rewrote, with the size
+// and mtime each was left at, until the watcher's change event for the
+// rewrite.
 const ownRewrites = new Map();
 
-async function noteRewrite(file) {
+export async function noteRewrite(file) {
   const st = await fsp.stat(file);
   ownRewrites.set(file, `${st.size} ${Math.round(st.mtimeMs)}`);
 }
 
-// Whether file is as the glue fix or the re-layout left it; its record goes
-// either way.
-async function rewroteHere(file) {
+// Whether file is as the glue fix, the re-layout or vetting left it; its
+// record goes either way.
+export async function rewroteHere(file) {
   const left = ownRewrites.get(file);
   if (!left) return false;
   ownRewrites.delete(file);
@@ -542,40 +294,39 @@ async function rewroteHere(file) {
 // never glued. No timing moves, so a file keeps its check, made current for
 // the rewritten file. With dryRun nothing is written. Returns [{file, fixes}]
 // for each file with glued words.
-export async function fixGluedSidecars(videoPath, { only = null, dryRun = false } = {}) {
-  await notBusy(videoPath);
-  busy.add(videoPath);
-  try {
-    const dir = path.dirname(videoPath);
-    const files = [];
-    for (const s of subs.listSidecars(videoPath)) {
-      const full = path.join(dir, s.file);
-      files.push({ ...s, full, text: await fsp.readFile(full, "utf8") });
-    }
-    const out = new Map();
-    for (let changed = true; changed; ) {
-      changed = false;
-      for (const f of files) {
-        if (f.type === "+" || (only && f.full !== only)) continue;
-        const siblings = files
-          .filter((g) => g !== f)
-          .map((g) => ({ text: g.text, outside: g.type === "V" || g.type === "+" }));
-        const r = await fixGlued(videoPath, f.text, siblings);
-        if (!r) continue;
-        changed = true;
-        out.set(f.file, [...(out.get(f.file) ?? []), ...r.fixes]);
-        f.text = r.text;
-        if (dryRun) continue;
-        await fsp.writeFile(f.full, r.text, "utf8");
-        subs.restatCheck(f.full);
-        await noteRewrite(f.full);
-        unilog(3023, `${showNameFromFilePath(videoPath)}: glued words split in ${f.file}: ${r.fixes.map((x) => `${x.from} → ${x.to}`).join(", ")}`);
-      }
-    }
-    return [...out].map(([file, fixes]) => ({ file, fixes }));
-  } finally {
-    busy.delete(videoPath);
+export async function fixGluedSidecars(videoPath, opts = {}) {
+  return withVideo(videoPath, () => glueSidecars(videoPath, opts));
+}
+
+// fixGluedSidecars for a caller already holding the video (withVideo).
+export async function glueSidecars(videoPath, { only = null, dryRun = false } = {}) {
+  const dir = path.dirname(videoPath);
+  const files = [];
+  for (const s of subs.listSidecars(videoPath)) {
+    const full = path.join(dir, s.file);
+    files.push({ ...s, full, text: await fsp.readFile(full, "utf8") });
   }
+  const out = new Map();
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const f of files) {
+      if (f.type === "+" || (only && f.full !== only)) continue;
+      const siblings = files
+        .filter((g) => g !== f)
+        .map((g) => ({ text: g.text, outside: g.type === "V" || g.type === "+" }));
+      const r = await fixGlued(videoPath, f.text, siblings);
+      if (!r) continue;
+      changed = true;
+      out.set(f.file, [...(out.get(f.file) ?? []), ...r.fixes]);
+      f.text = r.text;
+      if (dryRun) continue;
+      await fsp.writeFile(f.full, r.text, "utf8");
+      subs.restatCheck(f.full);
+      await noteRewrite(f.full);
+      unilog(3023, `${showNameFromFilePath(videoPath)}: glued words split in ${f.file}: ${r.fixes.map((x) => `${x.from} → ${x.to}`).join(", ")}`);
+    }
+  }
+  return [...out].map(([file, fixes]) => ({ file, fixes }));
 }
 
 // The video is gone, and so is what was learned about it.
@@ -583,27 +334,14 @@ export function forgetVideo(videoPath) {
   subs.forgetVideo(videoPath);
 }
 
-// Whether the video's subtitle files have not all been checked and dealt
-// with: it has no clip transcripts, or a sidecar has no verdict for the file
-// as it is now, or one found fixable and not fixed. A dry run, or a remote's
-// Sync, leaves clips with no verdicts.
-export function needsCheck(videoPath) {
-  if (!subs.getClips(videoPath)) return true;
-  const dir = path.dirname(videoPath);
-  return subs.listSidecars(videoPath).some((s) => {
-    const verdict = subs.freshCheck(path.join(dir, s.file))?.verdict;
-    return !verdict || verdict === "fixable";
-  });
-}
-
-// The remotes' Sync: how far the sidecar srtFile of videoPath is off, by the
-// clip transcripts stored for the video,
-// heard now when it has none. Nothing is changed but those, and the file's
-// verdict when it fits as it is: the remote's Apply makes the shift. Returns
-// {verdict, offsetMs, why, label, subsChecked}: offsetMs the shift that makes
-// the file fit; null, with why, when no one shift fits (a file from another
-// cut, or at another rate) or none can be told. label and subsChecked are the
-// file's label in a play's list and getPlayUrl's subsChecked, as they are now.
+// The remotes' Sync for a video with no complete transcript (subVet.js has
+// the rest): how far the sidecar srtFile of videoPath is off, by the clip
+// transcripts the older checks stored for the video, else by its .asr.srt;
+// no clips are heard. Nothing is changed but the file's verdict when it fits
+// as it is: the remote's Apply makes the shift. Returns {verdict, offsetMs,
+// why}: offsetMs the shift that makes the file fit; null, with why, when no
+// one shift fits (a file from another cut, or at another rate) or none can be
+// told.
 export async function measureSidecar({ videoPath, srtFile }) {
   const video = path.resolve(String(videoPath || ""));
   if (!video.startsWith(TV_DIR + "/"))
@@ -622,34 +360,18 @@ export async function measureSidecar({ videoPath, srtFile }) {
       ? { verdict: "unusable", offsetMs: null, why: `it can't be checked, ${f.why}` }
       : track < 0
         ? await measureByAudio(video, name)
-        : await measureByAsr(video, track, files, f, durS);
+        : await measureByAsr(video, track, f);
     unilog(2803, `${name} measured for Sync: ${out.verdict}, ${out.offsetMs == null ? out.why : fmtOfs(out.offsetMs)}`);
-    return {
-      ...out,
-      label: await subs.playLabel(video, name),
-      subsChecked: !needsCheck(video),
-    };
+    return out;
   } finally {
     busy.delete(video);
   }
 }
 
-async function measureByAsr(videoPath, track, files, f, durS) {
-  const usable = files.filter((x) => !x.unusable);
-  const timing = { cutMs: 0, asrMs: 0 };
-  let set = storedSet(videoPath);
-  if (set?.track !== track) set = null;
-  const keep = () => subs.saveClips(videoPath, track, sc.clipsToJson(set));
-  if (!set) {
-    set = { track, ...(await sc.hearClips(videoPath, track, usable, timing)) };
-    keep();
-  }
-  let r = sc.judgeFile(f, set);
-  if (r.needsCover) {
-    set.cover = await sc.hearCover(videoPath, track, usable, set, durS, timing);
-    keep();
-    r = sc.judgeFile(f, set);
-  }
+async function measureByAsr(videoPath, track, f) {
+  const set = storedSet(videoPath);
+  if (set?.track !== track) return measureByAsrFile(videoPath, f);
+  const r = sc.judgeFile(f, set);
   if (r.fix?.drift)
     return { verdict: "other rate", offsetMs: null, why: "it runs at another rate, no one shift fits it" };
   if (r.verdict === "good")
@@ -670,6 +392,25 @@ async function measureByAsr(videoPath, track, files, f, durS) {
   return { verdict: r.verdict, offsetMs: null, why };
 }
 
+// With no stored clips: the one shift that fits the file to the video's
+// .asr.srt (asrOffset).
+async function measureByAsrFile(videoPath, f) {
+  const asrFile = asrFileOf(videoPath);
+  if (!asrFile || f.type === "+")
+    return { verdict: "can't tell", offsetMs: null, why: "the video has no transcript to measure it by" };
+  const dir = path.dirname(videoPath);
+  try {
+    const { offsetMs } = asrOffset(
+      await fsp.readFile(path.join(dir, f.file), "utf8"),
+      await fsp.readFile(asrFile, "utf8"),
+      path.basename(asrFile),
+    );
+    return { verdict: "by asr", offsetMs };
+  } catch (e) {
+    return { verdict: "can't tell", offsetMs: null, why: e.message };
+  }
+}
+
 // A video with no English audio: the whole file's offset by audio matching.
 async function measureByAudio(videoPath, name) {
   try {
@@ -683,10 +424,11 @@ async function measureByAudio(videoPath, name) {
   }
 }
 
-// The Sync of the local pane and the remotes' subtitle panel: the file moved
-// to fit the words of its video, by the clip transcripts stored for the video
-// when it has them, else by its .asr.srt (the retime, by hand). Returns
-// {offsetMs, matches}.
+// The Sync of the local pane for a video with no complete transcript
+// (subVet.js has the rest): the file moved to fit the words of its video, by
+// the clip transcripts the older checks stored for the video when it has
+// them, else by its .asr.srt (the retime, by hand). Returns {offsetMs,
+// matches}.
 export async function syncSidecar({ path: relPath }) {
   const file = path.resolve(TV_DIR, String(relPath || ""));
   if (!file.startsWith(TV_DIR + "/") || !file.endsWith(".srt"))

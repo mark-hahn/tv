@@ -266,9 +266,9 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   - `processed`: videos the add-to-disk steps have handled.
   - `clips`: the ASR clip transcripts of each checked video, and its audio
     track (-1: no English audio). `checks`: each sidecar's verdict, valid
-    while the file keeps its size and mtime. `asrSpend`: automatic complete
-    ASR's cost per PST day. `subs.unfitFor` marks a result found not to fit
-    a video, `subs.hashFor` one OpenSubtitles made for it (moviehash).
+    while the file keeps its size and mtime. `subs.unfitFor` marks a result
+    found not to fit a video, `subs.hashFor` one OpenSubtitles made for it
+    (moviehash).
 - Subtitle checks (`apps/srvr/src/subPrepare.js`, `subSpotCheck.js`,
   `srt-fix.md`): each sidecar's timing is checked against the words of the
   video's English audio, heard by ASR (Speechmatics) on two 2-minute clips
@@ -347,10 +347,10 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   (`apps/srvr/src/subsQueue.js`): T and H copied out, an arriving `.srt`
   named `S<n>`, glued words split (below), then the subtitle checks above,
   and ASR when they leave
-  nothing that fits. Automatic ASR stops for the day at $20
-  (`AUTO_ASR_DAILY_USD`); a video put off is not marked processed, so the
-  sweep brings it back. Manual ASR from the ASR pane is not limited by
-  this. A request for the video being processed runs it again once that run
+  nothing that fits. There is no daily limit on ASR. What it costs is
+  Speechmatics' own job durations (`apps/srvr/src/asrCost.js`,
+  `data/asrjobs.db`), shown in the ASR pane's Cost chart; nothing estimates
+  it. A request for the video being processed runs it again once that run
   is done. A video rewritten in place under the same name (a forced
   download, tv-down's remux) is queued as another file: what was learned
   about the old one is forgotten, its T and H are copied out again, and its
@@ -422,6 +422,34 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   show; `scripts/fix-glued-subs.js [--dry]` drives it over the library.
   The first pass (10-21) split 586 words in 76 files; their originals are in
   `data/glue-backup/` on hahnca.com.
+- Subtitle vetting (planned in `subs-final-plan.md`, not built yet) will
+  replace the clip checks, at two levels:
+  - full: a complete ASR, then every subtitle file judged against it, and
+    kept and retimed, filled, or deleted;
+  - cheap: no ASR and nothing judged. Embedded tracks are copied out, files
+    cleaned, old files kept, and one OpenSubtitles download made only when
+    there is no embedded track;
+  - a video with an old `+` file is cheap, but its files are judged against
+    the `+` file's caption starts: good ones retimed with a ✓, bad ones kept
+    without one, gaps filled from the `+` file;
+  - when it runs: only in the tvdb update task's per-show step (the show's
+    next two episodes in full, the rest cheap) and at the end of a watch
+    (the next two in full). Never when files land, at play, or in the
+    sweep, and no backfill;
+  - ✓ means judged good by the new judge; the old clip checks' ✓s are
+    dropped, and the play list's order is unchanged;
+  - an episode that has been through it has its subtitles "vetted"; "vetted
+    v1" means vetted under rules version 1;
+  - say "vetting" and "vetted" alone only in subtitle contexts, and
+    "subtitle vetting" or "subs vetted" anywhere else (log group "subs vet").
+- Episode subtitle-vetting fields, stored in tvdb `episodeData` whenever an
+  episode is vetted:
+  - `subsVetted`: the version number;
+  - `subsVetLevel`: `cheap` or `full`;
+  - `subsVettedAt`: PST time, as `lastPlayed`;
+  - `subsVettedFile`: the video it vetted, as `file`; a mismatch means not
+    vetted;
+  - `subsVettedResult`: `own`, `download`, `filled`, `asr` or `none`.
 - Movies get no subtitle processing.
 - Players: tvapp; tv-srvr's browser player (`play.html` at `/api/play`),
   opened by the info and map panes' Play and by the local pane's Play for an

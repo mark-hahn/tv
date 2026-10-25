@@ -20,6 +20,11 @@
 //                 TVDB's Special Category tag and whether it calls the
 //                 special critical to the story, season 0 only
 //     tagged      TVDB's lastUpdated for the episode when its tags were read
+//     subsVetted, subsVetLevel, subsVettedAt, subsVettedFile, subsVettedResult
+//                 its subtitle vetting (tv-srvr's subVet.js): the vetting
+//                 version, "cheap" or "full", when (PST, as lastPlayed), the
+//                 video it vetted (as file), and what it was left with
+//                 ("own", "download", "filled", "asr" or "none")
 // Season 0 holds only the specials that count as episodes; TVDB's other
 // season 0 entries are tv-srvr's extras, kept elsewhere (season0.js).
 //
@@ -216,6 +221,11 @@ const RECORD_FIELDS = [
   "category",
   "critical",
   "tagged",
+  "subsVetted",
+  "subsVetLevel",
+  "subsVettedAt",
+  "subsVettedFile",
+  "subsVettedResult",
 ];
 
 // The fields worth storing, in RECORD_FIELDS order: anything empty, false or
@@ -248,6 +258,10 @@ function normalizeField(name, value) {
     case "lastPlayed":
     case "category":
     case "tagged":
+    case "subsVetLevel":
+    case "subsVettedAt":
+    case "subsVettedFile":
+    case "subsVettedResult":
       return typeof value === "string" && value ? value : null;
     case "res":
     case "pos":
@@ -257,6 +271,7 @@ function normalizeField(name, value) {
     case "airsBeforeEpisode":
     case "airsAfterSeason":
     case "runtime":
+    case "subsVetted":
       return typeof value === "number" && value > 0 ? value : null;
     default:
       return value;

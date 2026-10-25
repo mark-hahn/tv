@@ -215,7 +215,7 @@ async function extractAudio(inputVideo, outFlac) {
     "-i",
     inputVideo,
     "-map",
-    "0:a:0",
+    `0:a:${audioTrack}`,
     "-ac",
     "1",
     "-ar",
@@ -504,6 +504,16 @@ async function processOneVideo(videoPath) {
 
     const outputPath = getSrtPath(videoPath);
     writeSRT(splitLongCues(segments), outputPath);
+    // The word-timed transcript, for tv-srvr to keep (subtitle vetting):
+    // [[text, startMs, endMs]], text as the cues show it.
+    if (wordsOut)
+      await fsp.writeFile(
+        wordsOut,
+        JSON.stringify(
+          words.map((w) => [w.w, Math.round(w.start * 1000), Math.round(w.end * 1000)]),
+        ),
+        "utf8",
+      );
     const summary = `${words.length} words from ${(totalDur / 60).toFixed(1)} min of audio`;
     pane(`Usage: ${summary}`);
     unilog(2308, `ASR: finished, ${summary}`);
@@ -527,6 +537,10 @@ if (!inputPath) {
 // Optional JSON array of names (characters etc.) sent to Speechmatics as
 // additional_vocab so it recognizes them instead of near-homophones.
 const vocab = process.argv[3] ? JSON.parse(process.argv[3]) : [];
+// Optional: the audio track to transcribe (the video's English one), and
+// where to write the word-timed transcript.
+const audioTrack = process.argv[4] ? Number(process.argv[4]) : 0;
+const wordsOut = process.argv[5] || null;
 (async () => {
   await run("ffmpeg", ["-version"]);
   await run("ffprobe", ["-version"]);

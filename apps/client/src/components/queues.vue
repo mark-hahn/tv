@@ -130,7 +130,7 @@
           gap: '10px',
           alignItems: 'baseline',
           padding: '2px 0',
-          fontSize: '18.72px',
+          fontSize: '14.98px',
           borderBottom: '1px solid #eee',
           cursor: 'pointer',
           backgroundColor:
@@ -164,7 +164,7 @@
           v-if="hasEta"
           style="
             flex: 0 0 auto;
-            width: 70px;
+            margin-right: 8px;
             font-family: monospace;
             color: #036;
           "

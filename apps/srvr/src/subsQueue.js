@@ -1,11 +1,12 @@
 // subsQueue — subtitle/ASR queue domain extracted from index.js.
 //
 // Owns two persistent queues and their background loops:
-//   subQueue  what a video gets when it lands on disk: its text tracks copied
-//             out to sidecars, new subtitle files named, every sidecar checked
-//             against its audio and a download or ASR when none fits
-//             (subPrepare.js)
-//   asrQueue  whisper ASR transcription queue
+//   subQueue  what a video gets when it lands on disk (the add-to-disk steps):
+//             its text tracks copied out to sidecars, new subtitle files
+//             named and glued words split; and subtitle vetting (subVet.js),
+//             for entries marked full or cheap
+//   asrQueue  complete ASR (asr.js): the `+` file and the word-timed
+//             transcript a full vetting judges by
 // Every subtitle is a sanitized sidecar .srt; src/subs.js has the rest.
 //
 // All mutable state lives on the exported `subsState` object so that route
@@ -15,6 +16,7 @@
 // other queues' state).
 
 import fs from "fs";
+import os from "os";
 import * as path from "node:path";
 import * as cp from "child_process";
 import {
@@ -34,12 +36,9 @@ import * as subs from "./subs.js";
 import { stillsBusy } from "./stills.js";
 import { getRecodePending } from "./recode.js";
 import { addBlockedName } from "./blockedNames.js";
-import {
-  prepareVideoSubs,
-  retimePass,
-  needsRetime,
-  fixGluedSidecars,
-} from "./subPrepare.js";
+import { fixGluedSidecars } from "./subPrepare.js";
+import { vetVideo } from "./subVet.js";
+import { videoInfo, englishTrack } from "./subSpotCheck.js";
 
 // ---- hard-wired constants (no env vars per repo convention) ----
 const moviesDir = "/mnt/media/movies";
@@ -50,11 +49,6 @@ const SUBTITLE_LOG_DIR = "/root/dev/apps/tv/apps/asr/data/subtitle-logs/";
 const ASR_JS_PATH = "/root/dev/apps/tv/apps/asr/asr.js";
 const ASR_LOG_BUFFER_MAX = 500;
 const EMB_LOG_BUFFER_MAX = 500;
-// What complete ASR the pipeline starts by itself may cost in a day (PST), at
-// Speechmatics' price. ASR asked for from the ASR pane or the Subs button is
-// not counted.
-const AUTO_ASR_DAILY_USD = 20;
-const ASR_USD_PER_HOUR = 0.38;
 // A sidecar this code names itself, as opposed to one that arrived as it is.
 // Case-sensitive like sidecarType (subOrigin.js), so a name it calls S is not
 // taken for a named one; an opn tag grows past 5 characters with the file id.
@@ -256,15 +250,17 @@ function addToAsrQueue(entries) {
     subsState.asrQueueDelay = 500;
   }
 }
-// Two requests for one video as one: either one's naming or replacement
-// stands, with the more urgent priority.
+// The vetting two requests for one video ask for together: full over cheap.
+const mergeVet = (a, b) => (a === "full" || b === "full" ? "full" : a || b || undefined);
+// Two requests for one video as one: either one's naming, replacement or
+// vetting stands, with the more urgent priority.
 const mergeSubRequest = (a, b) =>
   a
     ? {
         ...a,
         renameS: !!(a.renameS || b.renameS),
         replaced: !!(a.replaced || b.replaced),
-        retime: !!(a.retime || b.retime),
+        vet: mergeVet(a.vet, b.vet),
         lowPriority: !!(a.lowPriority && b.lowPriority),
         fromUI: !!(a.fromUI || b.fromUI),
       }
@@ -284,7 +280,7 @@ function enqueueSubQueue(entry, toFront) {
     const existing = subsState.subQueue[idx];
     if (entry.renameS) existing.renameS = true;
     if (entry.replaced) existing.replaced = true;
-    if (entry.retime) existing.retime = true;
+    existing.vet = mergeVet(existing.vet, entry.vet);
     if (!entry.lowPriority && existing.lowPriority) {
       subsState.subQueue.splice(idx, 1);
       subsState.subQueue.unshift({
@@ -492,7 +488,24 @@ async function renameSFiles(videoFilePath, season, episode) {
     await fs.promises.unlink(src);
   }
 }
-async function generateSrtWithAsr(videoFilePath, fromUI) {
+// A full vetting waiting on this video's ASR, queued again once its
+// transcript is stored.
+function vetAgain(videoFilePath) {
+  enqueueSubQueue(
+    { videoFilePath, fromUI: false, lowPriority: false, vet: "full" },
+    false,
+  );
+  persistSubQueue();
+  doSubQueueNow();
+}
+// A complete ASR of the video: its `+` file, and its word-timed transcript
+// stored for vetting (subs.saveTranscript). entry.vet: a full vetting waits
+// on it, so it is made even over an old `+` file, unless the transcript is
+// stored already, and the vetting is queued again once it is. entry.track:
+// the audio track, else the English one (the first with none).
+async function generateSrtWithAsr(entry) {
+  const videoFilePath = entry.videoPath;
+  const fromUI = entry.fromUI;
   const base = videoFilePath.replace(/\.[^.]+$/, "");
   const srtPath = base + ".asr.srt";
   if (!fs.existsSync(videoFilePath)) {
@@ -503,15 +516,18 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
     unilog(1400, `dropping asr queue entry, file gone: ${videoFilePath}`);
     return;
   }
-  if (fs.existsSync(srtPath)) {
+  const track =
+    entry.track ?? Math.max(0, englishTrack((await videoInfo(videoFilePath)).audioLangs));
+  if (entry.vet ? subs.getTranscript(videoFilePath, track) : fs.existsSync(srtPath)) {
     subsState.asrLogBuffer = [];
     appendAsrLog(
-      `=== Skipped: ${path.basename(videoFilePath)} (srt already exists) ===`,
+      `=== Skipped: ${path.basename(videoFilePath)} (${entry.vet ? "transcript" : "srt"} already exists) ===`,
     );
     unilog(12, `asr skip exists: ${videoFilePath}`);
-    unilog(13, `skipped (srt exists): ${videoFilePath}`);
+    if (entry.vet) vetAgain(videoFilePath);
     return;
   }
+  const wordsPath = path.join(os.tmpdir(), `asr-words-${process.pid}-${Date.now()}.json`);
   subsState.asrLogBuffer = [];
   appendAsrLog("");
   appendAsrLog(`=== Queued: ${path.basename(videoFilePath)} ===`);
@@ -537,6 +553,8 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
           ASR_JS_PATH,
           videoFilePath,
           JSON.stringify(asrVocabForShow(showNameFromFilePath(videoFilePath))),
+          String(track),
+          wordsPath,
         ],
         {
           stdio: ["ignore", "pipe", "pipe"],
@@ -558,7 +576,13 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
       });
     });
     unilog(15, `asr done: ${videoFilePath}`);
+    subs.saveTranscript(
+      videoFilePath,
+      track,
+      JSON.parse(await fs.promises.readFile(wordsPath, "utf8")),
+    );
     appendAsrLog(`=== Done: ${path.basename(videoFilePath)} ===`);
+    if (entry.vet) vetAgain(videoFilePath);
     if (fromUI)
       publishSubsProgress({
         path: videoFilePath,
@@ -574,6 +598,7 @@ async function generateSrtWithAsr(videoFilePath, fromUI) {
       appendAsrLog(`=== Error: ${e.message} ===`);
     }
   } finally {
+    await fs.promises.rm(wordsPath, { force: true });
     subsState.genSrtRunning = false;
     subsState.genSrtChild = null;
     subsState.genSrtAborting = false;
@@ -650,12 +675,31 @@ function doSubQueueNow() {
     setTimeout(poll, 1000);
   }
 }
+// A full vetting that needs the video's complete ASR queues it. Nothing is
+// added for a video already waiting.
+function queueVetAsr(videoFilePath, showName, season, episode, { track }) {
+  if (subsState.asrQueue.some((e) => e.videoPath === videoFilePath)) return;
+  addToAsrQueue([
+    {
+      videoPath: videoFilePath,
+      showName,
+      season: season ?? 0,
+      episode: episode ?? 0,
+      fromUI: false,
+      lowPriority: false,
+      vet: true,
+      track,
+      source: "subtitle vetting",
+      addedAt: Date.now(),
+    },
+  ]);
+}
 // What a video gets when it lands on disk, or when the sweep or the local
 // pane's Subs button names it: its text tracks copied out, new subtitle files
-// named, glued words split (subGlue.js), then every subtitle file checked
-// against the video's audio and dealt
-// with, an OpenSubtitles download that fits when none does, and ASR when no
-// download fits either (subPrepare.js).
+// named and glued words split (subGlue.js). An entry marked vet ("full" or
+// "cheap", from the per-show step or the end of a watch) is vetted after
+// them (subVet.js); a cheap one of a video already through them skips them,
+// as cheap vetting cleans every file itself.
 async function processSubQueueEntry() {
   // Only one entry at a time. startSubQueueLoop serializes itself by awaiting,
   // but doSubQueueNow can fire between ticks, and the entry now stays at the
@@ -706,20 +750,6 @@ async function processSubQueueEntry() {
     const season = parsed?.season;
     const episode = parsed?.episode;
     const isEpisode = Number.isInteger(season) && Number.isInteger(episode);
-    // The retime mark (an .asr.srt landing, the backfill): only the retime
-    // pass, with downloads, nothing else.
-    if (entry.retime) {
-      setSubStage("retiming subtitles");
-      await retimePass({
-        videoPath: videoFilePath,
-        rec,
-        season,
-        episode,
-        canDownload: true,
-        force: true,
-      });
-      return;
-    }
     // The video is another file under the same name (rewritten in place):
     // what was learned about the old one goes, and so do the copies of its
     // embedded tracks, which are taken again from this one. Its other
@@ -731,61 +761,32 @@ async function processSubQueueEntry() {
         if (s.type === "T" || s.type === "H")
           await fs.promises.unlink(path.join(path.dirname(videoFilePath), s.file));
     }
-    await extractEmbSrts(videoFilePath, entry.fromUI);
-    if (isEpisode && entry.renameS) {
-      setSubStage("naming subtitle files");
-      await renameSFiles(videoFilePath, season, episode);
+    const addToDisk = !(entry.vet === "cheap" && subs.isProcessed(videoFilePath));
+    if (addToDisk) {
+      await extractEmbSrts(videoFilePath, entry.fromUI);
+      if (isEpisode && entry.renameS) {
+        setSubStage("naming subtitle files");
+        await renameSFiles(videoFilePath, season, episode);
+      }
+      setSubStage("splitting glued words");
+      await fixGluedSidecars(videoFilePath);
+      subs.markProcessed(videoFilePath);
     }
-    setSubStage("splitting glued words");
-    await fixGluedSidecars(videoFilePath);
-    // A check, search or download that fails throws: then the video is not
-    // marked done, and the sweep brings it back.
-    const prep = await prepareVideoSubs({
-      videoPath: videoFilePath,
-      rec,
-      season,
-      episode,
-      setStage: setSubStage,
-    });
-    // A video whose only good file is its .asr.srt gets one other file fitted
-    // to it, once; a video only now going to ASR has no .asr.srt yet, and
-    // gets its pass when that lands.
-    if (needsRetime(videoFilePath) && !subs.getRetime(videoFilePath)) {
-      setSubStage("retiming subtitles");
-      await retimePass({
+    // A vetting whose search or download fails throws: the episode is not
+    // marked vetted, and its show's next update queues it again.
+    if (entry.vet) {
+      setSubStage(`${entry.vet} subtitle vetting`);
+      const vetted = await vetVideo({
         videoPath: videoFilePath,
+        level: entry.vet,
+        showName,
         rec,
         season,
         episode,
-        canDownload: true,
+        setStage: setSubStage,
       });
+      if (vetted.needsAsr) queueVetAsr(videoFilePath, showName, season, episode, vetted);
     }
-    setSubStage("choosing next queue");
-    if (prep.needsAsr) {
-      const usd = (prep.durS / 3600) * ASR_USD_PER_HOUR;
-      if (!entry.fromUI) {
-        const spent = subs.asrSpentToday();
-        if (spent + usd > AUTO_ASR_DAILY_USD) {
-          // Not marked done: the sweep brings it back on a later day.
-          unilog(2796, `${showName}: ASR for ${path.basename(videoFilePath)} put off, automatic ASR is at $${spent.toFixed(2)} of $${AUTO_ASR_DAILY_USD} today`);
-          return;
-        }
-        subs.addAsrSpend(usd);
-      }
-      addToAsrQueue([
-        {
-          videoPath: videoFilePath,
-          showName,
-          season: season ?? 0,
-          episode: episode ?? 0,
-          fromUI: entry.fromUI,
-          lowPriority: entry.lowPriority,
-          source: entry.fromUI ? "ASR pane" : "subtitle pipeline",
-          addedAt: Date.now(),
-        },
-      ]);
-    }
-    subs.markProcessed(videoFilePath);
   } catch (e) {
     // A failed fetch says only "fetch failed"; what went wrong is in its cause.
     const cause = e.cause ? ` (${e.cause.code || e.cause.message})` : "";
@@ -837,7 +838,7 @@ function startAsrQueueLoop() {
     if (!subsState.genSrtRunning && subsState.asrQueue.length > 0) {
       const entry = subsState.asrQueue[0];
       subsState.asrQueueDelay = 500;
-      generateSrtWithAsr(entry.videoPath, entry.fromUI)
+      generateSrtWithAsr(entry)
         .catch((e) => unilog(522, "", e.message))
         .finally(() => {
           if (subsState.asrQueue[0]?.videoPath === entry.videoPath) {

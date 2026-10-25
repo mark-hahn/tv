@@ -196,6 +196,44 @@ async function openSubtitlesSubtitles({
   return { resp, body };
 }
 
+// The account's download quota as OpenSubtitles counts it (/infos/user):
+// {allowed, used, remaining, resetAt}, resetAt when the count starts afresh
+// (ms). A request answered 429 is tried again once its retry-after has
+// passed, and one refused for the login once more after a new login.
+export async function subsDownloadQuota() {
+  const login = loadSubsLogin();
+  const ask = async () => {
+    for (let attempt = 1; ; attempt++) {
+      const resp = await fetch("https://api.opensubtitles.com/api/v1/infos/user", {
+        headers: {
+          "Api-Key": login.apiKey,
+          "User-Agent": openSubtitlesUserAgent,
+          Accept: "application/json",
+          ...(subsTokenCache ? { Authorization: `Bearer ${subsTokenCache}` } : {}),
+        },
+      });
+      if (resp.status !== 429 || attempt >= 3) return resp;
+      await sleep(1000 * (Number(resp.headers.get("retry-after")) || 1));
+    }
+  };
+  let resp = await ask();
+  if (resp.status === 401 || resp.status === 403) {
+    await persistSubsToken(await openSubtitlesLogin(login));
+    resp = await ask();
+  }
+  if (!resp.ok) throw new Error(`OpenSubtitles /infos/user HTTP ${resp.status}`);
+  const d = (await resp.json())?.data;
+  const resetAt = Date.parse(d?.reset_time_utc ?? "");
+  if (!Number.isInteger(d?.remaining_downloads) || !Number.isFinite(resetAt))
+    throw new Error("OpenSubtitles /infos/user gave no download quota");
+  return {
+    allowed: d.allowed_downloads,
+    used: d.downloads_count,
+    remaining: d.remaining_downloads,
+    resetAt,
+  };
+}
+
 // The API allows 5 requests a second; a search answered 429 is tried again
 // once the time its retry-after asks for has passed.
 async function searchRetrying429(args) {

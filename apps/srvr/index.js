@@ -54,7 +54,6 @@ import {
 import {
   videoFileExtensions,
   resFindEpisodeVideos,
-  resIsVideoName,
   vidDeleteWithSidecars,
 } from "./src/videoFiles.js";
 import {
@@ -89,6 +88,7 @@ import * as subs from "./src/subs.js";
 import * as asrCost from "./src/asrCost.js";
 import { subsCountEpisodes } from "./src/opensubtitles.js";
 import * as subPrepare from "./src/subPrepare.js";
+import * as subVet from "./src/subVet.js";
 import * as stills from "./src/stills.js";
 import * as recode from "./src/recode.js";
 
@@ -222,6 +222,8 @@ const safeShowFolderName = disk.safeShowFolderName;
 const seasonFolderName = disk.seasonFolderName;
 const buildTvShowNfo = disk.buildTvShowNfo;
 subsQueue.init({ syncBatchMsgs });
+// An episode's subtitle-vetting fields changed: the record goes out.
+subVet.init({ onVetted: (showName) => debouncedTvdbPush(showName) });
 // Local aliases keep existing call sites terse (subsQueue domain lives in
 // src/subsQueue.js). State lives on the shared subsState object.
 const { subsState } = subsQueue;
@@ -477,6 +479,8 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     const playedSince = util.toPstDateTimeMs(new Date(Date.now() - PREFETCH_PLAYED_MS));
     if (tvdbRecord.inLibrary && tvdbRecord.lastPlayedDate >= playedSince)
       prefetchNextSubs(showName, tvdbRecord);
+    // Subtitle vetting: the next two episodes in full, the rest cheap.
+    queueVetting(showName, tvdbRecord);
     return { hasChanges: push2Changes.length > 0, changes: push2Changes };
   } catch (e) {
     unilog(544, "error for", showName, e.message);
@@ -1934,7 +1938,6 @@ app.post(
     await tvdb.saveTvdbSync();
     debouncedTvdbPush(name);
     unilog(2846, `${name}: watched marks set on ${changed} episode(s)`);
-    if (episodes.some((e) => e.watched)) queueNextUpCheck(name, rec);
     return { ok: true, changed };
   }),
 );
@@ -1963,7 +1966,6 @@ app.post(
     await tvdb.saveTvdbSync();
     debouncedTvdbPush(name);
     unilog(2518, `${name} S${season}E${episode} watched=${!!watched}`);
-    if (watched) queueNextUpCheck(name, rec);
     return { ok: true, watched: !!watched };
   }),
 );
@@ -2202,56 +2204,48 @@ app.post(
 // The torrent pane's Chk Subs, through tv-api: OpenSubtitles release counts.
 app.post("/api/subsCountEpisodes", apiWrapper(subsCountEpisodes));
 
-// Sync in the local pane and the remotes' subtitle panel: a sidecar moved to
-// fit the words of its video, by its stored clip transcripts, else by its
-// <base>.asr.srt.
-app.post("/api/syncSubToAsr", apiWrapper(subPrepare.syncSidecar));
+// Sync in the local pane: a sidecar moved to fit the words of its video, by
+// its transcript, else by its stored clip transcripts, else by its
+// <base>.asr.srt (subVet.syncSidecar).
+app.post("/api/syncSubToAsr", apiWrapper(subVet.syncSidecar));
 
-// The remotes' Sync: how far the subtitle file showing is off its video at
-// posMs (subPrepare.measureSidecar). Nothing is shifted; the remote shows the
-// offset, and its Apply shifts the file.
-app.post("/api/measureSub", apiWrapper(subPrepare.measureSidecar));
+// The remotes' Sync: how far the subtitle file showing is off its video
+// (subVet.measureSidecar). Nothing is shifted; the remote shows the offset,
+// and its Apply shifts the file.
+app.post("/api/measureSub", apiWrapper(subVet.measureSidecar));
 
-// subPrepare.js on one video (path under the tv folder), dry unless dryRun is
-// false: what it would do with each subtitle file, and what a play would then
-// offer.
+// Subtitle vetting (subVet.js) of one video (path under the tv folder) at
+// level full or cheap, dry unless dryRun is false: what it would do with each
+// subtitle file, and what a play would then offer. A full vetting with no
+// transcript stored only says it needs ASR, dry or not.
 app.post(
-  "/api/subPrepare",
-  apiWrapper(async ({ path: relPath, dryRun = true }) => {
+  "/api/subVet",
+  apiWrapper(async ({ path: relPath, level = "full", dryRun = true }) => {
     const videoPath = path.resolve(tvDir, String(relPath || ""));
     if (!videoPath.startsWith(tvDir + "/"))
       throw new Error(`not under ${tvDir}: ${relPath}`);
+    if (level !== "full" && level !== "cheap")
+      throw new Error(`level must be full or cheap: ${level}`);
     const showName = showNameFromFilePath(videoPath);
     const rec = tvdb.getAllTvdbSync()?.[showName];
     const se = parseFileSeasonEpisode(
       path.basename(videoPath),
       path.basename(path.dirname(videoPath)),
     );
-    const prep = await subPrepare.prepareVideoSubs({
+    const vetted = await subVet.vetVideo({
       videoPath,
+      level,
+      showName,
       rec,
       season: se?.season,
       episode: se?.episode,
       dryRun: dryRun !== false,
     });
-    // What the retime pass would do, when the video needs one.
-    const retime = [];
-    if (subPrepare.needsRetime(videoPath))
-      await subPrepare.retimePass({
-        videoPath,
-        rec,
-        season: se?.season,
-        episode: se?.episode,
-        canDownload: true,
-        dryRun: dryRun !== false,
-        notes: retime,
-      });
     const play = rec
       ? await subs.playList(String(rec.id), se?.season, se?.episode, videoPath)
       : null;
     return {
-      ...prep,
-      retime,
+      ...vetted,
       play: play && {
         labels: play.sidecars.map((x) => x.label),
         pick: play.pick,
@@ -2403,35 +2397,38 @@ app.post("/api/applySubOffset", async (req, res) => {
   }
   // Timed by hand now: it keeps a check mark only when it fits. label is its
   // label in a play's list now, and subsChecked getPlayUrl's.
-  await subPrepare.judgeHandTimed(resolvedSrt);
+  await subVet.judgeHandTimed(resolvedSrt);
   res.json({
     ok: true,
     label: await subs.playLabel(resolvedVideo, path.basename(resolvedSrt)),
-    subsChecked: !subPrepare.needsCheck(resolvedVideo),
+    subsChecked: subVet.subsChecked(resolvedVideo),
   });
 });
 
 // ASR subtitle queue endpoints
 // lowPriority queues them at the back, after all other batch work, as the
-// sweep does (a backfill).
-// retime queues only the retime pass (subPrepare.js) for them, as the
-// backfill does.
+// sweep does (a backfill). vet ("full" or "cheap") has them vetted after the
+// add-to-disk steps (subVet.js).
 app.post("/api/asr/subs/enqueue", (req, res) => {
-  const { videoPaths, fromUI, lowPriority, retime } = req.body || {};
+  const { videoPaths, fromUI, lowPriority, vet } = req.body || {};
   if (!Array.isArray(videoPaths) || videoPaths.length === 0) {
     res.status(400).json({ error: "videoPaths required" });
+    return;
+  }
+  if (vet !== undefined && vet !== "full" && vet !== "cheap") {
+    res.status(400).json({ error: "vet must be full or cheap" });
     return;
   }
   if (lowPriority)
     for (const vp of videoPaths)
       enqueueSubQueue(
-        { videoFilePath: vp, fromUI: false, lowPriority: true, retime: !!retime },
+        { videoFilePath: vp, fromUI: false, lowPriority: true, vet },
         false,
       );
   else
     for (const vp of [...videoPaths].reverse()) {
       enqueueSubQueue(
-        { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false, retime: !!retime },
+        { videoFilePath: vp, fromUI: !!fromUI, lowPriority: false, vet },
         true,
       );
     }
@@ -2440,12 +2437,10 @@ app.post("/api/asr/subs/enqueue", (req, res) => {
   res.json({ ok: true, queued: videoPaths.length });
 });
 
-// The downloads OpenSubtitles said were left for the day, from the last
-// download's answer: {remaining, ts}, or null before any. The backfill
-// paces itself by it.
-app.get("/api/subsQuota", (req, res) => {
-  res.json(subs.downloadsRemaining());
-});
+// The day's OpenSubtitles downloads as it counts them: {allowed, used,
+// remaining, resetAt, ts} (subs.downloadQuota). The backfill paces itself by
+// it.
+app.get("/api/subsQuota", apiWrapper(() => subs.downloadQuota()));
 
 app.post("/api/asr/gensrt/enqueue", (req, res) => {
   const { videoPaths, fromUI } = req.body || {};
@@ -2993,27 +2988,20 @@ function prefetchNextSubs(showName, rec, after = null) {
   if (file) subs.prefetchSubs(rec, next.season, next.episode, file);
 }
 
-// An episode marked watched: the show's next-up video goes through the
-// subtitle steps ahead of its play when its files are not all checked, as
-// with one marked processed before the checks existed, which the sweep passes
-// over.
-function queueNextUpCheck(showName, rec) {
-  if (!rec.inLibrary) return;
-  const next = nextUpEpisode(rec.episodeData);
-  if (!next) return;
-  const file = epd.getFullPath(
-    rec.episodeData,
-    showPaths.showFolderFor(showName, rec),
-    next.season,
-    next.episode,
-    tvDir,
-  );
-  if (!file || !subPrepare.needsCheck(file)) return;
-  unilog(2960, `${showName} ${fmtSeasonEpisode(next.season, next.episode)} queued for subtitle checks: next up`);
-  enqueueSubQueue(
-    { videoFilePath: file, fromUI: false, lowPriority: false },
-    false,
-  );
+// Subtitle vetting of the show's episodes into the sub queue (subVet.js): from
+// the tvdb update task's per-show step, the next two in full and the rest
+// cheap; at the end of a watch (nextTwoOnly), the next two in full. Cheap
+// ones wait behind all other batch work.
+function queueVetting(showName, rec, { nextTwoOnly = false } = {}) {
+  const todo = subVet.episodesToVet(showName, rec, { nextTwoOnly });
+  if (todo.length === 0) return;
+  for (const { videoPath, level } of todo)
+    enqueueSubQueue(
+      { videoFilePath: videoPath, fromUI: false, lowPriority: level === "cheap", vet: level },
+      false,
+    );
+  const full = todo.filter((t) => t.level === "full");
+  unilog(3056, `${showName}: queued for subtitle vetting, full ${full.map((t) => fmtSeasonEpisode(t.season, t.episode)).join(" ") || "none"}, cheap ${todo.length - full.length}`);
   persistSubQueue();
   doSubQueueNow();
 }
@@ -3113,9 +3101,9 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
     trimPosMs,
     skipDurMs: Math.max(0, Math.round(intro.skipDur || 0)),
     ...(await subsForFile(String(rec.id), file, season, episode)),
-    // Whether the episode's subtitle files have all been checked and fixed;
-    // the remotes' Sync is for one that has not (measureSub).
-    subsChecked: !subPrepare.needsCheck(file),
+    // Whether every subtitle file the play offers but the `+` file has
+    // vetting's ✓; the remotes' Sync is for one where not (measureSub).
+    subsChecked: subVet.subsChecked(file),
     ...(web
       ? {
           path: file,
@@ -3198,7 +3186,7 @@ async function playProgress({ showName, season, episode, posMs, durMs, state, su
   if (started || stopped) debouncedTvdbPush(showName);
   if (ended) {
     await view.recordViewed(showName);
-    queueNextUpCheck(showName, rec);
+    queueVetting(showName, rec, { nextTwoOnly: true });
   }
   tvappNowPlaying = stopped
     ? null
@@ -3967,29 +3955,6 @@ function subFileAdded(filePath) {
   doSubQueueNow();
 }
 
-// An .asr.srt landed (an ASR job): its video gets the retime pass, so one
-// other file is fitted to it (subPrepare.js).
-function asrLanded(asrFile) {
-  const dir = path.dirname(asrFile);
-  const stem = path.basename(asrFile).slice(0, -".asr.srt".length);
-  const video = fs
-    .readdirSync(dir)
-    .find((f) => resIsVideoName(f) && f.replace(/\.[^.]+$/, "") === stem);
-  if (!video) return;
-  enqueueSubQueue(
-    {
-      videoFilePath: path.join(dir, video),
-      fromUI: false,
-      lowPriority: false,
-      renameS: false,
-      retime: true,
-    },
-    false,
-  );
-  persistSubQueue();
-  doSubQueueNow();
-}
-
 // A ".SRT" file renamed to ".srt", unless that name is taken.
 async function lowerSrtExt(filePath) {
   const to = `${filePath.slice(0, -"srt".length)}srt`;
@@ -4057,9 +4022,6 @@ watcher
       subFileAdded(filePath);
       subPrepare
         .subFileEvent(filePath, "add", subsQueue.NAMED_SIDECAR_RE.test(filePath))
-        .then(() => {
-          if (filePath.endsWith(".asr.srt")) asrLanded(filePath);
-        })
         .catch((e) => {
           unilog(2797, `check of added ${path.basename(filePath)} failed: ${e.message}`);
         });
@@ -4149,7 +4111,7 @@ watcher
     }, DISK_CHANGE_DEBOUNCE_MS);
   })
   // A subtitle file rewritten in place, most often by a remote's Apply, is
-  // judged as timed by hand (subPrepare.js). A video rewritten in place is
+  // judged as timed by hand (subVet.js). A video rewritten in place is
   // another file under the same name.
   .on("change", (filePath) => {
     const ext = filePath.split(".").pop();
@@ -4160,7 +4122,7 @@ watcher
       return;
     }
     if (ext !== "srt") return;
-    subPrepare.subFileEvent(filePath, "change").catch((e) => {
+    subVet.sidecarChanged(filePath).catch((e) => {
       unilog(2798, `check of changed ${path.basename(filePath)} failed: ${e.message}`);
     });
   })
@@ -4270,11 +4232,6 @@ unilog(91, `Watching ${tvDir} for file changes...`);
 // every folder and found videos, so a disk outage clears nothing.
 const SUB_BACKSTOP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const SUB_BACKSTOP_START_DELAY_MS = 10 * 60 * 1000;
-// The backfill: with this on, the sweep also queues library videos that have
-// been through the queue before their subtitle files were checked against
-// their audio (subPrepare.js), so they are checked too. Off until it is
-// wanted; each check costs about 2.5 cents of ASR.
-const SUB_CHECK_BACKFILL = false;
 
 async function runSubBackstopSweep() {
   let scanned = 0;
@@ -4317,11 +4274,7 @@ async function runSubBackstopSweep() {
           const showName = showNameFromFilePath(fp);
           const rec = tvdb.getAllTvdbSync?.()?.[showName];
           if (!rec?.inLibrary) continue;
-          if (
-            !sweepWantsVideo(fp) &&
-            !(SUB_CHECK_BACKFILL && subPrepare.needsCheck(fp))
-          )
-            continue;
+          if (!sweepWantsVideo(fp)) continue;
           enqueueSubQueue(
             { videoFilePath: fp, fromUI: false, lowPriority: true },
             false,

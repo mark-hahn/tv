@@ -95,6 +95,34 @@ embedded tracks copied out before vetting; none of those is measured.
 4. **OCR repair in `cleanSrt()`**: a capital I between lower-case letters, or
    starting a word before a lower-case consonant cluster, is an l. Needs
    care ("I'll", "Ill").
+   **Done 10-25** (`apps/srvr/src/subOcr.js`), not in `cleanSrt()` but in
+   the sidecar repair step of `subPrepare.js` (the glued-words step's
+   place: the sub queue, cheap vetting, the watcher, `/api/fixGluedSubs`),
+   before the glue split, since it needs the word table and tv-srvr. The
+   rule is odds, not a dictionary: a word is repaired when a reading of it
+   with some I's as l's (or its first l as an I; a contraction a half at a
+   time) is a word OpenSubtitles' text has 100× as often as the word as
+   written and 200 times in all; words in capitals and files with fewer than
+   3 repairs are left alone. The table holds the OCR garbage itself ("iike"
+   8,435 times), so membership means nothing and the odds decide. Two guards
+   from the first library dry run: a file is repaired only when it is
+   English (15% of its words very common English words; the French `enx`
+   files of Based on a True Story had "l'argent" read as "I'argent"), and a
+   lone l before an apostrophe becomes I only before m, ll, ve or d, all
+   English puts after "I'"; "I'II" is "I'll" by name, since "ii" (Roman II)
+   is itself frequent. Dry run over the 980 test-set and sample files: 18
+   repaired, none wrongly; Ill, Ice, McIvor, Ian, FBI, Illinois, l'amour
+   stay. Rare in the sets (3 of 473 and 2 of 457 files with 5+ confusions);
+   Cold Feet's DVD rips are the heavy case (230–340 a file, 36 distinct
+   words). Names the table lacks stay damaged; no dictionary file is on the
+   server. The library pass (10-25 16:59, `scripts/fix-glued-subs.js`
+   through `/api/fixGluedSubs`): 50 files in 12 shows, 4,439 words, no
+   errors; the originals are in `apps/srvr/data/ocr-backup/` on hahnca.com
+   under their library paths. Each file kept its check, refreshed for the
+   rewrite. Not reached: files of an episode numbered 0 (Cold Feet
+   "S01E00"), which tvdb's episode table cannot hold, so the show-by-show
+   API never visits them; the sub queue repairs such a file only when it
+   lands.
 5. **The truth in `evaluate.py`** should carry the measure, so the test sets
    score incompleteness; today every file above is "good" there.
 6. **A library scan** for the truncation signature over every T/H sidecar

@@ -89,7 +89,8 @@ let tablePromise = null;
 
 // The word table: {counts, never, total}. counts has the common words' counts
 // in OpenSubtitles' text, never the real words a glued word's split would
-// otherwise be taken for, total the count of all words.
+// otherwise be taken for, total the count of all words. subOcr.js reads it
+// too (wordTable).
 function table() {
   tablePromise ??= loadTable().catch((e) => {
     tablePromise = null;
@@ -97,6 +98,8 @@ function table() {
   });
   return tablePromise;
 }
+
+export const wordTable = table;
 
 async function loadTable() {
   const counts = new Map();

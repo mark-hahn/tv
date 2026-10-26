@@ -18,6 +18,7 @@ import { VET_AUDIO_METHOD } from "./subs.js";
 import * as sc from "./subSpotCheck.js";
 import { syncSubToAudio, asrOffset, shiftedSrt, sidecarVideo } from "./subSync.js";
 import { fixGlued } from "./subGlue.js";
+import { fixOcr } from "./subOcr.js";
 import { showNameFromFilePath } from "./showPaths.js";
 
 const TV_DIR = "/mnt/media/tv";
@@ -288,12 +289,13 @@ export async function rewroteHere(file) {
   return !!st && `${st.size} ${Math.round(st.mtimeMs)}` === left;
 }
 
-// The video's sidecars with their glued words split (subGlue.js), each read
-// beside the others, again until none changes, since a file split can show
-// where another's words go apart; only the file only, when given. ASR's are
-// never glued. No timing moves, so a file keeps its check, made current for
-// the rewritten file. With dryRun nothing is written. Returns [{file, fixes}]
-// for each file with glued words.
+// The video's sidecars repaired: first their l/I confusions (subOcr.js),
+// then their glued words split (subGlue.js), each read beside the others,
+// again until none changes, since a file split can show where another's
+// words go apart; only the file only, when given. ASR's are never touched.
+// No timing moves, so a file keeps its check, made current for the rewritten
+// file. With dryRun nothing is written. Returns [{file, fixes}] for each
+// file changed, the l/I fixes marked ocr.
 export async function fixGluedSidecars(videoPath, opts = {}) {
   return withVideo(videoPath, () => glueSidecars(videoPath, opts));
 }
@@ -307,6 +309,19 @@ export async function glueSidecars(videoPath, { only = null, dryRun = false } = 
     files.push({ ...s, full, text: await fsp.readFile(full, "utf8") });
   }
   const out = new Map();
+  for (const f of files) {
+    if (f.type === "+" || (only && f.full !== only)) continue;
+    const r = await fixOcr(f.text);
+    if (!r) continue;
+    out.set(f.file, [...(out.get(f.file) ?? []), ...r.fixes]);
+    f.text = r.text;
+    if (dryRun) continue;
+    await fsp.writeFile(f.full, r.text, "utf8");
+    subs.restatCheck(f.full);
+    await noteRewrite(f.full);
+    const shown = [...new Set(r.fixes.map((x) => `${x.from} → ${x.to}`))].slice(0, 6).join(", ");
+    unilog(3072, `${showNameFromFilePath(videoPath)}: l/I confusions repaired in ${f.file}: ${r.fixes.length} words (${shown})`);
+  }
   for (let changed = true; changed; ) {
     changed = false;
     for (const f of files) {

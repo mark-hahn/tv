@@ -71,6 +71,13 @@ timing data). Memory notes mirror the state.
   `incRunsN`; truth `credits5`), `plusfile/plus.py` (backup `.bak-1025`),
   new folder `coverage/` (its README).
 
+- 10-25: l/I OCR repair (`subOcr.js`) added to the sidecar repair step
+  (`subPrepare.glueSidecars`, before the glue split); deployed with
+  `./srvr srvr`. The library pass ran 16:59: 50 files, 4,439 words,
+  originals in `data/ocr-backup/`; `scripts/fix-glued-subs.js` carries it
+  from now on. Episode-0 files (Cold Feet S01E00) are out of the API's
+  reach.
+
 ## Test data
 
 | Where | What | State |

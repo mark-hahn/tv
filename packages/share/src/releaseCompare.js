@@ -36,11 +36,13 @@ const FACTORS = [
   ["size", "size", larger],
   ["seeds", "seeds", higher],
   ["badGroup", "bad group", isFalse],
-  ["tracker", "tracker", isTrue],
+  ["tracker", "tracker", higher],
 ];
 
 // a and b are factor records: { res, proper, source, hevc, depth, size,
-// seeds, badGroup, tracker }, any of them left out. A factor is judged only
+// seeds, badGroup, tracker }, any of them left out. tracker is a rank, higher
+// better (flexget: torrentleech, then iptorrents, then eztv; the tor pane's
+// true for torrentleech counts as 1). A factor is judged only
 // when both have it. cmp is 1 when a is better, -1 when b is, 0 when equal;
 // factor names the factor that decided ("" when equal).
 export function compareRelease(a, b) {

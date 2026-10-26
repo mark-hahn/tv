@@ -312,11 +312,7 @@ function addTvdbEvents(add, ctx) {
 }
 
 function flexProvider(entry) {
-  if (entry.provider) return entry.provider;
-  const url = String(entry.url || "");
-  if (url.includes("iptorrents.com")) return "ipt";
-  if (url.includes("torrentleech.org")) return "tl";
-  return "unknown provider";
+  return entry.provider || flexget.providerOf(entry) || "unknown provider";
 }
 
 function addFlexgetEvents(add, ctx) {

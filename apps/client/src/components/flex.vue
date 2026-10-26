@@ -483,16 +483,20 @@ function buildRows(entries) {
 
     // Entry rows (no timestamp)
     for (const { e, epKey, idx } of withIdx) {
-      // Blue label: "2/1 - 720p" (resolution omitted when unknown or mixed).
+      // Blue label: episode, resolution and provider in fixed-width columns,
+      // " 2/1   720p ipt " (episode lined up on its "/", resolution right
+      // aligned and blank when unknown or mixed).
       const seBase = fmtSeasonEpisode(e.seasonKey, e.episodeKey);
-      const res = String(e.resolution || "").trim();
-      const se =
-        seBase && res && res.toLowerCase() !== "mixed"
-          ? `${seBase} - ${res}`
-          : seBase;
+      const rawRes = String(e.resolution || "").trim();
+      const res = rawRes.toLowerCase() === "mixed" ? "" : rawRes;
+      const provider = String(e.provider || "");
+      const [season = "", episode] = seBase.split("/");
+      const epCol =
+        season.padStart(2) + (episode === undefined ? "" : `/${episode}`);
+      const se = `${epCol.padEnd(5)} ${res.padStart(5)} ${provider.padEnd(4)}`;
       const dupePart = idx > 1 ? " (dupe)" : "";
       const rest = `${e.showName || "?"}${dupePart}`;
-      const line = se ? `${se} ${rest}` : rest;
+      const line = [seBase, res, rest].filter(Boolean).join(" ");
       rows.push({
         key: `${epKey}\x00${e.sent}\x00${idx}`,
         line,

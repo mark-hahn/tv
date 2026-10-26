@@ -92,9 +92,9 @@ echarts.use([
   CanvasRenderer,
 ]);
 
-// Categorical slots, assigned in fixed order (blue, green).
-const SERIES_COLORS = ["#2a78d6", "#008300"];
-const SURFACE = "#fafafa"; // pane background — draws the gap between segments
+// Categorical slots, assigned in fixed order (blue, orange, violet, green),
+// checked for colorblind separation and contrast on the #fafafa background.
+const SERIES_COLORS = ["#2a78d6", "#eb6834", "#6250d6", "#008300"];
 
 // One entry per radio button; add new plots here. `series` lists the per-day
 // fields the server returns; more than one stacks them. `usb` plots scan the
@@ -106,7 +106,9 @@ const PLOTS = [
     title: "Downloads per day",
     series: [
       { field: "tor", name: "Tor" },
-      { field: "flex", name: "Flex" },
+      { field: "tl", name: "TL" },
+      { field: "ipt", name: "IPT" },
+      { field: "eztv", name: "EZTV" },
     ],
   },
   {
@@ -270,11 +272,9 @@ export default {
             barMaxWidth: 28,
             itemStyle: {
               color: SERIES_COLORS[i],
-              // Round only the top of the stack; a surface-colored border
-              // leaves a gap between stacked segments.
+              // Round only the top of the stack; segments touch, no gap.
               borderRadius: i === series.length - 1 ? [4, 4, 0, 0] : 0,
-              borderColor: SURFACE,
-              borderWidth: stacked ? 2 : 0,
+              borderWidth: 0,
             },
           })),
         },

@@ -7,6 +7,7 @@
 import * as unilogDb from "../unilogDb.js";
 import { notifyClients } from "../messaging.js";
 import { appendAsrTail } from "../subsQueue.js";
+import { getSentHistoryRows } from "../flexget.js";
 
 const unilogSubscribers = new Set();
 let unilogLastPruneTime = 0;
@@ -353,7 +354,12 @@ export function registerUnilogRoutes(app) {
   // Day counts for the web client Plot pane (bar charts of downloads/day).
   app.get("/api/unilog/plot-days", (req, res) => {
     try {
-      res.json({ days: unilogDb.plotDayCounts(String(req.query.plot || "")) });
+      res.json({
+        days: unilogDb.plotDayCounts(
+          String(req.query.plot || ""),
+          getSentHistoryRows(),
+        ),
+      });
     } catch (error) {
       console.error("[unilog] /api/unilog/plot-days error:", error); // no-unilog
       res.status(500).json({ error: String(error?.message || error) });

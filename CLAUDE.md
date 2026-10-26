@@ -204,8 +204,10 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
 - Every comparison of two files or torrents for one episode goes through
   `compareRelease` (`packages/share/src/releaseCompare.js`, self-check
   `releaseCompare.check.js`). Order: resolution, PROPER/REPACK, source,
-  HEVC/AV1, bit depth, size (only when 20% larger), seeds, bad group, tracker.
-  A choice sends every factor; a replacement leaves out seeds and tracker.
+  HEVC/AV1, bit depth, size (only when 20% larger), seeds, bad group, tracker
+  (flexget: torrentleech, then iptorrents, then eztv, so a private copy beats
+  an equal public one; the tor pane: torrentleech first). A choice sends every
+  factor; a replacement leaves out seeds and tracker.
   Details: `better-plan.md`.
 - The blocked-name list is data, `apps/srvr/data/blockedNames.txt` (tv-srvr
   writes it, tv-api and tv-down read it on each use). Forcing overrides it.

@@ -158,6 +158,28 @@ async function saveFlexgetHistory() {
   notifyFlexgetChange();
 }
 
+// The feed an entry came from: "ipt", "tl" or "eztv", else null. eztv's url is
+// a download host whose link changes on every fetch, so it is known by its guid.
+export function providerOf(c) {
+  const url = String(c?.url || "");
+  if (url.includes("iptorrents.com")) return "ipt";
+  if (url.includes("torrentleech.org")) return "tl";
+  if (/^https?:\/\/[^/]*eztv/i.test(String(c?.guid || ""))) return "eztv";
+  return null;
+}
+
+// The tracker factor: a private tracker's copy beats an equal public one.
+const TRACKER_RANK = { tl: 3, ipt: 2, eztv: 1 };
+
+// A history entry already holding this candidate: the same guid, or for rows
+// from before guids were kept, the same url.
+function sameEntry(entry, candidate) {
+  return (
+    (!!candidate.guid && entry.guid === candidate.guid) ||
+    (!!candidate.url && entry.url === candidate.url)
+  );
+}
+
 // A candidate's factors for compareRelease. A choice among candidates also
 // weighs seeds and tracker; a replacement leaves them out.
 function candidateFactors(c, choice = false) {
@@ -169,7 +191,7 @@ function candidateFactors(c, choice = false) {
   };
   if (choice) {
     f.seeds = c.torrent_seeds == null ? null : Number(c.torrent_seeds) || 0;
-    f.tracker = String(c.url || "").includes("torrentleech.org");
+    f.tracker = TRACKER_RANK[providerOf(c)] || 0;
   }
   return f;
 }
@@ -210,12 +232,13 @@ async function storeFlexgetRejectedCandidate(
   candidate,
   rawTitle,
 ) {
-  if (!candidate.url || list.some((entry) => entry.url === candidate.url))
+  if (!candidate.url || list.some((entry) => sameEntry(entry, candidate)))
     return;
 
   list.push({
     title: rawTitle,
     url: candidate.url || null,
+    guid: candidate.guid || null,
     quality: candidate.quality || null,
     resolution: candidate.resolution || null,
     content_size: candidate.content_size || null,
@@ -225,11 +248,7 @@ async function storeFlexgetRejectedCandidate(
     release_group: candidate.release_group || null,
     task: candidate.task || null,
     regexp: candidate.regexp || null,
-    provider: String(candidate.url || "").includes("iptorrents.com")
-      ? "ipt"
-      : String(candidate.url || "").includes("torrentleech.org")
-        ? "tl"
-        : null,
+    provider: providerOf(candidate),
     sent: null,
     addedAt: flexgetFmtSent(),
   });
@@ -241,10 +260,10 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const rawTitle = String(candidate.title || "").trim();
   if (!rawTitle) return;
 
-  // Exact URL dedup — fast path before any expensive TVDB lookup
+  // Exact guid/URL dedup — fast path before any expensive TVDB lookup
   if (candidate.url) {
     for (const list of Object.values(flexgetHistory)) {
-      if (list.some((c) => c.url === candidate.url)) {
+      if (list.some((c) => sameEntry(c, candidate))) {
         unilog(1177, `Flexget: URL already seen "${rawTitle}"`);
         return;
       }
@@ -331,6 +350,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
   const newCandidate = {
     title: rawTitle,
     url: candidate.url || null,
+    guid: candidate.guid || null,
     quality: candidate.quality || null,
     resolution: ptt?.resolution || null,
     content_size: candidate.content_size || null,
@@ -340,11 +360,7 @@ async function processFlexgetCandidate(candidate, storeOnly = false) {
     release_group: candidate.release_group || null,
     task: candidate.task || null,
     regexp: candidate.regexp || null,
-    provider: String(candidate.url || "").includes("iptorrents.com")
-      ? "ipt"
-      : String(candidate.url || "").includes("torrentleech.org")
-        ? "tl"
-        : null,
+    provider: providerOf(candidate),
     sent: null,
     addedAt: flexgetFmtSent(),
   };
@@ -463,6 +479,7 @@ function parseFlexgetDumpOutput(stdout) {
           title: val,
           regexp: null,
           url: null,
+          guid: null,
           quality: null,
           release_group: null,
           torrent_seeds: null,
@@ -480,6 +497,13 @@ function parseFlexgetDumpOutput(stdout) {
               .replace(/&quot;/g, '"')
               .replace(/&lt;/g, "<")
               .replace(/&gt;/g, ">"); // prefer first url; decode HTML entities
+        } else if (key === "guid") current.guid = val;
+        else if (key === "size") {
+          // Bytes. eztv's only size: it has no description. Written like
+          // ipt's listed size ("1.72 GB"); ipt's description comes first.
+          const bytes = Number(val);
+          if (current.content_size === null && bytes > 0)
+            current.content_size = `${(bytes / 1024 ** 3).toFixed(2)} GB`;
         } else if (key === "quality") current.quality = val;
         else if (key === "release_group") current.release_group = val;
         else if (key === "torrent_seeds" || key === "seeds")

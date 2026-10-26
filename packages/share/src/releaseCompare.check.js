@@ -12,8 +12,9 @@ assert.deepEqual(cmp({ hevc: false, depth: 8 }, { hevc: true, depth: 10 }), { cm
 assert.deepEqual(cmp({ depth: 10, size: 1 }, { depth: 8, size: 9 }), { cmp: 1, factor: "bit depth" });
 assert.deepEqual(cmp({ size: 130, seeds: 0 }, { size: 100, seeds: 50 }), { cmp: 1, factor: "size" });
 assert.deepEqual(cmp({ seeds: 5, badGroup: true }, { seeds: 1, badGroup: false }), { cmp: 1, factor: "seeds" });
-assert.deepEqual(cmp({ badGroup: false, tracker: false }, { badGroup: true, tracker: true }), { cmp: 1, factor: "bad group" });
-assert.deepEqual(cmp({ tracker: true }, { tracker: false }), { cmp: 1, factor: "tracker" });
+assert.deepEqual(cmp({ badGroup: false, tracker: 1 }, { badGroup: true, tracker: 3 }), { cmp: 1, factor: "bad group" });
+assert.deepEqual(cmp({ tracker: 3 }, { tracker: 2 }), { cmp: 1, factor: "tracker" });
+assert.deepEqual(cmp({ tracker: 1 }, { tracker: 2 }), { cmp: -1, factor: "tracker" });
 
 // The 20% size rule.
 assert.equal(cmp({ size: 115 }, { size: 100 }).cmp, 0);

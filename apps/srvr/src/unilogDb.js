@@ -667,9 +667,14 @@ export function getOldestTimestamp() {
 // download regardless of where it came from.
 const DOWN_ENTRY_LOG_ID = 1189;
 
-export function plotDayCounts(plot) {
+// Flexget's feeds, the order their sends are taken out of a day's total.
+const FLEX_PROVIDERS = ["tl", "ipt", "eztv"];
+
+// flexSends: flexget's sent history rows ({ sent, provider }); their sent
+// days match flexget.js's SENT log lines.
+export function plotDayCounts(plot, flexSends = []) {
   if (plot === "down") {
-    // Stacked bars: total downloads split into flexget-originated and the
+    // Stacked bars: total downloads split into flexget's sends by feed and the
     // remainder (sent by hand from the tor pane).
     const total = db
       .prepare(
@@ -677,21 +682,26 @@ export function plotDayCounts(plot) {
            FROM log_events WHERE log_id = ? GROUP BY day ORDER BY day`,
       )
       .all(DOWN_ENTRY_LOG_ID);
-    // Every SENT(first|better|upgrade-...) emitted by flexget.js.
-    const flexRows = db
-      .prepare(
-        `SELECT substr(e.ts, 1, 10) AS day, COUNT(*) AS count
-           FROM log_events e JOIN log_sites s ON e.log_id = s.log_id
-          WHERE s.src_file LIKE '%flexget.js' AND e.message LIKE 'SENT(%'
-          GROUP BY day ORDER BY day`,
-      )
-      .all();
-    const flexByDay = new Map(flexRows.map((r) => [r.day, r.count]));
+    const flexByDay = new Map();
+    for (const r of flexSends) {
+      if (!FLEX_PROVIDERS.includes(r.provider)) continue;
+      const day = String(r.sent || "").slice(0, 10);
+      const counts = flexByDay.get(day) || {};
+      counts[r.provider] = (counts[r.provider] || 0) + 1;
+      flexByDay.set(day, counts);
+    }
     return total.map((r) => {
-      // Flexget sends can outrun the downloads they trigger; cap so the two
+      // Flexget sends can outrun the downloads they trigger; cap so the
       // segments always sum to the day's download total.
-      const flex = Math.min(flexByDay.get(r.day) || 0, r.count);
-      return { day: r.day, tor: r.count - flex, flex };
+      const counts = flexByDay.get(r.day) || {};
+      const row = { day: r.day };
+      let left = r.count;
+      for (const p of FLEX_PROVIDERS) {
+        row[p] = Math.min(counts[p] || 0, left);
+        left -= row[p];
+      }
+      row.tor = left;
+      return row;
     });
   }
   throw new Error(`unknown plot: ${plot}`);

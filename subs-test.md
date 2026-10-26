@@ -159,6 +159,24 @@ Observation page (`observe/`, README there has the keys and rules):
   have Mistral's (coarse, wandering ±0.5 s) and 113 Speechmatics' without a
   transcript. Even ideal `+` files reject 40 of 643 transcript-good set files
   (Due South S04E05 `opnJRZ2G`, rejected at 304 ms late, looked right).
+- Shared windows (10-25, left alone at the user's word): in many episodes
+  2+ files fail the same rule at the same minute within 150 ms. Of the 182
+  timing rejections full vetting has on record, 117 (41 groups) are such;
+  under version 4's limits 39 (12 groups) still fail, and all 41 of step 3's
+  kept-to-rejected flips pass. The record says shared source, not a wrong
+  ASR: when a video's embedded tracks and its downloads both fail they fail
+  at different minutes (That '70s Show S01E01/E02, Corner Gas Animated
+  S01E02), agreeing downloads have consecutive OpenSubtitles ids, and T and H
+  are the same captions twice. Only 3 groups (7 files: Sirens (2014) S02E07
+  T2 + opnKX4BJ 620 ms late at 5.2 min, Save Me S01E01 H2 + en1 791 late,
+  Troppo S02E02 en + 2 downloads 813 late) have files of different origins
+  agreeing; Ray Donovan S01E01's 8 downloads 831 late at 13.5 min could be
+  either. No rated clip was a shared case (all were unwatched). A fix would
+  be a sibling-consensus pass in `judgeFiles` (skip a window where files of
+  two origins agree within ~150 ms against the ASR; the judge must return
+  the window, and the per-file 930/930 harness can't check it), or per-word
+  Speechmatics confidence, which transcripts don't store. Revisit only if a
+  watched episode shows the pattern and its file looked fine.
 
 ## What to do next
 

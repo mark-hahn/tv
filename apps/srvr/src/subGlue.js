@@ -4,18 +4,23 @@
 // itself is split into the likeliest words it can be read as, by how often
 // each turns up in OpenSubtitles' English text (glueWords.txt, built by
 // scripts/glue-words.js), when all of:
-//   - it is not capitalized mid-sentence, nor anywhere in its file so (a
-//     name), unless its first word is "I"; a word in capitals, or with a
-//     capital inside it, is left alone, and so are a dropped g ("stuffin'")
-//     and a stutter ("ffff");
+//   - it is not capitalized mid-sentence (after "Mr." too), nor anywhere in
+//     its file so (a name), unless its first word is "I"; a word in capitals,
+//     or with a capital inside it, is left alone, and so are a dropped g
+//     ("stuffin'") and a stutter ("ffff");
 //   - it is not in an English dictionary;
 //   - it turns up at most MAX_REPEATS times in its file, and in no other
 //     episode's subtitle files of the show: names, slang and compounds recur,
-//     glued words do not;
+//     glued words do not, but for the T and H copies of the video's release
+//     group, which are left out: its converter glues the same words in every
+//     episode ("youthink");
 //   - the words apart are SPLIT_ODDS times likelier than the word, or another
 //     sidecar of the video has them apart near the cue;
 //   - no OpenSubtitles download or .asr.srt of the video has the word itself
-//     near the cue, and another word of its cue is a very common English one;
+//     near the cue, and another word of its cue is a very common English
+//     one, or a word one of its glued words is likely split into is and half
+//     its file's cues have another such word;
+//   - it is not part of a hyphenated word;
 //   - and its file has at least MIN_FILE_GLUED such words with a word like
 //     "the" or "his" in them: a release that glues words glues many, while
 //     the others hold compounds ("airfreight").
@@ -30,6 +35,7 @@ import {
   parseFileSeasonEpisode,
   vidIsVideoName,
 } from "@tv/share";
+import { sidecarType } from "./subOrigin.js";
 
 const TV_DIR = "/mnt/media/tv";
 const GLUE_WORDS_PATH = "/root/dev/apps/tv/apps/srvr/data/glueWords.txt";
@@ -41,7 +47,8 @@ export const MIN_PART = 200;
 const SPLIT_ODDS = 100;
 // How often a word the list does not have is counted as turning up.
 const UNSEEN = 0.5;
-export const MIN_WORD_LEN = 5;
+// The shortest word looked at ("Igot").
+export const MIN_WORD_LEN = 4;
 const MAX_PART_LEN = 20;
 const MAX_PARTS = 3;
 // The shortest word a contraction can be run into ("you'rethe").
@@ -67,9 +74,14 @@ const MIN_FILE_GLUED = 3;
 // MIN_FILE_GLUED ("the", "his", "but"): two other words run together are
 // most often a compound ("airfreight").
 const PLAIN_MIN = 500000;
-// A cue is read only when another of its words turns up this often: the rest
-// are another language, or too short to tell.
+// A cue is read only when another of its words, or a word one of its glued
+// words is likely split into ("Wedon't call itanything!"), turns up this
+// often: the rest are another language, or too short to tell.
 const ENGLISH_MIN = 1000000;
+// A cue English only by what its glued words are split into is read only in
+// a file with at least this share of its cues English by another word: French
+// "sois" is "so is" (French files 0.19 to 0.25, English ones 0.64 and up).
+const ENGLISH_FILE_SHARE = 0.5;
 // How far either side of a cue another sidecar's cues are read.
 const NEAR_MS = 10000;
 // How long the words of a show's subtitle files are kept once read.
@@ -78,6 +90,9 @@ const SHOW_WORDS_TTL_MS = 10 * 60 * 1000;
 const WORD_RE = /[A-Za-z]+(?:['’][A-Za-z]+)*/g;
 // What a capitalized word that starts a sentence comes after.
 const START_RE = /(^|[.!?:\-–—"“([♪…])$/;
+// Titles whose period ends no sentence: the capital after one is a name's
+// ("Mr. Peepee's").
+const TITLE_RE = /\b(?:Mr|Mrs|Ms|Dr)\.$/;
 
 const lower = (w) => w.toLowerCase().replace(/’/g, "'");
 // The words of srt text, lower case, with plain apostrophes.
@@ -200,8 +215,9 @@ export function splitGlued(tok, t) {
 
 // ---- the words of a show's other episodes ----
 
-// showDir -> {at, words}; words maps a word to the one episode it is in, or
-// to "*" when it is in more than one.
+// showDir -> {at, words}; words maps a word to a Map from where it came from
+// (copyGroup) to the one episode it is in, or to "*" when it is in more than
+// one.
 const showWordsCache = new Map();
 
 const showDirOf = (videoPath) =>
@@ -215,8 +231,22 @@ function episodeKey(dir, videoName) {
     : path.join(dir, videoName);
 }
 
-// The words of every subtitle file under showDir, by episode. A file with no
-// video beside it is an episode of its own.
+// The release group at the end of a video's name less its extension
+// ("...-playWEB": "playweb"), or null.
+function releaseGroup(stem) {
+  return /-([a-z0-9]{2,})$/i.exec(stem)?.[1].toLowerCase() ?? null;
+}
+
+// Where srtName, a sidecar of videoName, came from: the video's release group
+// when it is a T or H copy of the video's text tracks, else "".
+function copyGroup(videoName, srtName) {
+  const stem = videoName.replace(/\.[^.]+$/, "");
+  const suffix = srtName.slice(stem.length + 1, -".srt".length);
+  return "TH".includes(sidecarType(suffix)) ? (releaseGroup(stem) ?? "") : "";
+}
+
+// The words of every subtitle file under showDir, by where they came from and
+// episode. A file with no video beside it is an episode of its own.
 async function showWords(showDir) {
   const now = Date.now();
   for (const [dir, v] of showWordsCache)
@@ -238,10 +268,13 @@ async function showWords(showDir) {
         return d.name === `${stem}.srt` || d.name.startsWith(`${stem}.`);
       });
       const key = owner ? episodeKey(dir, owner) : path.join(dir, d.name);
+      const from = owner ? copyGroup(owner, d.name) : "";
       for (const w of new Set(wordsOf(await fsp.readFile(path.join(dir, d.name), "utf8")))) {
-        const k = words.get(w);
-        if (k === undefined) words.set(w, key);
-        else if (k !== key) words.set(w, "*");
+        let byFrom = words.get(w);
+        if (!byFrom) words.set(w, (byFrom = new Map()));
+        const k = byFrom.get(from);
+        if (k === undefined) byFrom.set(from, key);
+        else if (k !== key) byFrom.set(from, "*");
       }
     }
   }
@@ -249,15 +282,18 @@ async function showWords(showDir) {
   return words;
 }
 
-// Those of toks in a subtitle file of another episode of the video's show.
+// Those of toks in a subtitle file of another episode of the video's show,
+// leaving out the T and H copies of videos of its own release group: the
+// release's converter glues the same words in every episode.
 async function seenInOtherEpisodes(videoPath, toks) {
   const words = await showWords(showDirOf(videoPath));
-  const mine = episodeKey(path.dirname(videoPath), path.basename(videoPath));
+  const videoName = path.basename(videoPath);
+  const mine = episodeKey(path.dirname(videoPath), videoName);
+  const group = releaseGroup(videoName.replace(/\.[^.]+$/, ""));
   return new Set(
-    [...toks].filter((w) => {
-      const k = words.get(w);
-      return k !== undefined && k !== mine;
-    }),
+    [...toks].filter((w) =>
+      [...(words.get(w) ?? [])].some(([from, k]) => k !== mine && !(group && from === group)),
+    ),
   );
 }
 
@@ -296,26 +332,43 @@ export async function fixGlued(videoPath, text, siblings) {
   const counts = new Map();
   const names = new Set();
   const found = [];
+  // Those of cues English only by what their glued words are split into.
+  const bySplit = [];
+  let englishCues = 0;
+  const veryCommon = (w) => (t.counts.get(w.split("'")[0]) ?? 0) >= ENGLISH_MIN;
   entries.forEach((e, ei) => {
-    const english = wordsOf(e.text).some((w) => (t.counts.get(w) ?? 0) >= ENGLISH_MIN);
+    const inCue = [];
     e.text.split("\n").forEach((line, li) => {
       for (const m of line.matchAll(WORD_RE)) {
         const word = m[0];
         const tok = lower(word);
         counts.set(tok, (counts.get(tok) ?? 0) + 1);
         const capital = /^[A-Z]/.test(word);
-        const start = START_RE.test(line.slice(0, m.index).trimEnd());
+        const before = line.slice(0, m.index).trimEnd();
+        const start = START_RE.test(before) && !TITLE_RE.test(before);
         if (capital && !start) names.add(tok);
-        if (!english || tok.length < MIN_WORD_LEN || !/^[A-Za-z][a-z'’]*$/.test(word)) continue;
+        if (tok.length < MIN_WORD_LEN || !/^[A-Za-z][a-z'’]*$/.test(word)) continue;
         // A dropped letter ("stuffin'", "'bout") or a stutter ("ffff").
         const around = `${line[m.index - 1] ?? ""}${line[m.index + word.length] ?? ""}`;
         if (/['’]/.test(around) || /^(.{1,3})\1+$/.test(tok)) continue;
+        // Part of a hyphenated word ("aRangoo-o-onian").
+        if (
+          /[A-Za-z]-$/.test(line.slice(0, m.index)) ||
+          /^-[A-Za-z]/.test(line.slice(m.index + word.length))
+        )
+          continue;
         if (tok.endsWith("in") && common(`${tok}g`, t)) continue;
         const split = splitGlued(tok, t);
-        if (split) found.push({ ei, li, offset: m.index, word, tok, capital, start, ...split });
+        if (split) inCue.push({ ei, li, offset: m.index, word, tok, capital, start, ...split });
       }
     });
+    const english = wordsOf(e.text).some((w) => (t.counts.get(w) ?? 0) >= ENGLISH_MIN);
+    if (english) {
+      englishCues++;
+      found.push(...inCue);
+    } else if (inCue.some((f) => f.likely && f.parts.some(veryCommon))) bySplit.push(...inCue);
   });
+  if (englishCues >= entries.length * ENGLISH_FILE_SHARE) found.push(...bySplit);
   const iFirst = (f) => f.parts[0] === "i" || f.parts[0].startsWith("i'");
   const cands = found.filter(
     (f) =>

@@ -379,15 +379,23 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   likeliest common words it can be read as, by counts from OpenSubtitles'
   English text (`data/glueWords.txt` on hahnca.com, built by
   `scripts/glue-words.js` from `data/glue-src/`), when all of:
-  - it is not capitalized mid-sentence, nor anywhere in its file so (a
-    name), unless its first word is "I"; not in capitals or with a capital
-    inside; not a dropped g ("stuffin'"), a stutter or a contraction that
-    is one ("C'mon", "I'ma"); and another word of its cue is very common
-    English, so other languages are left alone;
+  - it is at least 4 letters long; it is not capitalized mid-sentence
+    (after "Mr.", "Mrs.", "Ms." or "Dr." too), nor anywhere in its file so
+    (a name), unless its first word is "I"; not in capitals or with a
+    capital inside; not a dropped g ("stuffin'"), a stutter, part of a
+    hyphenated word, or a contraction that is one ("C'mon", "I'ma");
+  - another word of its cue is very common English (the 105 or so words
+    that turn up a million times, "the", "you", "on"), so other languages
+    are left alone; or a word it is likely split into is, in a file where
+    at least half the cues have such a word ("Wedon't call itanything!";
+    a French file has a quarter, so its "sois" is never "so is");
   - it is not in an English dictionary (Debian's huge American and British
     lists, names included);
   - it turns up at most twice in its file and in no other episode's
-    subtitle files of the show: names, slang and compounds recur;
+    subtitle files of the show: names, slang and compounds recur. The T
+    and H copies of videos of its own release group are left out of that,
+    since a release's converter glues the same words in every episode
+    ("youthink");
   - the words apart are 100 times likelier than the word, or another
     sidecar of the video has them apart within 10 s of the cue; a sibling
     alone is not enough, since opn files have stray spaces of their own and
@@ -405,7 +413,10 @@ adb -s <device-serial> reverse tcp:8081 tcp:8081
   named arriving later. `/api/fixGluedSubs?showName=[&dryRun=1]` does a
   show; `scripts/fix-glued-subs.js [--dry]` drives it over the library.
   The first pass (10-21) split 586 words in 76 files; their originals are in
-  `data/glue-backup/` on hahnca.com.
+  `data/glue-backup/` on hahnca.com. The second (10-25, after the rules
+  above for 4-letter words, titles, hyphens, cues English only by their
+  glued words, and the same release's copies) split 55 words in 15 files;
+  their originals are in `data/glue-backup-1025/`.
 - Subtitle vetting (`apps/srvr/src/subVet.js`, the judge `subJudge.js`;
   the design in `subs-final-plan.md`, the work log in `subs-test.md`)
   decides which files a video keeps and which get a ✓. It replaced the older

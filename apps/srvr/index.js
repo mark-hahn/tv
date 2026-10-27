@@ -567,7 +567,6 @@ function rpcParamToString(param) {
 
 const upload = async () => {
   let str = headerStr;
-  str += '        - "dummy"\n';
   for (let name of pickups)
     str += '        - "' + name.replace(/"/g, "") + '"\n';
   str += footerStr;

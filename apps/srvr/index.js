@@ -2437,7 +2437,7 @@ app.post("/api/asr/subs/enqueue", (req, res) => {
 });
 
 // The day's OpenSubtitles downloads as it counts them: {allowed, used,
-// remaining, resetAt, ts} (subs.downloadQuota). The backfill paces itself by
+// remaining, ts}, and resetAt after a download (subs.downloadQuota). The backfill paces itself by
 // it.
 app.get("/api/subsQuota", apiWrapper(() => subs.downloadQuota()));
 

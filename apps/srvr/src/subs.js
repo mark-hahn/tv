@@ -596,9 +596,9 @@ function nextCandidate(showId, season, episode, failed, videoPath) {
   );
 }
 
-// The day's downloads as OpenSubtitles counts them, {remaining, resetAt, ts},
-// with allowed and used once its /infos/user has been asked: from that, and
-// kept current by each download's answer. null until known.
+// The day's downloads as OpenSubtitles counts them, {remaining, ts}, with
+// allowed and used once its /infos/user has been asked: from that, and kept
+// current by each download's answer, which adds resetAt. null until known.
 let quota = null;
 
 // The download quota, asked of OpenSubtitles when it is not known, older

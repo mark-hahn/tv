@@ -505,9 +505,10 @@ async function vetCheap(o) {
   const embedded = sides.some((s) => (s.type === "T" || s.type === "H") && whole(s));
   const downloaded = sides.some((s) => s.type === "V" && whole(s));
   if (!embedded && !downloaded && o.canDownload) {
+    o.setStage("checking download quota");
     const quota = await subs.cheapDownloadQuota();
     if (!quota.ok) {
-      unilog(3060, `${o.showName} ${o.code}: cheap vetting put off, OpenSubtitles has ${quota.remaining} downloads left until ${new Date(quota.resetAt).toISOString()}`);
+      unilog(3084, `${o.showName} ${o.code}: cheap vetting put off, OpenSubtitles has ${quota.remaining} downloads left${quota.resetAt ? ` until ${new Date(quota.resetAt).toISOString()}` : ""}`);
       return null;
     }
     if (dryRun) notes.push("would download one from OpenSubtitles");

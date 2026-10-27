@@ -197,9 +197,10 @@ async function openSubtitlesSubtitles({
 }
 
 // The account's download quota as OpenSubtitles counts it (/infos/user):
-// {allowed, used, remaining, resetAt}, resetAt when the count starts afresh
-// (ms). A request answered 429 is tried again once its retry-after has
-// passed, and one refused for the login once more after a new login.
+// {allowed, used, remaining}. Its answer has no time the count starts
+// afresh; only a download's answer does. A request answered 429 is tried
+// again once its retry-after has passed, and one refused for the login once
+// more after a new login.
 export async function subsDownloadQuota() {
   const login = loadSubsLogin();
   const ask = async () => {
@@ -223,14 +224,12 @@ export async function subsDownloadQuota() {
   }
   if (!resp.ok) throw new Error(`OpenSubtitles /infos/user HTTP ${resp.status}`);
   const d = (await resp.json())?.data;
-  const resetAt = Date.parse(d?.reset_time_utc ?? "");
-  if (!Number.isInteger(d?.remaining_downloads) || !Number.isFinite(resetAt))
+  if (!Number.isInteger(d?.remaining_downloads))
     throw new Error("OpenSubtitles /infos/user gave no download quota");
   return {
     allowed: d.allowed_downloads,
     used: d.downloads_count,
     remaining: d.remaining_downloads,
-    resetAt,
   };
 }
 

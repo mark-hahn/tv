@@ -17,7 +17,8 @@ Alt+click episode — play the episode
 Ctrl+click season — delete entire season folder
 Ctrl+click "Not In Library" — create the show folder & add it to the library`,
 
-  actors: `Ctrl+click actor name — open IMDB search for actor`,
+  actors: `Alt+click actor — copy actor name to clipboard
+Ctrl+click actor name — open IMDB search for actor`,
 
   reviews: `Click IMDB / Rotten — filter reviews by source`,
 

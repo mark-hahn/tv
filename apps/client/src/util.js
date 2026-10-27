@@ -310,6 +310,24 @@ export function openNewTab(url) {
   return openExternalPage(url);
 }
 
+// Flash a half-opaque pink overlay over a card, photo included, to show an
+// alt-click copied it.
+export function flashCopyOverlay(el) {
+  if (!el) return;
+  if (getComputedStyle(el).position === "static") el.style.position = "relative";
+  const overlay = document.createElement("div");
+  Object.assign(overlay.style, {
+    position: "absolute",
+    inset: "0",
+    backgroundColor: "pink",
+    opacity: "0.5",
+    borderRadius: "inherit",
+    pointerEvents: "none",
+  });
+  el.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 300);
+}
+
 export function wrapFileName(name, maxLen = 79) {
   if (!name || name.length <= maxLen) return name;
   const lines = [];

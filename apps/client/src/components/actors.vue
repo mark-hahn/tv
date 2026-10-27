@@ -455,6 +455,7 @@
           <div
             v-for="related in row.actors"
             :key="related.personName"
+            @click="handleRelatedClick($event, related)"
             style="
               min-width: 0;
               display: flex;
@@ -1205,7 +1206,20 @@ export default {
       }
     },
 
+    handleRelatedClick(event, related) {
+      if (!event?.altKey) return;
+      const name = String(related?.personName || "").trim();
+      if (name) navigator.clipboard.writeText(name).catch(() => {});
+      util.flashCopyOverlay(event.currentTarget);
+    },
+
     handleCrewClick(event, member) {
+      if (event?.altKey) {
+        const name = String(member?.name || "").trim();
+        if (name) navigator.clipboard.writeText(name).catch(() => {});
+        util.flashCopyOverlay(event.currentTarget);
+        return;
+      }
       if (event?.ctrlKey) {
         const name = String(member?.name || "").trim();
         if (name)

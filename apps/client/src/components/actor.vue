@@ -83,7 +83,7 @@ export default {
 
   methods: {
     handleImageClick(e) {
-      if (e.ctrlKey) return;
+      if (e.ctrlKey || e.altKey) return;
       e.stopPropagation();
       e.preventDefault();
 
@@ -98,6 +98,7 @@ export default {
 
       if (e?.altKey) {
         navigator.clipboard.writeText(name);
+        util.flashCopyOverlay(e.currentTarget);
         return;
       }
 

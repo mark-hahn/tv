@@ -95,7 +95,9 @@ and `./srvr` deploys them.
   - `T<n>` / `H<n>` (T, H): a copy of embedded text track n (its ffprobe
     stream index, counting every stream), H when it is flagged as describing
     music and sound or its title says SDH or CC. A legacy `mb<n>` counts as
-    T.
+    T. A track with a copy under any of the three names is not copied
+    again, so a copy keeps the letter it was made with (before 10-16 only
+    the flag made an H).
   - `opn<TAG>` (V): an OpenSubtitles download; TAG is its file_id in base32.
   - `asr` (+): ASR's.
   - `S<n>` and anything else (S): a file that arrived beside the video.

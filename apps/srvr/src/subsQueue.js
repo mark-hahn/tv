@@ -393,9 +393,13 @@ async function extractEmbSrts(videoFilePath, fromUI) {
       /\b(sdh|cc)\b/i.test(s.tags?.title || "");
     const outPath = `${base}.${sdh ? "H" : "T"}${s.index}.srt`;
     extracted++;
-    // mb<n> is the name this copy went by before.
-    if (fs.existsSync(outPath) || fs.existsSync(`${base}.mb${s.index}.srt`)) {
-      if (fromUI) publishEmbLog(`exists: ${path.basename(outPath)}`);
+    // mb<n> is the name this copy went by before, and a copy keeps the letter
+    // it was made with when the T/H rule changes.
+    const have = ["T", "H", "mb"]
+      .map((p) => `${base}.${p}${s.index}.srt`)
+      .find((p) => fs.existsSync(p));
+    if (have) {
+      if (fromUI) publishEmbLog(`exists: ${path.basename(have)}`);
       continue;
     }
     // A copy deleted as unusable or from another cut, or by a full vetting

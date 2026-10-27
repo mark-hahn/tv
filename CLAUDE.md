@@ -10,8 +10,7 @@
 
 ## Documentation
 
-- never modify CLAUDE.md or .github/copilot-instructions.md unless told to modify
-  - exception: when i say to save a rule, add it to CLAUDE.md (and mirror it here)
+- when i say to save a rule, add it to CLAUDE.md (and mirror it in .github/copilot-instructions.md)
 
 ## Remote server
 

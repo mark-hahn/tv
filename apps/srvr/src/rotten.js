@@ -132,7 +132,7 @@ async function dismissOverlays(page, query) {
           count++;
         }
       });
-      document.body.style.overflow = "auto"; // Restore scrolling
+      if (document.body) document.body.style.overflow = "auto"; // Restore scrolling
       return count;
     });
     // if (deleted > 0) console.log(`[Nuclear] Removed ${deleted} OneTrust elements from DOM.`);
@@ -346,7 +346,7 @@ async function dismissOverlays(page, query) {
       );
       overlays.forEach((el) => el.remove());
       // Also ensure body is scrollable in case modal froze it
-      document.body.style.overflow = "auto";
+      if (document.body) document.body.style.overflow = "auto";
     });
   } catch {}
 

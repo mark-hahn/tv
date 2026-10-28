@@ -726,6 +726,7 @@ const EMPTY_SEASON_INTRO = {
 export function getSeasonIntro(seasonIntros, season) {
   // Season 0 takes no part in intros: a special's opening may not match the
   // show's, so it plays from its start and never borrows another season's.
+  // (getPlayUrl does give it the Skip of the season it is placed in.)
   if (Number(season) === 0) return { ...EMPTY_SEASON_INTRO };
   const map = seasonIntros;
   if (!map || typeof map !== "object") return { ...EMPTY_SEASON_INTRO };

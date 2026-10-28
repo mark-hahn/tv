@@ -524,7 +524,10 @@ because the TV is unreachable from any wireless host here.
   plus 0.5 s, at most 4 s. The rate stays until a video of another rate
   plays; tvapp leaving the front puts the TV back on its own.
 - It starts at the resume point, or past the intro (`trimPosMs`) if there is
-  none. A season 0 special has no intro to trim or skip.
+  none. A season 0 special is never trimmed; its Skip is the skip of the
+  season it is placed in (the nearest season with marks), season 1's if
+  unplaced. Only `getPlayUrl` borrows it: `getSeasonIntro` still gives
+  season 0 nothing, so no marks are kept for it.
 - Subtitles: the video's sidecar `.srt` files are sideloaded (served as
   vtt). Embedded tracks are never shown. It starts on the one `getPlayUrl`
   picked (`subPick`); with none, subtitles are off. See Subtitles.

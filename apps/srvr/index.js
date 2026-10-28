@@ -14,7 +14,7 @@ import * as gaps from "./src/gaps.js";
 import * as tvdb from "./src/tvdb.js";
 import { setDeletedListener } from "./src/tvdbDb.js";
 import { nextUpAfter } from "./src/derived.js";
-import { storyOrder } from "./src/storyOrder.js";
+import { storyOrder, placements } from "./src/storyOrder.js";
 import * as season0 from "./src/season0.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
@@ -3052,7 +3052,19 @@ async function getPlayUrl({ showName, season: s, episode: e, web, path: filePath
   const file = epd.getFullPath(ed, folder, season, episode, tvDir);
   if (!file) return { url: null };
   const rel = file.slice(tvDir.length + 1);
-  const intro = tvdb.getSeasonIntro(rec, season);
+  // A special is never trimmed, but its Skip is the one of the season it is
+  // placed in (or the nearest season with marks; season 1's for an unplaced
+  // one).
+  const intro =
+    season === 0
+      ? {
+          trimPos: null,
+          skipDur: tvdb.getSeasonIntro(
+            rec,
+            placements(ed).get(episode)?.season ?? 1,
+          ).skipDur,
+        }
+      : tvdb.getSeasonIntro(rec, season);
   const posMs = epd.getPos(ed, season, episode);
   const trimPosMs = Math.max(0, Math.round(intro.trimPos || 0));
   // Started before the wait on the subtitle downloads, which is no reason to

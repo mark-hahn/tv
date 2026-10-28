@@ -38,6 +38,7 @@ Code layout, main flows and gotchas: `.claude/architecture.md`.
   - with one exception don't build or deploy client -- do not use `./srvr client` -- vite does that
   - the exception is it is ok for srvr script to deploy client when deploying all with `./srvr`
   - whenever you deploy to the server and pm2 does a restart check pm2 logs to make sure there is no server crashing and restarting
+  - never use an api call with an empty or dummy body (like `-d "{}"`) as a readiness probe after a restart -- it fails with a 500 on every try and floods unilog with errors; probe with a real, valid request or check pm2 status instead
   - Build/install with `cd apps/tvapp && ./build-apk`. Gradle and adb both run
     on hahnca.com, never here — this workspace cannot reach the TV at all. Do
     this after every tvapp change; there is no hot reload for it.

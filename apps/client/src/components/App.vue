@@ -69,7 +69,7 @@
             <button
               v-for="t in topTabs"
               :key="t.key"
-              @click.stop="selectTab(t.key)"
+              @click.stop="clickTab(t.key)"
               :disabled="t.key === 'map' && isMapDisabledInPreview"
               :style="{
                 fontSize: '13px',
@@ -126,7 +126,7 @@
             <button
               v-for="t in bottomTabs"
               :key="t.key"
-              @click.stop="selectTab(t.key)"
+              @click.stop="clickTab(t.key)"
               :style="{
                 fontSize: '13px',
                 cursor: 'pointer',
@@ -770,6 +770,7 @@ export default {
       torEpisodeRequest: null, // map pane Tor button request passed to tor.vue
       movieMode: false,
       savedPane: null,
+      lastPane: null, // pane before currentPane, for re-click toggle back
       restoringPreviewPane: false,
       previewMode: false,
       previewPanesLoading: false,
@@ -1875,6 +1876,11 @@ export default {
     handleAllTvdb(tvdbData) {
       this.allTvdb = tvdbData || {};
     },
+    clickTab(key) {
+      // Clicking the selected tab again goes back to the tab before it.
+      if (key === this.currentPane && this.lastPane) this.selectTab(this.lastPane);
+      else this.selectTab(key);
+    },
     selectTab(key) {
       const k = String(key || "");
       if (!k) return;
@@ -2231,6 +2237,9 @@ export default {
     // Watch for changes to badge-triggering states and update favicon
     this.$watch("browseTabHasMore", () => {
       this.updateFaviconBadge();
+    });
+    this.$watch("currentPane", (n, o) => {
+      this.lastPane = o;
     });
     this.$watch("introCount", () => {
       this.updateFaviconBadge();

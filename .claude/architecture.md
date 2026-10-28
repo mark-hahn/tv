@@ -382,6 +382,21 @@ and `./srvr` deploys them.
   counting with its release. It searches 3 at a time, finds an IMDb id by
   show name when it has none, and writes nothing to `subs.db`.
 
+## IMDB trailer video (tv-srvr `getRemotes`)
+
+- The IMDB remote's `video` is what the web trailer pane and tvapp's
+  `TrailerList` play. It comes from the title page scrape, which yields a
+  signed `imdb-video.media-imdb.com` mp4 or, failing that, only the video
+  page `www.imdb.com/video/vi…`. Either is stored as `show.imdbVideo`.
+- Neither stored form is handed out: `getRemotes` swaps it for a fresh mp4 of
+  the same `vi…` id via `freshImdbVideo` (IMDB's graphql api, which 403s
+  without the `x-imdb-client-name` header; it is not behind the page WAF).
+  Stored mp4s are signed and mostly 403 by the time they're asked for. A
+  fresh one is reused from memory for `IMDB_VIDEO_CACHE_MS` (6 h; they're
+  signed for ~24 h). `show.imdbVideo` keeps the scraped url, which only names
+  the video. When it can't be resolved `video` is null, so no client saves a
+  page url into `show.trailers`.
+
 ## Button background colors in client panes
 
 - App.vue has a global CSS rule that forces `background-color: var(--btn-bg, whitesmoke) !important` on buttons inside `#tor`, `#info`, `#actors`, `#reviews`, `#qbt`, `#down`, etc.

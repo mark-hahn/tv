@@ -59,6 +59,12 @@ const VERIFY_UA =
   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36";
 // wikimedia's robot policy 403s a bare agent; it wants contact info in it
 const WIKI_API_UA = "tv-app/1.0 (https://hahnca.com)";
+// imdb's graphql api turns a video id into its mp4 urls; it 403s a request
+// without a client name
+const IMDB_GRAPHQL_URL = "https://api.graphql.imdb.com/";
+const IMDB_GRAPHQL_CLIENT = "imdb-web-next";
+// its mp4 urls are signed for about a day; one is handed out again for this long
+const IMDB_VIDEO_CACHE_MS = 6 * 60 * 60 * 1000;
 
 function buildTvdbUrl(tvdbPath, query) {
   const safePath = String(tvdbPath || "").replace(/^\/+/, "");
@@ -742,6 +748,59 @@ const extractImdbVideo = (html) => {
   }
 
   return null;
+};
+
+// show.imdbVideo is whatever the title page scrape found: a signed
+// imdb-video.media-imdb.com mp4, or only the video page
+// (www.imdb.com/video/vi…). Nothing can play the page, and a stored mp4 stops
+// loading long before anyone asks for it, so getRemotes always hands out a
+// fresh mp4 of the video, from the graphql api, which is not behind the page
+// WAF. Unresolved gives null, not the stored url: a dead mp4 is no use, and a
+// client that saved the page url into show.trailers would take it as the
+// video and never ask again.
+const imdbVideoCache = new Map(); // video id -> { at, mp4: Promise<url|null> }
+
+const fetchImdbMp4 = async (id, name) => {
+  try {
+    const resp = await fetch(IMDB_GRAPHQL_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": IMDB_USER_AGENT,
+        "x-imdb-client-name": IMDB_GRAPHQL_CLIENT,
+      },
+      body: JSON.stringify({
+        query: `{ video(id: "${id}") { playbackURLs { url videoMimeType videoDefinition } } }`,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resp.ok) throw new Error(`status ${resp.status}`);
+    const body = await resp.json();
+    const mp4s = (body?.data?.video?.playbackURLs || []).filter(
+      (p) => p?.videoMimeType === "MP4" && p.url,
+    );
+    // highest definition first: DEF_1080p before DEF_720p
+    const lines = (p) => Number(/\d+/.exec(p.videoDefinition || "")?.[0] || 0);
+    mp4s.sort((a, b) => lines(b) - lines(a));
+    if (mp4s.length) return mp4s[0].url;
+    unilog(3088, `no mp4 for ${name} (${id})`);
+  } catch (e) {
+    unilog(3089, `${name} (${id}) not resolved: ${e.message}`);
+  }
+  return null;
+};
+
+const freshImdbVideo = async (url, name) => {
+  const id = /imdb\.com\/(?:video\/|mc\/)?(vi\d+)/i.exec(url || "")?.[1];
+  if (!id) return url;
+  const hit = imdbVideoCache.get(id);
+  if (hit && Date.now() - hit.at < IMDB_VIDEO_CACHE_MS) return hit.mp4;
+  const mp4 = fetchImdbMp4(id, name);
+  imdbVideoCache.set(id, { at: Date.now(), mp4 });
+  const found = await mp4;
+  // a failure is asked again next time
+  if (!found && imdbVideoCache.get(id)?.mp4 === mp4) imdbVideoCache.delete(id);
+  return found;
 };
 
 const getUrlAndRatings = async (type, url, name) => {
@@ -1472,6 +1531,8 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
     flatUrls.imdbRatings = imdbRemote.ratings || null;
     flatUrls.imdbReviewers = imdbRemote.reviewers || null;
     flatUrls.imdbVideo = imdbRemote.video || null;
+    // stored: the url that names the video; returned: a fresh mp4 of it
+    imdbRemote.video = await freshImdbVideo(imdbRemote.video, name);
     remotes.push(imdbRemote);
   }
 

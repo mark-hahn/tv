@@ -5,7 +5,7 @@
 import fs from "fs";
 import * as path from "node:path";
 import fetch from "node-fetch";
-import { unilog, smartTitleMatch } from "@tv/share";
+import { unilog, logHere, smartTitleMatch } from "@tv/share";
 import { SRVR_SECRETS_DIR } from "./srvrPaths.js";
 import * as util from "./util.js";
 import * as tvdb from "./tvdb.js";
@@ -301,11 +301,11 @@ export async function openSubtitlesDownloadWithRetry({
     } catch (e) {
       // Network error / fetch throw: retry.
       if (attempt < maxAttempts) {
-        unilog(1734, `OpenSubtitles /download failed for file_id=${fileId} (attempt=${attempt}/${maxAttempts}): ${e?.message || String(e)}, retrying`);
+        unilog(3096, `OpenSubtitles /download failed for file_id=${fileId} (attempt=${attempt}/${maxAttempts}): ${e?.message || String(e)}${e?.code ? ` (${e.code})` : ""}, retrying`);
         await sleep(400 * attempt);
         continue;
       }
-      unilog(1735, `OpenSubtitles /download gave up for file_id=${fileId} after ${attempt} attempts: ${e?.message || String(e)}`);
+      unilog(3097, `OpenSubtitles /download gave up for file_id=${fileId} after ${attempt} attempts: ${e?.message || String(e)}${e?.code ? ` (${e.code})` : ""}`);
       throw e;
     }
   }
@@ -385,7 +385,7 @@ export const subsSearch = async (params) => {
     throw err;
   } catch (e) {
     if (e instanceof Error && e.message.startsWith("subsSearch:")) throw e;
-    throw new Error(`subsSearch: ${e.message}`);
+    throw new Error(`subsSearch: ${e.message}${e.code ? ` (${e.code})` : ""}`);
   }
 };
 

@@ -8,7 +8,7 @@ const DOWNLOAD_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 const SRT_FILE_RE = /\.srt$/i;
-const PACKED_ARCHIVE_RE = /\.(?:rar|r\d\d|001)$/i;
+const VIDEO_FILE_RE = /\.(?:mkv|mp4|m4v|avi|ts|wmv|mov|mpe?g)$/i;
 const POSITIVE_GROUP_PRIORS = new Set([
   "d3g",
   "ethel",
@@ -164,7 +164,7 @@ function compactText(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
-function findTorrentDownloadUrls(html, detailUrl) {
+export function findTorrentDownloadUrls(html, detailUrl) {
   const urls = [];
   const seen = new Set();
   let detailHost = "";
@@ -184,7 +184,9 @@ function findTorrentDownloadUrls(html, detailUrl) {
       lower.includes("download.php") ||
       lower.includes("download?id=");
     if (!isTorrentLink) continue;
-    const url = absoluteUrl(href, detailUrl);
+    // IPT's links are page-relative ("download.php/..."), but the site serves
+    // them from its root, as download.js resolves them.
+    const url = absoluteUrl(/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(href) ? href : `/${href}`, detailUrl);
     if (detailHost) {
       try {
         if (new URL(url).hostname.toLowerCase() !== detailHost) continue;
@@ -197,7 +199,12 @@ function findTorrentDownloadUrls(html, detailUrl) {
     urls.push(url);
   }
 
-  return urls;
+  // The page also links related releases' .torrents: keep only its own,
+  // the ones carrying its torrent id.
+  const id = String(detailUrl || "").match(/(?:\/torrent\/|\/t\/|[?&]id=)(\d+)/)?.[1];
+  if (!id) return urls;
+  const ownRe = new RegExp(String.raw`(?:/|[?&]id=)${id}(?:[/&.]|$)`);
+  return urls.filter((url) => ownRe.test(url));
 }
 
 function looksLikeHtml(buffer) {
@@ -223,12 +230,6 @@ function filesFromTorrentBytes(torrentData) {
     : [];
 }
 
-function hasPackedArchiveFiles(files) {
-  return (Array.isArray(files) ? files : []).some((file) =>
-    PACKED_ARCHIVE_RE.test(String(file?.path || file?.name || file || "")),
-  );
-}
-
 export function classifyTorrentSubtitleFiles(files) {
   const subtitleFiles = (Array.isArray(files) ? files : [])
     .map((file) => String(file?.path || file?.name || file || "").trim())
@@ -251,6 +252,29 @@ export function classifyTorrentSubtitleFiles(files) {
     reason: ".srt file listed in torrent metadata",
     evidence: subtitleFiles.slice(0, 8),
   };
+}
+
+// The page's answer, overruled by the torrent's file list: an .srt file is a
+// yes, and videos that are all .avi (no subtitle tracks) are a no unless the
+// page says yes.
+export function judgeWithFiles(pageResult, files) {
+  if (!Array.isArray(files)) return pageResult;
+  const fileResult = classifyTorrentSubtitleFiles(files);
+  if (fileResult.status === "yes") return fileResult;
+  if (pageResult.status === "yes") return pageResult;
+  const videos = files
+    .map((file) => String(file?.path || file?.name || file || "").trim())
+    .filter((filePath) => VIDEO_FILE_RE.test(filePath));
+  if (videos.length > 0 && videos.every((filePath) => /\.avi$/i.test(filePath))) {
+    return {
+      status: "no",
+      confidence: "medium",
+      source: "torrent-file",
+      reason: "videos are all .avi, which carry no subtitle tracks, and no .srt files",
+      evidence: videos.slice(0, 3),
+    };
+  }
+  return pageResult;
 }
 
 async function fetchProviderPage(detailUrl) {
@@ -308,21 +332,57 @@ async function fetchTorrentFileListFromPage(detailUrl, html, profile) {
   return { files: null, downloadUrl: "" };
 }
 
+// The release's own part of a detail page, without comments, related
+// torrents and site menus: TL "Torrent Description" (not on every page) or
+// "NFO" to "Comments", IPT "Size: 2.90 GB in 2 files" to "Thank Uploader".
+// Null when the page has neither (a login, Cloudflare or error page).
+function releaseSection(text) {
+  const start = text.search(/^(?:Torrent Description|NFO|Size: .+ in \d+ files?)[ \t]*$/m);
+  if (start < 0) return null;
+  const rest = text.slice(start);
+  const end = rest.search(/^(?:Comments|Thank Uploader)[ \t]*$/m);
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+// MediaInfo text tracks: a "Text" / "Text #2" line, then its "Key : value"
+// lines (IPT puts a blank line between them).
+function mediaInfoTextTracks(text) {
+  const tracks = [];
+  for (const m of text.matchAll(
+    /^Text(?:[ \t]*#[ \t]*\d+)?[ \t]*\n((?:[ \t]*\n|[A-Za-z][^\n:]{0,40}:[^\n]*(?:\n|$))+)/gm,
+  )) {
+    if (/^(?:Format|Codec ID|Language)[ \t]*:/m.test(m[1])) tracks.push(m[1]);
+  }
+  return tracks;
+}
+
 export function analyzePageText(html, { torrent = null } = {}) {
   const pageTitle = pageTitleFromHtml(html);
-  const rawText = htmlToText(html);
-  const cleanedText = stripAudioSections(stripProviderChrome(rawText));
+  const section = releaseSection(htmlToText(html));
+  if (section === null) return failStatus(`not a torrent detail page: "${pageTitle}"`);
+  const cleanedText = stripAudioSections(stripProviderChrome(section));
   const compact = compactText(cleanedText);
   const evidence = [];
 
+  // A forced track only covers foreign-language parts.
+  const textTracks = mediaInfoTextTracks(cleanedText);
+  const fullTracks = textTracks.filter(
+    (t) => !/^Forced[ \t]*:[ \t]*Yes\b/im.test(t) && !/^Title[ \t]*:[^\n]*\bforced\b/im.test(t),
+  );
+  // Codec IDs alone catch a MediaInfo whose lines were run together.
   const mediaInfoTextSection =
-    /\bText(?:\s*#?\d+)?\b[\s\S]{0,900}\b(?:ID|Format|Codec ID|Title|Language|Default|Forced)\s*(?:[:.]|\.{2,}\s*:)/i.test(
-      cleanedText,
-    ) ||
-    /\bCodec ID\s*(?:[:.]|\.{2,}\s*:)\s*S_TEXT/i.test(cleanedText) ||
-    /\bText\s*(?:#?\d+)?\s+(?:ID|Format|Codec ID|Language|Default|Forced)\b/i.test(
-      compact,
-    );
+    fullTracks.length > 0 ||
+    (textTracks.length === 0 && /\bCodec ID ?: ?S_(?:TEXT|HDMV|VOBSUB)/.test(compact));
+
+  if (textTracks.length > 0 && fullTracks.length === 0) {
+    return {
+      status: "no",
+      confidence: "medium",
+      source: "page-mediainfo",
+      reason: "MediaInfo lists only forced subtitle tracks",
+      evidence: ["MediaInfo forced Text tracks"],
+    };
+  }
 
   if (mediaInfoTextSection) {
     evidence.push("MediaInfo Text section");
@@ -335,16 +395,23 @@ export function analyzePageText(html, { torrent = null } = {}) {
     };
   }
 
+  // Phrases and "label: value" lines are matched within one line of
+  // cleanedText: in compact, "Language: English" + "Subtitles: N/A" on the
+  // next line reads as "English Subtitles".
   const explicitSubtitle =
-    /\b(?:english|eng|multi(?:ple)?|full|forced)\s+subtitles?\b/i.test(compact) ||
-    /\bsubtitles?\s*(?:[:=-]|included|available|yes|english|eng|multi|muxed|embedded)\b/i.test(
-      compact,
+    /\b(?:english|eng|multi(?:ple)?|full)[ \t]+subtitles?\b/i.test(cleanedText) ||
+    /\bsubtitles?[ \t]*(?:included|available|yes|english|eng|multi|muxed|embedded)\b/i.test(
+      cleanedText,
     ) ||
     /\b(?:embedded|muxed)\s+subtitles?\b/i.test(compact) ||
     /(?:^|\s)\.srt\b|\bsrt\b/i.test(compact) ||
-    // NFO release info: "Subs ......: 2: English, Spanish", or a
+    // "Subtitles: English", NFO "Subs ......: 2: English, Spanish", IPT's
+    // "Subtitle(s) : English (US)" (not a lone "English (Forced)"), or a
     // "── Subtitles ──" heading over "Count ..: 1" / "Tracks ..: English".
-    new RegExp(String.raw`\bsub(?:title)?s?\s*\.*\s*:\s*${NFO_SUB_VALUE}`, "i").test(compact) ||
+    new RegExp(
+      String.raw`\bsub(?:title)?(?:s|\(s\))?[ \t]*\.*[ \t]*[:=][ \t]*(?![^,\n]*\bforced\b[^,\n]*$)${NFO_SUB_VALUE}`,
+      "im",
+    ).test(cleanedText) ||
     new RegExp(
       String.raw`\bsubtitles?\s*[─━═-]{2,}[\s\S]{0,80}?\b(?:count|tracks?|languages?)\s*\.*\s*:\s*${NFO_SUB_VALUE}`,
       "i",
@@ -362,8 +429,10 @@ export function analyzePageText(html, { torrent = null } = {}) {
   }
 
   const explicitNo =
-    /\b(?:no|without)\s+(?:embedded\s+)?subtitles?\b/i.test(compact) ||
-    /\b(?:subtitles?|subs?)\s*[:=-]\s*(?:none|no|n\/a)\b/i.test(compact);
+    /\b(?:no|without)[ \t]+(?:embedded[ \t]+)?subtitles?\b/i.test(cleanedText) ||
+    /\b(?:subtitles?|subtitle\(s\)|subs?)[ \t]*\.*[ \t]*[:=-][ \t]*(?:none|no|n\/a)\b/i.test(
+      cleanedText,
+    );
 
   if (explicitNo) {
     evidence.push("explicit no-subtitle text");
@@ -373,6 +442,23 @@ export function analyzePageText(html, { torrent = null } = {}) {
       source: "page-text",
       reason: "provider page text says subtitles are absent",
       evidence,
+    };
+  }
+
+  // A MediaInfo that lists General, Video and Audio but no Text track. Read
+  // from the section, since cleanedText has its Audio blocks cut.
+  const mediaInfoWithoutText =
+    textTracks.length === 0 &&
+    ["General", "Video", "Audio"].every((heading) =>
+      new RegExp(String.raw`^${heading}[ \t]*\n(?:[ \t]*\n)*[A-Za-z][^\n:]{0,40}:`, "m").test(section),
+    );
+  if (mediaInfoWithoutText) {
+    return {
+      status: "no",
+      confidence: "medium",
+      source: "page-mediainfo",
+      reason: "MediaInfo lists video and audio but no Text track",
+      evidence: ["MediaInfo without Text section"],
     };
   }
 
@@ -404,10 +490,10 @@ export function analyzePageText(html, { torrent = null } = {}) {
   }
 
   return {
-    status: "no",
-    confidence: "medium",
+    status: "maybe",
+    confidence: "low",
     source: "page-text",
-    reason: "no subtitle evidence found in provider page text",
+    reason: "provider page does not say whether there are subtitles",
     evidence,
   };
 }
@@ -454,24 +540,8 @@ export async function detectTorrentSubtitlesByUrl(
     }
   }
 
-  if (torrentFiles) {
-    const fileResult = classifyTorrentSubtitleFiles(torrentFiles);
-    if (fileResult.status === "yes") {
-      return { ...fileResult, ...(downloadUrl ? { downloadUrl } : {}) };
-    }
-    if (hasPackedArchiveFiles(torrentFiles) && pageResult.status === "no") {
-      return {
-        status: "maybe",
-        confidence: "low",
-        source: "torrent-file",
-        reason:
-          "torrent metadata is packed archives, so embedded subtitles cannot be verified without unpacking",
-        evidence: pageResult.evidence,
-      };
-    }
-  }
-
-  return pageResult;
+  const result = judgeWithFiles(pageResult, torrentFiles);
+  return result.source === "torrent-file" && downloadUrl ? { ...result, downloadUrl } : result;
 }
 
 export async function detectTorrentSubtitlesForTorrent(torrent, { files = null } = {}) {

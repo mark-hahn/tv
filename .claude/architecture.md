@@ -383,11 +383,22 @@ and `./srvr` deploys them.
   show name when it has none, and writes nothing to `subs.db`.
 - Whether a torrent carries subtitles (`/api/tor/subs`, `/api/tor/chk-subs`;
   tv-api `torrentSubtitles.js`): its TL/IPT detail page, fetched through the
-  usb server like all TL/IPT traffic, is read for a MediaInfo Text section,
-  then for NFO lines (`Subs : 2: English, Spanish`, a `── Subtitles ──`
-  heading over `Count`/`Tracks`), then a group prior. The Audio block is cut
-  first, up to the next heading, so a new NFO heading for subs must be in
-  `stripAudioSections`' list or the cut eats it. Self-check:
+  usb server like all TL/IPT traffic, is read for a MediaInfo Text track
+  (forced ones alone are a no), then for NFO lines (`Subs : 2: English,
+  Spanish`, IPT's `Subtitle(s) :`, a `── Subtitles ──` heading over
+  `Count`/`Tracks`), then a MediaInfo with Audio but no Text (a no), then a
+  group prior; a page that says nothing is a maybe. Only the release's own
+  section is read (TL `Torrent Description`/`NFO` to `Comments`, IPT
+  `Size: … in N files` to `Thank Uploader`); a page without one (login,
+  Cloudflare) is a failed fetch. The file list then overrules it
+  (`judgeWithFiles`): an .srt is a yes, all-.avi videos a no. Without a
+  known list, the page's own .torrent is fetched (`findTorrentDownloadUrls`):
+  IPT's links are page-relative but served from the site root, and a page
+  also links related releases, so only links carrying its id are used.
+  The Audio block is cut first, up to the next heading, so a new NFO heading
+  for subs must be in `stripAudioSections`' list or the cut eats it. Label
+  and phrase checks run within one line: joined, `Language: English` over
+  `Subtitles: N/A` reads as "English Subtitles". Self-check:
   `node torrentSubtitles.check.js`.
 
 ## IMDB trailer video (tv-srvr `getRemotes`)

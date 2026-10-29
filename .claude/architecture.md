@@ -381,6 +381,14 @@ and `./srvr` deploys them.
   per episode, the distinct OpenSubtitles releases, a hearing-impaired copy
   counting with its release. It searches 3 at a time, finds an IMDb id by
   show name when it has none, and writes nothing to `subs.db`.
+- Whether a torrent carries subtitles (`/api/tor/subs`, `/api/tor/chk-subs`;
+  tv-api `torrentSubtitles.js`): its TL/IPT detail page, fetched through the
+  usb server like all TL/IPT traffic, is read for a MediaInfo Text section,
+  then for NFO lines (`Subs : 2: English, Spanish`, a `── Subtitles ──`
+  heading over `Count`/`Tracks`), then a group prior. The Audio block is cut
+  first, up to the next heading, so a new NFO heading for subs must be in
+  `stripAudioSections`' list or the cut eats it. Self-check:
+  `node torrentSubtitles.check.js`.
 
 ## IMDB trailer video (tv-srvr `getRemotes`)
 

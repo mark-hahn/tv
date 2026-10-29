@@ -21,6 +21,8 @@ const POSITIVE_GROUP_PRIORS = new Set([
   "xebec",
 ]);
 const NEGATIVE_GROUP_PRIORS = new Set(["megusta"]);
+// An NFO subtitle value that names tracks: a count of 1+ or a word, not 0/none/no/n/a.
+const NFO_SUB_VALUE = String.raw`(?!0\b|none\b|no\b|n\/a\b)[1-9a-z]`;
 
 function failStatus(reason, extra = {}) {
   return {
@@ -153,7 +155,7 @@ function stripProviderChrome(text) {
 
 function stripAudioSections(text) {
   return String(text || "").replace(
-    /(^|\n)\s*Audio(?:\s*#?\d+)?\b[\s\S]{0,1800}?(?=\n\s*(?:Video|Text|Subtitle|Subtitles|Menu|Chapters|General|Source|Torrent Description|Pack Contents|Screens?|$)\b)/gi,
+    /(^|\n)\s*Audio(?:\s*#?\d+)?\b[\s\S]{0,1800}?(?=\n\s*(?:Video|Text|Subtitle|Subtitles|Subs?|Menu|Chapters|General|Source|Torrent Description|Pack Contents|Screens?|$)\b)/gi,
     "\n",
   );
 }
@@ -306,7 +308,7 @@ async function fetchTorrentFileListFromPage(detailUrl, html, profile) {
   return { files: null, downloadUrl: "" };
 }
 
-function analyzePageText(html, { torrent = null } = {}) {
+export function analyzePageText(html, { torrent = null } = {}) {
   const pageTitle = pageTitleFromHtml(html);
   const rawText = htmlToText(html);
   const cleanedText = stripAudioSections(stripProviderChrome(rawText));
@@ -339,7 +341,14 @@ function analyzePageText(html, { torrent = null } = {}) {
       compact,
     ) ||
     /\b(?:embedded|muxed)\s+subtitles?\b/i.test(compact) ||
-    /(?:^|\s)\.srt\b|\bsrt\b/i.test(compact);
+    /(?:^|\s)\.srt\b|\bsrt\b/i.test(compact) ||
+    // NFO release info: "Subs ......: 2: English, Spanish", or a
+    // "── Subtitles ──" heading over "Count ..: 1" / "Tracks ..: English".
+    new RegExp(String.raw`\bsub(?:title)?s?\s*\.*\s*:\s*${NFO_SUB_VALUE}`, "i").test(compact) ||
+    new RegExp(
+      String.raw`\bsubtitles?\s*[─━═-]{2,}[\s\S]{0,80}?\b(?:count|tracks?|languages?)\s*\.*\s*:\s*${NFO_SUB_VALUE}`,
+      "i",
+    ).test(compact);
 
   if (explicitSubtitle) {
     evidence.push("explicit subtitle text");

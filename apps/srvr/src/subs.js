@@ -16,7 +16,7 @@ import * as path from "node:path";
 import zlib from "zlib";
 import Database from "better-sqlite3";
 import fetch from "node-fetch";
-import { logHere, cleanSrt, unilog} from "@tv/share"
+import { logHere, cleanSrt, decodeSrt, unilog} from "@tv/share"
 import { SRVR_DATA_DIR } from "./srvrPaths.js";
 import { notifyClients } from "./messaging.js";
 import {
@@ -652,7 +652,7 @@ async function downloadSub(row, videoPath) {
   if (!resp.ok) throw new Error(`subtitle file HTTP ${resp.status}`);
   await fs.promises.writeFile(
     opnPath(videoPath, row.fileId),
-    cleanSrt(await resp.text()),
+    cleanSrt(decodeSrt(await resp.arrayBuffer())),
     "utf8",
   );
   markDownloaded.run(row.showId, row.season, row.episode, row.fileId);

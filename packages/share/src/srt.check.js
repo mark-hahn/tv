@@ -1,6 +1,6 @@
 // Self-check for cleanSrt's line layout: node srt.check.js
 import assert from "node:assert/strict";
-import { cleanSrt, parseSrt } from "./srt.js";
+import { cleanSrt, decodeSrt, parseSrt } from "./srt.js";
 
 const cue = (a, b, text) => `1\n${a} --> ${b}\n${text}\n`;
 const layout = (text) => {
@@ -57,6 +57,17 @@ const repeat = parseSrt(
 );
 assert.equal(repeat.length, 1);
 assert.equal(repeat[0].endMs, 241032);
+
+// Unexpected non-ASCII is removed; music symbols, accents and curly quotes stay.
+assert.equal(
+  layout("There�s an appointment​ in his private diary, you see."),
+  "Theres an appointment in his private diary, you see.",
+);
+assert.equal(layout("♪ Café — it’s “fine”… ♫"), "♪ Café — it’s “fine”… ♫");
+
+// UTF-8 bytes stay UTF-8; anything else is read as Windows-1252.
+assert.equal(decodeSrt(Buffer.from("There’s é ♪", "utf8")), "There’s é ♪");
+assert.equal(decodeSrt(Buffer.from([0x54, 0x92, 0x73, 0x20, 0xe9])), "T’s é");
 
 // A cleaned file is left as it is.
 for (const text of [

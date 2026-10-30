@@ -12,6 +12,7 @@ import path from "node:path";
 import fs from "node:fs";
 import {
   cleanSrt,
+  decodeSrt,
   logHere,
   setUnilogSink,
   unilog,
@@ -426,8 +427,8 @@ const main = () => {
   const cleanLandedSrt = async (dst) => {
     if (!/\.srt$/i.test(dst)) return;
     try {
-      const onDisk = await fs.promises.readFile(dst, "utf8");
-      let raw = onDisk;
+      const onDisk = await fs.promises.readFile(dst);
+      let raw = decodeSrt(onDisk);
       if (/\.(ass|ssa)$/i.test(title)) {
         raw = await assToSrt(dst).catch((e) => e);
         if (raw instanceof Error || !raw.trim()) {
@@ -437,7 +438,8 @@ const main = () => {
         }
       }
       const clean = cleanSrt(raw);
-      if (clean !== onDisk) await fs.promises.writeFile(dst, clean, "utf8");
+      if (!onDisk.equals(Buffer.from(clean, "utf8")))
+        await fs.promises.writeFile(dst, clean, "utf8");
     } catch (e) {
       unilog(2881, `could not clean subtitle file ${path.basename(dst)}: ${e.message}`);
     }

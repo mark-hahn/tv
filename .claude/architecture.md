@@ -89,7 +89,12 @@ and `./srvr` deploys them.
   never shown or served; the text ones are copied out to sidecars. chksrt no
   longer exists.
 - Every subtitle file written anywhere, for any reason, goes through
-  `cleanSrt()` (`packages/share/src/srt.js`) first.
+  `cleanSrt()` (`packages/share/src/srt.js`) first. It removes any character
+  outside its `UNEXPECTED_CHARS` allowlist (ASCII, Latin accents, typographic
+  punctuation, music symbols), so a misdecoded `�` is dropped, not mapped.
+  Files from outside (down's landed sidecars, OpenSubtitles downloads, stray
+  `.srt`s beside a video) are read with `decodeSrt()`: UTF-8, or
+  Windows-1252 when not valid UTF-8. Everything written is UTF-8.
 - Types, from the suffix between the video's name and `.srt`
   (`sidecarType()` in `apps/srvr/src/subOrigin.js`):
   - `T<n>` / `H<n>` (T, H): a copy of embedded text track n (its ffprobe

@@ -2,6 +2,12 @@
 // formatting strip, "rolling" de-flicker sanitization, and the line layout
 // shared with ASR. No I/O, no state.
 
+// Characters a subtitle may hold: ASCII, Latin accented letters, typographic
+// dashes, quotes and ellipsis, € ™, and music symbols. Anything else (the
+// U+FFFD of a misdecoded file, controls, zero-widths, a BOM) is removed.
+const UNEXPECTED_CHARS =
+  /[^\t\n\r\x20-\x7E -ſ‐-‧‰-›€™♩-♯]/g;
+
 export function srtTimeToMs(timeStr) {
   // "hh:mm:ss,mmm" -> ms
   const m = /^([0-9]{2}):([0-9]{2}):([0-9]{2}),([0-9]{3})$/.exec(
@@ -290,7 +296,7 @@ export function reflowSrt(entries) {
 
 // Returns sanitized SRT string if anything changed, null if unchanged.
 export function sanitizeSrt(raw) {
-  const stripped = stripSrtFormatting(raw);
+  const stripped = stripSrtFormatting(raw).replace(UNEXPECTED_CHARS, "");
   const entries = parseSrt(stripped);
   // Sort by start time to fix out-of-order entries from embedded extraction
   const sorted = [...entries].sort((a, b) => a.startMs - b.startMs);
@@ -312,6 +318,18 @@ export function sanitizeSrt(raw) {
   const out = serializeSrt(mergeRepeats(reflowSrt(derollSrt(merged))));
   if (changed || out !== serializeSrt(merged)) return out;
   return null;
+}
+
+// A subtitle file's bytes as text. Bytes that are not valid UTF-8 are taken
+// as Windows-1252, the usual encoding of older English .srt files, so its
+// curly quote 0x92 comes out as ’ instead of U+FFFD.
+export function decodeSrt(bytes) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    // not UTF-8
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
 }
 
 // The text every subtitle file is written as: sanitized, or as it came when

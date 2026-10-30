@@ -24,6 +24,7 @@ import {
   logHere,
   parseFileSeasonEpisode,
   cleanSrt,
+  decodeSrt,
   vidIsVideoName,
   vidDeleteWithSidecars,
 } from "@tv/share";
@@ -486,7 +487,7 @@ async function renameSFiles(videoFilePath, season, episode) {
     const src = path.join(dir, name);
     const dstName = await addSFile(
       videoFilePath,
-      cleanSrt(await fs.promises.readFile(src, "utf8")),
+      cleanSrt(decodeSrt(await fs.promises.readFile(src))),
     );
     if (dstName)
       unilog(2685, `${showNameFromFilePath(videoFilePath)}: ${name} is now ${dstName}`);

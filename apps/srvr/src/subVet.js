@@ -49,7 +49,7 @@ import * as sc from "./subSpotCheck.js";
 import * as sp from "./subPrepare.js";
 import { sidecarVideo } from "./subSync.js";
 import { sidecarType } from "./subOrigin.js";
-import { nextUpAfter } from "./derived.js";
+import { storyOrder } from "./storyOrder.js";
 import { showFolderFor, showNameFromFilePath } from "./showPaths.js";
 import {
   VET_VERSION,
@@ -159,12 +159,27 @@ function hasStaleJudged(videoPath) {
   return subs.staleVetChecks(videoPath).some((c) => subs.freshCheck(c.file)) && !!asrFileOf(videoPath);
 }
 
+// The next-ups for vetting, as "<season>.<episode>": in story order, the
+// first two unwatched episodes with a video, and the first two after each
+// watched episode, so a show watched out of order has its next ones ready too.
+function nextUpKeys(ed) {
+  const keys = new Set();
+  let left = 2;
+  for (const { season, episode, ep } of storyOrder(ed)) {
+    if (ep.watched) left = 2;
+    else if (left > 0 && ep.file) {
+      keys.add(`${season}.${episode}`);
+      left--;
+    }
+  }
+  return keys;
+}
+
 // The episodes of the show to vet now, [{videoPath, level, season, episode}],
-// the next two first. Watched episodes are never vetted. The next two
-// (next-up, the first unwatched episode with a video in story order, and the
-// first unwatched one with a video after it) get full vetting unless they
-// have had it for their current video under this version. With nextTwoOnly
-// (the end of a watch) that is all. Otherwise a fully vetted episode with a
+// the next-ups first. Watched episodes are never vetted. The next-ups
+// (nextUpKeys) get full vetting unless they have had it for their current
+// video under this version. With nextTwoOnly (the end of a watch) that is
+// all. Otherwise a fully vetted episode with a
 // file that arrived since, a file judged under an older version, or a copy
 // of an embedded track deleted under one, is vetted in full again, which
 // judges them against its stored transcript; an episode vetted in full under
@@ -175,10 +190,8 @@ function hasStaleJudged(videoPath) {
 export function episodesToVet(showName, rec, { nextTwoOnly = false } = {}) {
   if (!rec?.inLibrary || !Array.isArray(rec.episodeData)) return [];
   const ed = rec.episodeData;
-  const first = nextUpAfter(ed);
-  const second = first ? nextUpAfter(ed, first) : null;
-  const next = [first, second].filter(Boolean);
-  const isNext = (s, e) => next.some((x) => x.season === s && x.episode === e);
+  const next = nextUpKeys(ed);
+  const isNext = (s, e) => next.has(`${s}.${e}`);
   const folder = showFolderFor(showName, rec);
   const nextOut = [];
   const restOut = [];

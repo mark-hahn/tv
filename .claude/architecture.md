@@ -270,12 +270,14 @@ and `./srvr` deploys them.
   the design in `subs-final-plan.md`, the work log in `subs-test.md`)
   decides which files a video keeps and which get a ✓. It replaced the older
   clip checks (`subPrepare.js`, `subSpotCheck.js`) on 10-24.
-  - When: the tvdb update task's per-show step queues the show's next two
-    episodes (next-up and the one after) for full vetting and the rest for
-    cheap; selecting a show in the web client starts that step. The end of
-    a watch queues the next two in full. Never when files land, at play, or
+  - When: the tvdb update task's per-show step queues the show's next-ups
+    for full vetting and the rest for cheap; selecting a show in the web
+    client starts that step. The end of a watch queues the next-ups in full.
+    The next-ups (`nextUpKeys`), in story order: the first two unwatched
+    episodes with a video, and the first two after each watched episode, so
+    a show watched out of order has its next ones vetted too. Never when files land, at play, or
     in the sweep. Watched episodes are never vetted.
-  - Which (`episodesToVet`): a next-two episode in full unless it was fully
+  - Which (`episodesToVet`): a next-up episode in full unless it was fully
     vetted under this version for its current video. A fully vetted episode
     again in full when a file arrived since, a file has a verdict from an
     older version, or a T/H copy was deleted under one; an episode fully

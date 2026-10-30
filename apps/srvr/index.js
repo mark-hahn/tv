@@ -479,7 +479,7 @@ tvdb.setPerShowCallback(async (showName, tvdbRecord, options) => {
     const playedSince = util.toPstDateTimeMs(new Date(Date.now() - PREFETCH_PLAYED_MS));
     if (tvdbRecord.inLibrary && tvdbRecord.lastPlayedDate >= playedSince)
       prefetchNextSubs(showName, tvdbRecord);
-    // Subtitle vetting: the next two episodes in full, the rest cheap.
+    // Subtitle vetting: the next-ups in full, the rest cheap.
     queueVetting(showName, tvdbRecord);
     return { hasChanges: push2Changes.length > 0, changes: push2Changes };
   } catch (e) {
@@ -2988,8 +2988,9 @@ function prefetchNextSubs(showName, rec, after = null) {
 }
 
 // Subtitle vetting of the show's episodes into the sub queue (subVet.js): from
-// the tvdb update task's per-show step, the next two in full and the rest
-// cheap; at the end of a watch (nextTwoOnly), the next two in full. Cheap
+// the tvdb update task's per-show step, the next-ups (subVet.nextUpKeys) in
+// full and the rest cheap; at the end of a watch (nextTwoOnly), the next-ups
+// in full. Cheap
 // ones wait behind all other batch work.
 function queueVetting(showName, rec, { nextTwoOnly = false } = {}) {
   const todo = subVet.episodesToVet(showName, rec, { nextTwoOnly });

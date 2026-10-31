@@ -2199,6 +2199,9 @@ const getTvdbData = async (paramObj, resolve, _reject) => {
   if (existing.gapSig != null) tvdbData.gapSig = existing.gapSig;
   // The waiting state the background loop last acted on (see tryLocalGetTvdb).
   if (existing.waitSeen != null) tvdbData.waitSeen = existing.waitSeen;
+  // When the last wait ended (Safe start sort); never recomputed.
+  if (existing.waitOverDate != null)
+    tvdbData.waitOverDate = existing.waitOverDate;
 
   setImdbId(tvdbData);
 

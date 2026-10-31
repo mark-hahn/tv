@@ -3787,8 +3787,10 @@ async function hideShowIfNeeded(showName, rec) {
 }
 
 // The wait on a show being over is a notification: stamp its last viewing as
-// now so it heads the watched sort.
+// now so it heads the watched sort. waitOverDate orders the Safe start sort
+// after the shows still waiting.
 async function markWaitOverViewedNow(showName, rec) {
+  rec.waitOverDate = util.toPstDateTimeMs(new Date());
   await stampFakeLastPlayed(rec, Date.now());
   unilog(2525, `wait over for ${showName}: last viewed set to now`);
 }

@@ -1293,22 +1293,15 @@ export default {
           return show.averageRuntime || 0;
         case "Size":
           return util.fmtSize(show);
-        case "Safe start": {
-          const ws = show.waitStr || "";
-          if (!ws) return "9999-99-99";
-          const inner = ws.slice(1, -1);
-          const parts = inner.split("-");
-          const yr =
-            parts.length === 3
-              ? `20${parts[0]}`
-              : String(new Date().getFullYear());
-          const mo = (parts.length === 3 ? parts[1] : parts[0]).padStart(
-            2,
-            "0",
-          );
-          const dy = parts.length === 3 ? parts[2] : parts[1];
-          return `${yr}-${mo}-${dy}`;
-        }
+        case "Safe start":
+          // A waiting show already shows its waitStr by its name; the column
+          // shows the day the wait ended.
+          if (show.waitStr) return "";
+          return (
+            show.waitOverDate ||
+            allTvdb?.[show.name]?.waitOverDate ||
+            ""
+          ).slice(0, 10);
         case "Ratings":
           ratings = show?.ratings;
           return ratings !== undefined && ratings !== null && ratings !== 0

@@ -211,9 +211,16 @@ export function getSortKey(show, sortChoice, allTvdb = null) {
     case "Size":
       return show.size;
     case "Safe start": {
-      // waitStr is "{m-d}" or "{y-m-d}" in braces; no wait at all sorts last.
+      // waitStr is "{m-d}" or "{y-m-d}" in braces. After the waiting shows
+      // come the ones whose wait ended, most recent first: "9" puts them
+      // after every wait date and the digits flipped (9-d) reverse their
+      // order. Shows that never waited sort last.
       const ws = show.waitStr || "";
-      if (!ws) return "9999-99-99";
+      if (!ws) {
+        const over =
+          show.waitOverDate || allTvdb?.[show.name]?.waitOverDate || "";
+        return over ? "9" + over.replace(/\d/g, (d) => 9 - d) : "9999-99-99";
+      }
       const inner = ws.slice(1, -1);
       const parts = inner.split("-");
       const yr =

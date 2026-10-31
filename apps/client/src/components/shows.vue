@@ -232,7 +232,7 @@ export default {
         Added: "75px",
         Ratings: "25px",
         Size: "25px",
-        "Safe start": "0",
+        "Safe start": "75px",
         Ended: "75px",
         Premiered: "75px",
         Length: "25px",

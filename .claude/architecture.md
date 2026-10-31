@@ -41,6 +41,10 @@ and `./srvr` deploys them.
   (counts, gaps, `waitStr`, `nextUp`, last aired and played, ...) are
   computed by tv-srvr and never saved (`apps/srvr/src/computedFields.js`);
   `setTvdbFields` ignores them.
+- A TVDB refresh rebuilds a record from scratch (`getTvdbData` in
+  `apps/srvr/src/tvdb.js`): a stored field not copied over there is lost.
+  `waitOverDate` (stamped when a wait ends) orders the Safe start sort
+  after the shows still waiting, most recent first.
 - Season 0 specials count like any other episode: counts, gaps, Finished
   and next-up, in story order by air date, else by TVDB's placement. The map
   shows them in season 0, and an episode card says where one belongs. They

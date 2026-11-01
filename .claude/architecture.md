@@ -25,6 +25,10 @@ and `./srvr` deploys them.
 - `packages/share` (`@tv/share`): code the apps share (`compareRelease`,
   `cleanSrt()`, the show sort, the file types, `logHere`).
 - `unilog/`: the logging system (the reconciler `./srvr` runs, `query.js`).
+  Gotcha: `log_events.ts` is LA wall-clock time with no offset, so on the
+  fall-back night 01:00–01:59 occurs twice and `ts` comparisons and windows
+  are off for that hour. Order by `id`, and time ages on `Date.now()` (the
+  tv-watchdog heartbeat check does that).
 
 ## Library, play state and episode data
 

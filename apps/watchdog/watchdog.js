@@ -160,37 +160,29 @@ function getDb() {
   return db;
 }
 
-function heartbeatCountSince(cutoffPst) {
-  const d = getDb();
-  if (!d) return null;
-  try {
-    return d
-      .prepare(
-        `SELECT count(*) AS n FROM log_events
-          WHERE pid = 'tv-srvr' AND message LIKE 'hb %' AND ts > ?`,
-      )
-      .get(cutoffPst).n;
-  } catch {
-    return null;
-  }
-}
-function lastHeartbeatTs() {
+// Newest tv-srvr heartbeat as { id, ts } ({} if none yet), null if unreadable.
+function lastHeartbeat() {
   const d = getDb();
   if (!d) return null;
   try {
     return (
       d
         .prepare(
-          `SELECT ts FROM log_events
+          `SELECT id, ts FROM log_events
             WHERE pid = 'tv-srvr' AND message LIKE 'hb %'
             ORDER BY id DESC LIMIT 1`,
         )
-        .get()?.ts || null
+        .get() || {}
     );
   } catch {
     return null;
   }
 }
+// Heartbeat age is timed on the real clock from when a new heartbeat id first
+// shows up, not from the PST ts string: on the fall-back night the repeated
+// 01:xx hour made `ts > cutoff` find no beats and raised a false alarm.
+let hbLastId = null;
+let hbSeenMs = Date.now();
 function maxEventId() {
   const d = getDb();
   if (!d) return null;
@@ -586,16 +578,20 @@ async function runChecks() {
   // emitted its first beat yet (avoids a false alarm right after a restart).
   const serverTooYoung =
     srvrUptimeMs != null && srvrUptimeMs < HEARTBEAT_MAX_AGE_MS;
-  const hb = heartbeatCountSince(pstCutoff(HEARTBEAT_MAX_AGE_MS));
+  const hb = lastHeartbeat();
   if (hb === null) {
     raise("db", "warn", `cannot read unilog DB (${UNILOG_DB_PATH})`);
   } else {
     clear("db");
-    if (hb === 0 && !serverTooYoung) {
+    if (hb.id !== hbLastId) {
+      hbLastId = hb.id;
+      hbSeenMs = Date.now();
+    }
+    if (Date.now() - hbSeenMs > HEARTBEAT_MAX_AGE_MS && !serverTooYoung) {
       raise(
         "heartbeat",
         "critical",
-        `no tv-srvr heartbeat in ${HEARTBEAT_MAX_AGE_MS / 60000}m (last: ${lastHeartbeatTs() || "never"})`,
+        `no tv-srvr heartbeat in ${HEARTBEAT_MAX_AGE_MS / 60000}m (last: ${hb.ts || "never"})`,
       );
     } else {
       clear("heartbeat");

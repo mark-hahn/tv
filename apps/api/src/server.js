@@ -58,7 +58,7 @@ import {
   isReleaseExtra,
 } from "@tv/share";
 import { ChannelPeer } from "@tv/share/channelPeer";
-import { unilog, setUnilogSink, logHere } from "@tv/share";
+import { unilog, setUnilogSink, logHere, getPstDateTimeMs } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
 import {
   getApiDataDir,
@@ -103,20 +103,9 @@ const VIDEO_EXTENSIONS = new Set([
 const PACKED_ARCHIVE_EXTENSIONS = new Set([".rar", ".001"]);
 const FORCE_DOWN_POLL_MS = 10000;
 const FORCE_DOWN_MAX_POLLS = 720;
+// "MM-DD HH:mm:ss" in LA time (DST handled by Intl in getPstDateTimeMs).
 function formatPstTimestamp(date = new Date()) {
-  // Match the reelgood logger behavior: approximate PST/PDT using month.
-  const now = date instanceof Date ? date : new Date();
-  const month = now.getUTCMonth();
-  const isDST = month >= 2 && month <= 10; // Approximate DST period (Mar-Nov)
-  const offsetHours = isDST ? -7 : -8;
-  const pstTime = new Date(now.getTime() + offsetHours * 60 * 60 * 1000);
-
-  const mm = String(pstTime.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(pstTime.getUTCDate()).padStart(2, "0");
-  const hh = String(pstTime.getUTCHours()).padStart(2, "0");
-  const min = String(pstTime.getUTCMinutes()).padStart(2, "0");
-  const ss = String(pstTime.getUTCSeconds()).padStart(2, "0");
-  return `${mm}-${dd} ${hh}:${min}:${ss}`;
+  return getPstDateTimeMs(date).slice(5, 19).replace("/", "-");
 }
 
 function appendCallsLog({ endpoint, method, ok, result, error }) {

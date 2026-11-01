@@ -10,6 +10,8 @@ document.addEventListener(
     const id = t.id ? `#${t.id}` : "";
     const text = t.textContent?.trim().slice(0, 40) ?? "";
     unilog(892, `${tag}${id}`, text ? `"${text}"` : "");
+    // A clicked button keeps focus, and a later Enter or Space would click it again.
+    t.closest("button")?.blur();
   },
   true,
 );

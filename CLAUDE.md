@@ -66,6 +66,7 @@ Code layout, main flows and gotchas: `.claude/architecture.md`.
     which let the Emby app scan them. Emby keeps its library current with its
     own scans.
 - Web client, phone and tvapp:
+  - web client buttons drop focus when clicked (the document click listener in `apps/client/src/main.js` blurs every `<button>`), so a later Enter or Space can't fire them again
   - when any change is made to web client tv pane ui or the android app ui then the same change should be made to the other
   - you only need to check if a change affects android when change is in tv-pane or android
   - the watched (Viewed) sort order must always match on the web client, tvapp, and the phone

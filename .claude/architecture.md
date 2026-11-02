@@ -103,6 +103,21 @@ and `./srvr` deploys them.
   Files from outside (down's landed sidecars, OpenSubtitles downloads, stray
   `.srt`s beside a video) are read with `decodeSrt()`: UTF-8, or
   Windows-1252 when not valid UTF-8. Everything written is UTF-8.
+- Layout (`srt.js`): `cleanSrt` re-wraps every cue's lines with `wrapLines`
+  (60 a line, as even as they can be, a sentence then a clause end
+  preferred, then the wider line at the bottom) and never moves a cue. Cues
+  made from timed words, ASR's `+` file (`asrCues`) and vetting's fill
+  (`fillCaptions`), are cut by `cueGroups`: a run of speech ends at a pause
+  (1 s for ASR, 0.7 s for a fill) or at a sentence end once 56 characters
+  long, and a run too long for two lines goes into the fewest cues that fit,
+  cut where evenness and the cut cost least (a sentence end free, a clause
+  end 12, another word 30 less up to 15 for a pause). Since 11-01;
+  before, ASR filled each cue to 120 characters and fills cut at 6 s or 12
+  words. `+` files made before that are cut again by
+  `scripts/reflow-subs.js --recue` (`recueSrt`): rebuilt from the stored
+  transcript when the file's cue starts are its word starts, else from the
+  file, only where a cue ends mid-phrase or holds over two lines, the words
+  timed by their place in the old cue.
 - Types, from the suffix between the video's name and `.srt`
   (`sidecarType()` in `apps/srvr/src/subOrigin.js`):
   - `T<n>` / `H<n>` (T, H): a copy of embedded text track n (its ffprobe

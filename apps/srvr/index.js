@@ -2280,10 +2280,10 @@ app.get(
 
 // The subtitle files of a show's unwatched episodes, or with watched=1 its
 // watched ones, laid out again by cleanSrt (scripts/reflow-subs.js drives it,
-// show by show).
+// show by show). With recue=1 only their `+` files, their cues made again.
 app.get(
   "/api/reflowSubs",
-  apiWrapper(async ({ showName, watched }) => {
+  apiWrapper(async ({ showName, watched, recue }) => {
     const rec = tvdb.getAllTvdbSync()?.[showName];
     if (!rec) throw new Error(`reflowSubs: no show ${showName}`);
     const videos = [];
@@ -2300,7 +2300,7 @@ app.get(
       );
     });
     let files = 0;
-    for (const video of videos) files += await subPrepare.reflowSidecars(video);
+    for (const video of videos) files += await subPrepare.reflowSidecars(video, { recue: recue === "1" });
     return { videos: videos.length, files };
   }),
 );

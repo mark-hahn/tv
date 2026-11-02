@@ -21,11 +21,8 @@ import {
   setUnilogSink,
   logHere,
   cleanSrt,
-  MAX_CUE_CHARS,
-  SENTENCE_BREAK_MIN,
-  SENTENCE_END,
-  groupWords,
-  wrapLines,
+  serializeSrt,
+  asrCues,
 } from "@tv/share";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -91,31 +88,6 @@ const SM_OPERATING_POINT = "enhanced";
 const SM_POLL_MS = 5000;
 // a 46-min episode processed in ~95s; this allows a feature film
 const SM_POLL_MAX = 240;
-// measured word gaps larger than this never share a cue
-const SEG_GAP_SEC = 1.0;
-
-// Cue display-duration bounds, applied when building cues from word timings.
-const GUARD_MIN_DUR = 0.35;
-const GUARD_MAX_DUR = 12.0;
-const GUARD_CHARS_PER_SEC = 16;
-// A cue may outlast the speech a little, but not by multiples — anything past
-// this is a line stretched across a silence.
-const displayCap = (chars) => {
-  const spoken = Math.min(GUARD_MAX_DUR, Math.max(GUARD_MIN_DUR, chars / GUARD_CHARS_PER_SEC));
-  return { spoken, max: Math.min(GUARD_MAX_DUR, spoken * 2.5 + 1) };
-};
-// Every cue clears the screen before the next appears.
-const CUE_GAP_SEC = 0.08;
-// A cue must stay up long enough to read even when the words it covers were
-// spoken in a fraction of a second ("No.", "4%.").
-const MIN_CUE_SEC = 0.9;
-// Cues starting closer together than this are effectively simultaneous
-// (overlapping dialogue). Merge them when the text fits, otherwise force
-// them apart, so no cue is ever crammed into a flash.
-const CUE_MERGE_SEC = 0.45;
-// enough that the earlier cue can always reach MIN_CUE_SEC
-const MIN_CUE_SPACING = MIN_CUE_SEC + CUE_GAP_SEC;
-
 // Set by processOneVideo so the run's unilog rows can name the file even from
 // inside the transcription helpers.
 let currentVideoName = "";
@@ -323,48 +295,20 @@ async function transcribeAudio(flacPath, vocab) {
   return words;
 }
 
-// Build cues from the measured word timings: a new cue starts on a real gap
-// in the speech, when the text would overflow a cue, or after a sentence end
-// once there is enough to read. The word times ride along so splitLongCues
-// can cut on real word boundaries.
-function wordsToSegments(words) {
-  const segments = [];
-  let cur = null;
-  for (const w of words) {
-    const sentenceEnd =
-      cur &&
-      SENTENCE_END.test(cur.words[cur.words.length - 1].w) &&
-      cur.text.length >= SENTENCE_BREAK_MIN;
-    if (
-      !cur ||
-      w.start - cur.end > SEG_GAP_SEC ||
-      cur.text.length + 1 + w.w.length > MAX_CUE_CHARS ||
-      sentenceEnd
-    ) {
-      cur = { start: w.start, end: w.end, text: w.w, words: [w] };
-      segments.push(cur);
-    } else {
-      cur.text += " " + w.w;
-      cur.end = w.end;
-      cur.words.push(w);
-    }
-  }
-  return segments;
-}
-
 // Warn about stretches the transcript has nothing for — either genuinely
 // dialogue-free or a sign the engine skipped part of the track.
 const GAP_THRESHOLD_SEC = 30;
-function reportGaps(segments) {
+function reportGaps(cues) {
   let prevEnd = 0;
-  for (const seg of segments) {
-    if (seg.start - prevEnd >= GAP_THRESHOLD_SEC) {
+  for (const cue of cues) {
+    const start = cue.startMs / 1000;
+    if (start - prevEnd >= GAP_THRESHOLD_SEC) {
       pane(
-        `gap of ${Math.round(seg.start - prevEnd)}s with no cues: ` +
-          `${toSrtTime(prevEnd)} -> ${toSrtTime(seg.start)}`,
+        `gap of ${Math.round(start - prevEnd)}s with no cues: ` +
+          `${toSrtTime(prevEnd)} -> ${toSrtTime(start)}`,
       );
     }
-    prevEnd = Math.max(prevEnd, seg.end);
+    prevEnd = Math.max(prevEnd, cue.endMs / 1000);
   }
 }
 
@@ -377,108 +321,12 @@ function toSrtTime(totalSec) {
   return `${h}:${m}:${s},${ms3}`;
 }
 
-// Order the cues, hold each one long enough to read, and clear it before the
-// next appears. Applied last, so nothing downstream can reintroduce a flash.
-function normalizeCues(cues) {
-  cues.sort((a, b) => a.start - b.start);
-
-  const flat = (t) => t.replace(/\n/g, " ");
-  const merged = [];
-  for (const cue of cues) {
-    const prev = merged[merged.length - 1];
-    const joined = prev ? `${flat(prev.text)} ${flat(cue.text)}` : "";
-    if (
-      prev &&
-      cue.start - prev.start < CUE_MERGE_SEC &&
-      joined.length <= MAX_CUE_CHARS
-    ) {
-      prev.text = wrapLines(joined.split(" "));
-      prev.end = Math.max(prev.end, cue.end);
-      continue;
-    }
-    merged.push({ ...cue });
-  }
-
-  // give every cue room to be read; this also guarantees the end below can
-  // always reach its minimum without running into the next cue
-  for (let i = 1; i < merged.length; i++) {
-    const floor = merged[i - 1].start + MIN_CUE_SPACING;
-    if (merged[i].start < floor) merged[i].start = floor;
-  }
-
-  for (let i = 0; i < merged.length; i++) {
-    const cue = merged[i];
-    const cap = displayCap(flat(cue.text).length);
-    const room =
-      i + 1 < merged.length ? merged[i + 1].start - CUE_GAP_SEC : Infinity;
-    const wanted = Math.max(
-      cue.end,
-      cue.start + Math.min(MIN_CUE_SEC, cap.max),
-    );
-    cue.end = Math.max(
-      cue.start + GUARD_MIN_DUR,
-      Math.min(wanted, room),
-    );
-  }
-  return merged;
-}
-
-// A long cue becomes several, cut at measured word boundaries, so each piece
-// gets a real start and end.
-function splitLongCues(segments) {
-  const out = [];
-  let split = 0;
-  for (const seg of segments) {
-    const words = seg.text.replace(/\s+/g, " ").trim().split(" ");
-    const groups = groupWords(words);
-    if (groups.length > 1) split++;
-    const spoken = seg.words ?? [];
-    const span = seg.end - seg.start;
-    let wordAt = 0;
-    let cursor = seg.start;
-    for (const group of groups) {
-      if (!group.length) continue;
-      const timed = spoken.slice(wordAt, wordAt + group.length);
-      let start;
-      let end;
-      if (timed.length === group.length) {
-        start = timed[0].start;
-        end = timed[timed.length - 1].end;
-      } else {
-        start = seg.start + (wordAt / words.length) * span;
-        end = seg.start + ((wordAt + group.length) / words.length) * span;
-      }
-      if (start < cursor) start = cursor;
-      if (end <= start) end = start + GUARD_MIN_DUR;
-      const text = wrapLines(group);
-      const cap = displayCap(text.length);
-      if (end - start > cap.max) {
-        end = start + Math.max(GUARD_MIN_DUR, cap.spoken * 1.6 + 0.4);
-      }
-      out.push({ start, end, text });
-      cursor = start;
-      wordAt += group.length;
-    }
-  }
-  if (split > 0) pane(`split ${split} cues over ${MAX_CUE_CHARS} chars`);
-  return normalizeCues(out);
-}
-
 /* ---------------- SRT generation ---------------- */
-function writeSRT(segments, outputPath) {
-  if (!segments || segments.length === 0) {
+function writeSRT(cues, outputPath) {
+  if (!cues || cues.length === 0) {
     throw new Error(`Video has no segments to write: ${outputPath}`);
   }
-  const sorted = [...segments].sort((a, b) => a.start - b.start);
-
-  let srtContent = "";
-  let index = 0;
-  for (const seg of sorted) {
-    srtContent += `${++index}\n`;
-    srtContent += `${toSrtTime(seg.start)} --> ${toSrtTime(seg.end)}\n`;
-    srtContent += `${seg.text}\n\n`;
-  }
-  fs.writeFileSync(outputPath, cleanSrt(srtContent), "utf8");
+  fs.writeFileSync(outputPath, cleanSrt(serializeSrt(cues)), "utf8");
   pane(`Wrote: ${path.basename(outputPath)}`);
 }
 
@@ -498,12 +346,14 @@ async function processOneVideo(videoPath) {
     if (words.length === 0) {
       throw new Error("no words transcribed");
     }
-    const segments = wordsToSegments(words);
-    pane(`Transcribed ${words.length} words into ${segments.length} cues`);
-    reportGaps(segments);
+    const cues = asrCues(
+      words.map((w) => ({ text: w.w, s: w.start * 1000, e: w.end * 1000 })),
+    );
+    pane(`Transcribed ${words.length} words into ${cues.length} cues`);
+    reportGaps(cues);
 
     const outputPath = getSrtPath(videoPath);
-    writeSRT(splitLongCues(segments), outputPath);
+    writeSRT(cues, outputPath);
     // The word-timed transcript, for tv-srvr to keep (subtitle vetting):
     // [[text, startMs, endMs]], text as the cues show it.
     if (wordsOut)

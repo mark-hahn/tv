@@ -1,6 +1,6 @@
 // Self-check for cleanSrt's line layout: node srt.check.js
 import assert from "node:assert/strict";
-import { cleanSrt, decodeSrt, parseSrt } from "./srt.js";
+import { asrCues, cleanSrt, decodeSrt, fitsCue, parseSrt, recueSrt } from "./srt.js";
 
 const cue = (a, b, text) => `1\n${a} --> ${b}\n${text}\n`;
 const layout = (text) => {
@@ -79,5 +79,51 @@ for (const text of [
   const once = cleanSrt(cue("00:00:01,000", "00:00:05,000", text));
   assert.equal(cleanSrt(once), once);
 }
+
+// ASR's cues: a run of speech too long for one cue is cut evenly at a
+// clause, not filled to the brim with its last word left over (Becker
+// S02E11).
+const becker =
+  cue("00:16:42,800", "00:16:50,920", "Oh, I'm so sorry. But, you know,\nnow that you mention it, there's always been\nsomething about Louis that seemed a little") +
+  "\n" +
+  cue("00:16:51,000", "00:16:51,900", "off.");
+const recued = parseSrt(recueSrt(becker));
+assert.deepEqual(
+  recued.map((c) => c.text.replace(/\n/g, " ")),
+  ["Oh, I'm so sorry. But, you know, now that you mention it,", "there's always been something about Louis that seemed a little off."],
+);
+assert.equal(recued[0].startMs, 1002800);
+assert.equal(recueSrt(recueSrt(becker)), recueSrt(becker));
+// a cue that ends its phrase is left as it is
+const kept = cue("00:16:53,000", "00:16:54,500", "Louis? Our Louis?");
+assert.equal(parseSrt(recueSrt(becker + "\n" + kept)).at(-1).startMs, 1013000);
+assert.equal(parseSrt(recueSrt(becker + "\n" + kept)).at(-1).endMs, 1014500);
+// with the video's transcript, cut from its word times
+const words = "Oh, I'm so sorry. But, you know, now that you mention it, there's always been something about Louis that seemed a little off."
+  .split(" ")
+  .map((w, i) => [w, 1002800 + i * 350 + (i >= 12 ? 500 : 0), 1002800 + i * 350 + 300 + (i >= 12 ? 500 : 0)]);
+const fromWords = parseSrt(recueSrt(becker, words));
+assert.equal(fromWords[1].startMs, words[12][1]);
+// not when the file was moved by hand: its starts are not the words' starts
+assert.equal(recueSrt(becker, words.map(([w, s, e]) => [w, s + 300, e + 300])), recueSrt(becker));
+
+// From timed words: every cue fits two lines, and a pause beats a plain word.
+const timed = (text, from, step, pauseAfter = -1, pauseMs = 0) =>
+  text.split(" ").map((w, i) => {
+    const s = from + i * step + (i > pauseAfter && pauseAfter >= 0 ? pauseMs : 0);
+    return { text: w, s, e: s + step - 20 };
+  });
+const long = timed(
+  "and then we drove all the way down to the coast and back again in one day " +
+    "because nobody wanted to stay over in that terrible little motel by the highway",
+  0,
+  300,
+  17,
+  600,
+);
+const cues = asrCues(long);
+assert.equal(cues.length, 2);
+for (const c of cues) assert.ok(fitsCue(c.text.split(/\s+/)), c.text);
+assert.ok(cues[0].text.replace(/\n/g, " ").endsWith("in one day because"), cues[0].text);
 
 console.log("srt ok");

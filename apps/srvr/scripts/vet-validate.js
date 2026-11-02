@@ -113,14 +113,16 @@ for (const set of ["fresh100", "test100"]) {
         const lyrics = sibs.flatMap((g) => g.lyrics);
         const mine = j.verdict === "missing" ? filledText(f.text, heard, durMs, lyrics, j.line).fills : [];
         const theirs = r.fills ?? [];
+        // the fill's captions are cut by cueGroups, not as fill.py cuts
+        // them, so the words filled and their span are compared
+        const words = (texts) =>
+          texts.join(" ").replace(/\n/g, " ").toLowerCase().replace(/[^a-z0-9 ]/g, "").split(/ +/).filter(Boolean).join(" ");
         const same =
-          mine.length === theirs.length &&
-          mine.every(
-            (m, k) =>
-              Math.abs(m.s - theirs[k][0]) < 1 &&
-              Math.abs(m.e - theirs[k][1]) < 1 &&
-              m.text.replace(/\n/g, " ").toLowerCase().replace(/[^a-z0-9 ]/g, "").split(/ +/).filter(Boolean).join(" ") === theirs[k][2],
-          );
+          mine.length > 0 === theirs.length > 0 &&
+          (mine.length === 0 ||
+            (Math.abs(mine[0].s - theirs[0][0]) < 1 &&
+              Math.abs(mine.at(-1).e - theirs.at(-1)[1]) < 1 &&
+              words(mine.map((m) => m.text)) === words(theirs.map((t) => t[2]))));
         if (same) counts.fillSame++;
         else note.push(`fill: ${mine.length} captions vs ${theirs.length}`);
       }

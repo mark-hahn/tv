@@ -12,7 +12,7 @@
 
 import fsp from "fs/promises";
 import * as path from "node:path";
-import { logHere, unilog, cleanSrt } from "@tv/share"
+import { logHere, unilog, cleanSrt, recueSrt } from "@tv/share"
 import * as subs from "./subs.js";
 import { VET_AUDIO_METHOD } from "./subs.js";
 import * as sc from "./subSpotCheck.js";
@@ -249,14 +249,22 @@ export async function judgeHandTimed(file) {
 
 // The video's sidecars laid out again by cleanSrt, after a change to its line
 // layout. No timing moves, so each file keeps its check, made current for the
-// rewritten file, and the watcher leaves it alone. Returns how many changed.
-export async function reflowSidecars(videoPath) {
+// rewritten file, and the watcher leaves it alone. With recue, only its `+`
+// file, its cues cut again by recueSrt, from the video's stored transcript
+// when it has one. Returns how many changed.
+export async function reflowSidecars(videoPath, { recue = false } = {}) {
   return withVideo(videoPath, async () => {
     let rewritten = 0;
-    for (const { file } of subs.listSidecars(videoPath)) {
+    for (const { file, type } of subs.listSidecars(videoPath)) {
+      if (recue && type !== "+") continue;
       const full = path.join(path.dirname(videoPath), file);
       const raw = await fsp.readFile(full, "utf8");
-      const clean = cleanSrt(raw);
+      let clean;
+      if (recue) {
+        // the track asr.js transcribes (subsQueue's generateSrtWithAsr)
+        const track = Math.max(0, sc.englishTrack((await sc.videoInfo(videoPath)).audioLangs));
+        clean = recueSrt(raw, subs.getTranscript(videoPath, track)?.words);
+      } else clean = cleanSrt(raw);
       if (clean === raw) continue;
       await fsp.writeFile(full, clean, "utf8");
       subs.restatCheck(full);

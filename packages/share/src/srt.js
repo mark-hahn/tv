@@ -170,47 +170,129 @@ export function derollSrt(entries) {
   return result;
 }
 
-// Subtitle geometry, shared with ASR: lines are at most this wide. ASR cuts
-// its cues to fit two lines, at sentence, then clause, then word boundaries
-// so a cue rarely ends mid-phrase; other files' cues are never cut.
+// Subtitle geometry, shared with ASR: lines are at most this wide, and the
+// cues ASR and vetting's fill make from timed words hold at most
+// MAX_CUE_LINES of them, cut where a sentence or clause ends or the speaker
+// pauses, as evenly as they can be (cueGroups). Other files' cues are never
+// cut.
 export const MAX_LINE_CHARS = 60;
-export const MAX_CUE_CHARS = MAX_LINE_CHARS * 2;
+const MAX_CUE_LINES = 2;
 // The most lines a cue is balanced over; past this its lines are just filled.
 const MAX_WRAP_LINES = 3;
 // Splits this close to the most even one compete on punctuation.
 const NEAR_EVEN_CHARS = 8;
-// Break early at a sentence end once a cue is at least this full.
-export const SENTENCE_BREAK_MIN = 56;
-export const SENTENCE_END = /[.!?]["\')\]]?$/;
+// A run of speech ends at a sentence end once it is at least this full.
+const SENTENCE_BREAK_MIN = 56;
+const SENTENCE_END = /[.!?]["\')\]]?$/;
 const CLAUSE_END = /[,;:]["\')\]]?$/;
+// What cutting a run of speech between two words costs, in characters of
+// unevenness: nothing after a sentence end, CUT_CLAUSE after a clause end,
+// else CUT_WORD less up to PAUSE_BONUS for the pause before the next word
+// (all of it from PAUSE_FULL_MS).
+const CUT_CLAUSE = 12;
+const CUT_WORD = 30;
+const PAUSE_BONUS = 15;
+const PAUSE_FULL_MS = 500;
 
-// Group words into cues that fit MAX_CUE_CHARS, breaking at the end of a
-// sentence where possible and at a clause otherwise.
-export function groupWords(words) {
-  const groups = [];
-  let current = [];
+// Whether words fit on MAX_CUE_LINES lines (filled in order, which takes the
+// fewest).
+export function fitsCue(words) {
+  let lines = 1;
   let len = 0;
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const added = len === 0 ? word.length : len + 1 + word.length;
-    if (len > 0 && added > MAX_CUE_CHARS) {
-      groups.push(current);
-      current = [word];
-      len = word.length;
-      continue;
-    }
-    current.push(word);
-    len = added;
-    const last = i === words.length - 1;
-    if (last) break;
-    if (len >= SENTENCE_BREAK_MIN && SENTENCE_END.test(word)) {
-      groups.push(current);
-      current = [];
-      len = 0;
+  for (const w of words) {
+    if (len === 0) len = w.length;
+    else if (len + 1 + w.length <= MAX_LINE_CHARS) len += 1 + w.length;
+    else {
+      lines++;
+      len = w.length;
     }
   }
-  if (current.length) groups.push(current);
-  return groups;
+  return lines <= MAX_CUE_LINES;
+}
+
+function cutCost(word, pauseMs) {
+  if (SENTENCE_END.test(word)) return 0;
+  if (CLAUSE_END.test(word)) return CUT_CLAUSE;
+  return CUT_WORD - PAUSE_BONUS * Math.min(1, Math.max(0, pauseMs) / PAUSE_FULL_MS);
+}
+
+// A run of words (texts, and pauses[i] the ms after word i) cut into the
+// fewest pieces that each fit a cue, at the cuts that cost least: each
+// piece's distance in characters from an even share of the run, plus cutCost
+// at each cut. Returns where each piece ends, as a word index.
+function splitRun(texts, pauses) {
+  const n = texts.length;
+  // fitEnd[i]: one past the last word a piece starting at word i can hold
+  const fitEnd = texts.map((_, i) => {
+    let j = i + 1;
+    while (j < n && fitsCue(texts.slice(i, j + 1))) j++;
+    return j;
+  });
+  let count = 0;
+  for (let i = 0; i < n; i = fitEnd[i]) count++;
+  if (count <= 1) return [n];
+  const pre = [0];
+  for (const t of texts) pre.push(pre.at(-1) + t.length + 1);
+  const share = (pre[n] - 1) / count;
+  // cost[j]: the least cost of the first j words in k pieces; back[k][j]
+  // where its last piece starts
+  let cost = Array(n + 1).fill(Infinity);
+  cost[0] = 0;
+  const back = [];
+  for (let k = 0; k < count; k++) {
+    const next = Array(n + 1).fill(Infinity);
+    const from = Array(n + 1).fill(-1);
+    for (let i = 0; i < n; i++) {
+      if (cost[i] === Infinity) continue;
+      const cut = i === 0 ? 0 : cutCost(texts[i - 1], pauses[i - 1]);
+      for (let j = i + 1; j <= fitEnd[i]; j++) {
+        const c = cost[i] + cut + Math.abs(pre[j] - pre[i] - 1 - share);
+        if (c < next[j]) {
+          next[j] = c;
+          from[j] = i;
+        }
+      }
+    }
+    back.push(from);
+    cost = next;
+  }
+  const ends = [];
+  for (let k = count - 1, j = n; k >= 0; k--) {
+    ends.unshift(j);
+    j = back[k][j];
+  }
+  return ends;
+}
+
+// Timed words [{text, s, e}] (ms), in order, grouped into cues: a run of
+// speech ends at a pause of more than maxGapMs, or at a sentence end once it
+// is SENTENCE_BREAK_MIN full, and each run is cut by splitRun. Returns the
+// cues' words, [[word]].
+export function cueGroups(words, maxGapMs) {
+  const runs = [];
+  let cur = null;
+  let len = 0;
+  for (const w of words) {
+    const last = cur?.at(-1);
+    if (!cur || w.s - last.e > maxGapMs || (SENTENCE_END.test(last.text) && len >= SENTENCE_BREAK_MIN)) {
+      cur = [w];
+      len = w.text.length;
+      runs.push(cur);
+    } else {
+      cur.push(w);
+      len += 1 + w.text.length;
+    }
+  }
+  return runs.flatMap((run) => {
+    const texts = run.map((w) => w.text);
+    const pauses = run.map((w, i) => (i + 1 < run.length ? run[i + 1].s - w.e : 0));
+    let start = 0;
+    return splitRun(texts, pauses).map((end) => {
+      const piece = run.slice(start, end);
+      start = end;
+      return piece;
+    });
+  });
 }
 
 // Every way to put count words on n lines, as the word each later line starts at.
@@ -227,7 +309,8 @@ function* lineStarts(count, n, from = 1) {
 export function wrapLines(words) {
   const text = words.join(" ");
   if (text.length <= MAX_LINE_CHARS || words.length < 2) return text;
-  const lineCount = Math.ceil(text.length / MAX_LINE_CHARS);
+  // n lines hold n * MAX_LINE_CHARS characters and the n - 1 spaces between
+  const lineCount = Math.ceil((text.length + 1) / (MAX_LINE_CHARS + 1));
   for (let n = lineCount; n <= MAX_WRAP_LINES; n++) {
     const fits = [];
     for (const starts of lineStarts(words.length, n)) {
@@ -292,6 +375,149 @@ export function reflowSrt(entries) {
         : wrapLines(parts.flat());
     return { ...e, text };
   });
+}
+
+// ---- ASR's cues (the `+` file) from timed words ----
+
+// measured word gaps larger than this never share a cue
+const ASR_GAP_MS = 1000;
+// Cue display-duration bounds.
+const GUARD_MIN_MS = 350;
+const GUARD_MAX_MS = 12000;
+const GUARD_CHARS_PER_SEC = 16;
+// A cue may outlast the speech a little, but not by multiples — anything past
+// this is a line stretched across a silence.
+const displayCap = (chars) => {
+  const spoken = Math.min(GUARD_MAX_MS, Math.max(GUARD_MIN_MS, (chars / GUARD_CHARS_PER_SEC) * 1000));
+  return { spoken, max: Math.min(GUARD_MAX_MS, spoken * 2.5 + 1000) };
+};
+// Every cue clears the screen before the next appears.
+const CUE_GAP_MS = 80;
+// A cue must stay up long enough to read even when the words it covers were
+// spoken in a fraction of a second ("No.", "4%.").
+const MIN_CUE_MS = 900;
+// Cues starting closer together than this are effectively simultaneous
+// (overlapping dialogue). Merge them when the text fits, otherwise force
+// them apart, so no cue is ever crammed into a flash.
+const CUE_MERGE_MS = 450;
+// enough that the earlier cue can always reach MIN_CUE_MS
+const MIN_CUE_SPACING_MS = MIN_CUE_MS + CUE_GAP_MS;
+
+// Order the cues, hold each one long enough to read, and clear it before the
+// next appears. Applied last, so nothing downstream can reintroduce a flash.
+function normalizeCues(cues) {
+  cues.sort((a, b) => a.startMs - b.startMs);
+
+  const flat = (t) => t.replace(/\n/g, " ");
+  const merged = [];
+  for (const cue of cues) {
+    const prev = merged[merged.length - 1];
+    const joined = prev ? `${flat(prev.text)} ${flat(cue.text)}`.split(" ") : [];
+    if (prev && cue.startMs - prev.startMs < CUE_MERGE_MS && fitsCue(joined)) {
+      prev.text = wrapLines(joined);
+      prev.endMs = Math.max(prev.endMs, cue.endMs);
+      continue;
+    }
+    merged.push({ ...cue });
+  }
+
+  // give every cue room to be read; this also guarantees the end below can
+  // always reach its minimum without running into the next cue
+  for (let i = 1; i < merged.length; i++) {
+    const floor = merged[i - 1].startMs + MIN_CUE_SPACING_MS;
+    if (merged[i].startMs < floor) merged[i].startMs = floor;
+  }
+
+  for (let i = 0; i < merged.length; i++) {
+    const cue = merged[i];
+    const cap = displayCap(flat(cue.text).length);
+    const room = i + 1 < merged.length ? merged[i + 1].startMs - CUE_GAP_MS : Infinity;
+    const wanted = Math.max(cue.endMs, cue.startMs + Math.min(MIN_CUE_MS, cap.max));
+    cue.endMs = Math.max(cue.startMs + GUARD_MIN_MS, Math.min(wanted, room));
+  }
+  return merged.map((c) => ({
+    startMs: Math.max(0, Math.round(c.startMs)),
+    endMs: Math.max(0, Math.round(c.endMs)),
+    text: c.text,
+  }));
+}
+
+// ASR's cues from its timed words [{text, s, e}] (ms), as cueGroups groups
+// them, each from its first word's start to its last word's end:
+// [{startMs, endMs, text}].
+export function asrCues(words) {
+  const cues = cueGroups(words, ASR_GAP_MS).map((g) => {
+    const startMs = g[0].s;
+    let endMs = g.at(-1).e;
+    if (endMs <= startMs) endMs = startMs + GUARD_MIN_MS;
+    const text = wrapLines(g.map((w) => w.text));
+    const cap = displayCap(text.length);
+    if (endMs - startMs > cap.max) endMs = startMs + Math.max(GUARD_MIN_MS, cap.spoken * 1.6 + 400);
+    return { startMs, endMs, text };
+  });
+  return normalizeCues(cues);
+}
+
+// A cue ending in a letter or digit stops mid-phrase.
+const MID_PHRASE = /[A-Za-z0-9]$/;
+// The share of an ASR file's cue starts that are its transcript's word starts
+// when the file is as asr.js wrote it (a few are pushed apart).
+const TRANSCRIPT_MATCH = 0.9;
+
+// A cue's words timed by where each sits in its text, between the cue's start
+// and end: [{text, s, e}].
+function spreadWords(c) {
+  const texts = c.text.split(/\s+/).filter(Boolean);
+  const total = texts.join(" ").length;
+  const at = (chars) => c.startMs + (Math.min(chars, total) / total) * (c.endMs - c.startMs);
+  let chars = 0;
+  return texts.map((text) => {
+    const s = at(chars);
+    chars += text.length + 1;
+    return { text, s, e: at(chars) };
+  });
+}
+
+// An ASR file made before its cues were cut as they are now, cut again. With
+// words, its video's word-timed transcript [[text, s, e]], when
+// TRANSCRIPT_MATCH of the file's cues start on one of their starts (no hand
+// timing has moved it): made again from them, as asr.js makes a new one. Otherwise from the file alone:
+// each cue that ends mid-phrase is joined with the cues after it up to one
+// that does not (within ASR_GAP_MS), and each cue too long for MAX_CUE_LINES
+// is taken alone, and asrCues cuts them again, their words timed by
+// spreadWords, so a cut inside an old cue gets an estimated start. Every other
+// cue stays as it is.
+export function recueSrt(srtText, words = null) {
+  const cues = parseSrt(srtText);
+  if (words) {
+    const starts = new Set(words.map(([, s]) => s));
+    if (cues.filter((c) => starts.has(c.startMs)).length >= TRANSCRIPT_MATCH * cues.length)
+      return cleanSrt(serializeSrt(asrCues(words.map(([text, s, e]) => ({ text, s, e })))));
+  }
+  const out = [];
+  const made = new Set();
+  for (let i = 0; i < cues.length; ) {
+    let j = i + 1;
+    while (
+      j < cues.length &&
+      MID_PHRASE.test(cues[j - 1].text) &&
+      cues[j].startMs - cues[j - 1].endMs <= ASR_GAP_MS
+    )
+      j++;
+    const stretch = cues.slice(i, j);
+    if (stretch.length === 1 && fitsCue(stretch[0].text.split(/\s+/))) out.push(stretch[0]);
+    else
+      for (const c of asrCues(stretch.flatMap(spreadWords))) {
+        made.add(c);
+        out.push(c);
+      }
+    i = j;
+  }
+  // a stretch's last cue may have been held past the next one's start
+  for (let k = 0; k + 1 < out.length; k++)
+    if (made.has(out[k]))
+      out[k].endMs = Math.max(out[k].startMs + GUARD_MIN_MS, Math.min(out[k].endMs, out[k + 1].startMs - CUE_GAP_MS));
+  return cleanSrt(serializeSrt(out));
 }
 
 // Returns sanitized SRT string if anything changed, null if unchanged.

@@ -51,9 +51,10 @@
 // evaluate.py's whole+refit+mend+mlyr+mslide+segMin6+segE900+segL600+
 // spotE1200+spotL600+incShare77+incRuns15 and planted/fill.py) is matched
 // step for step, down to Python's random draws (pyRandom.js), its float sums
-// (pySum) and its rounding (pyRound).
+// (pySum) and its rounding (pyRound). Except: since 11-01 the fill's words go
+// into captions by cueGroups, not fill.py's 6 s / 12-word cuts.
 
-import { cleanSrt, msToSrtTime, parseSrt, serializeSrt, srtTimeToMs, wrapLines } from "@tv/share";
+import { cleanSrt, cueGroups, msToSrtTime, parseSrt, serializeSrt, srtTimeToMs, wrapLines } from "@tv/share";
 import { PyRandom } from "./pyRandom.js";
 
 export const VET_VERSION = 4;
@@ -113,8 +114,6 @@ const LYRIC_PAD_MS = 1000;
 // gap filling
 const FILL_EDGE_MS = 200;
 const FILL_PAUSE_MS = 700;
-const FILL_MAX_MS = 6000;
-const FILL_MAX_WORDS = 12;
 const FILL_TAIL_MS = 300;
 const FILL_GAP_MS = 50;
 
@@ -622,10 +621,11 @@ export function fixedText(srtText, { a, b }) {
 // each failing window's stretch, from the end of the caption before it (or
 // the video's start) to the start of the caption after it (or the video's
 // end), captioned from its counted heard words, leaving out those within
-// FILL_EDGE_MS of either caption. Heard words are grouped into captions at a
-// pause of FILL_PAUSE_MS, past FILL_MAX_MS or at FILL_MAX_WORDS, each ending
-// FILL_TAIL_MS after its last word and FILL_GAP_MS before the next. From an
-// old `+` file, its captions starting inside a stretch are taken as they are.
+// FILL_EDGE_MS of either caption. Heard words are grouped into captions by
+// cueGroups, a pause of more than FILL_PAUSE_MS ending a run, each caption
+// ending FILL_TAIL_MS after its last word and FILL_GAP_MS before the next.
+// From an old `+` file, its captions starting inside a stretch are taken as
+// they are.
 function fillCaptions(srtText, heard, durMs, lyrics, { a, b }) {
   const caps = captionsOf(srtText)
     .map((c) => ({ start: a + b * c.start, end: a + b * c.end, words: c.words }))
@@ -644,19 +644,7 @@ function fillCaptions(srtText, heard, durMs, lyrics, { a, b }) {
       for (const x of from) if (lo <= x.s && x.s <= hi) groups.push({ ...x, asIs: true });
       continue;
     }
-    let cur = [];
-    for (const x of from) {
-      if (!(lo <= x.s && x.e <= hi)) continue;
-      if (
-        cur.length &&
-        (x.s - cur.at(-1).e >= FILL_PAUSE_MS || x.e - cur[0].s > FILL_MAX_MS || cur.length >= FILL_MAX_WORDS)
-      ) {
-        groups.push(cur);
-        cur = [];
-      }
-      cur.push(x);
-    }
-    if (cur.length) groups.push(cur);
+    groups.push(...cueGroups(from.filter((x) => lo <= x.s && x.e <= hi), FILL_PAUSE_MS));
   }
   return groups.map((g, i) => {
     if (g.asIs) return { s: g.s, e: g.e, text: g.text };

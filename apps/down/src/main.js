@@ -644,8 +644,11 @@ async function main() {
     tvJson.addSkipLogged(file);
     return true;
   };
+  // Shows whose not-in-library skip was logged this cycle.
+  var notInLibLogged = new Set();
 
   resetCycleState = function () {
+    notInLibLogged.clear();
     startTime = time = Date.now();
     downloadTime = Date.now();
     deleteCount = chkCount = recentCount = 0;
@@ -3194,7 +3197,9 @@ async function main() {
               );
               return setTimeout(chkTvDB, rsyncDelay);
             } else {
-              err(`tvdb no results: fname: ${fname} | url: ${tvdburl}`);
+              // "no results" is logged only once the folder-title retry below
+              // is used up, so a file whose own name has no show name in it
+              // doesn't log an error that the retry then fixes.
               var libraryShowNamesForTvdb =
                 !processingForced && tvdbMap
                   ? Object.keys(tvdbMap).filter(
@@ -3220,13 +3225,15 @@ async function main() {
                   folderTitleYear = undefined;
                   return process.nextTick(chkTvDB);
                 }
-                unilog(2538, `Down: no TVDB match, not in the library "${fname}" (${title || "unknown show"})`);
+                err(`tvdb no results: fname: ${fname} | url: ${tvdburl}`);
+                unilog(2538,`Down: no TVDB match, not in the library "${fname}" (${title || "unknown show"})`);
                 // Cache null so remaining episodes from the same folder skip TVDB this cycle.
                 tvdbCache[title] = null;
                 if (titleBeforeRetry && titleBeforeRetry !== title)
                   tvdbCache[titleBeforeRetry] = null;
                 return process.nextTick(checkFile);
               }
+              err(`tvdb no results: fname: ${fname} | url: ${tvdburl}`);
               badFile("thetvdb: no series match");
               return;
             }
@@ -3455,8 +3462,12 @@ async function main() {
         ) || seriesName;
       const libraryEntry = tvdbMap[libraryKey];
       if (!libraryEntry || !libraryEntry.inLibrary) {
-        if (skipLoggedOnce(usbFilePath))
+        // Every file is marked, but only a show's first new file per cycle is
+        // logged, so a deleted show's whole season doesn't log a line per file.
+        if (skipLoggedOnce(usbFilePath) && !notInLibLogged.has(seriesName)) {
+          notInLibLogged.add(seriesName);
           unilog(2540, `show not in the library, skipping: ${seriesName}, file: ${fname}`);
+        }
         return process.nextTick(checkFile);
       }
     }

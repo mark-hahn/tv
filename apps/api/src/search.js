@@ -571,6 +571,7 @@ export async function searchTorrents({
   // Determine which providers to search based on category and `more` flag
   let rawCombined = [];
   let tpbFailed = false;
+  let tpbReady = null;
 
   if (category === "movie") {
     // Movie mode: search all 4 providers in parallel, no caching, no EZTV
@@ -734,6 +735,12 @@ export async function searchTorrents({
           return results;
         })();
 
+    // A TPB prefetch that has already finished is included without being
+    // asked for, so the tor pane needs no extra click to show it.
+    if (!tpb && !tpbOnly) {
+      tpbReady = readProviderCache(TPB_CACHE_PREFIX, showName, seasonNums);
+    }
+
     const tpbPromise =
       tpb || tpbOnly
         ? (async () => {
@@ -762,7 +769,7 @@ export async function searchTorrents({
             }
             return results;
           })()
-        : Promise.resolve([]);
+        : Promise.resolve(tpbReady || []);
 
     const [limEztResults, tpbResults] = await Promise.all([
       limEztPromise,
@@ -1096,6 +1103,7 @@ export async function searchTorrents({
       providerStats,
       hasMoreProviders: more,
       tpbError: tpbFailed ? true : undefined,
+      tpbIncluded: tpbReady ? true : undefined,
     };
   }
 
@@ -1108,6 +1116,7 @@ export async function searchTorrents({
     providerStats,
     hasMoreProviders: more,
     tpbError: tpbFailed ? true : undefined,
+    tpbIncluded: tpbReady ? true : undefined,
   };
 }
 

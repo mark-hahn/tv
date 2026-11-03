@@ -2041,7 +2041,7 @@ export default {
         preserveVisible: true,
         phaseOverride: "all-results",
       });
-      if (result) this.setTorSearchPhase("all-results");
+      if (result) this.setTorSearchPhase(result.phase);
     },
 
     setTorShow(show) {
@@ -3154,7 +3154,7 @@ export default {
           phaseOverride: "all-results",
         },
       );
-      if (result) this.setTorSearchPhase("all-results");
+      if (result) this.setTorSearchPhase(result.phase);
     },
 
     // TPB is a search of its own -- apibay takes ~60s to answer while the
@@ -3662,7 +3662,10 @@ export default {
         finalPayload = {
           data,
           torrents: activeTorrents.slice(),
-          phase: phaseOverride || this.torSearchPhase,
+          // A finished TPB prefetch came along, so there is no TPB step left.
+          phase: data?.tpbIncluded
+            ? "tpb-results"
+            : phaseOverride || this.torSearchPhase,
         };
         return finalPayload;
       } catch (err) {

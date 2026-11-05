@@ -98,6 +98,20 @@ async function persistSubsToken(token) {
   await util.writeFile(subsTokenWritePath, t);
 }
 
+let renewingToken = null;
+
+// A new login for a refused token. Downloads run at once: those refused
+// together share one login, and one refused a token since replaced needs none.
+async function renewSubsToken(refused, login) {
+  if (refused !== subsTokenCache) return;
+  renewingToken ??= openSubtitlesLogin(login)
+    .then(persistSubsToken)
+    .finally(() => {
+      renewingToken = null;
+    });
+  await renewingToken;
+}
+
 async function openSubtitlesLogin({ apiKey, username, password }) {
   if (!username || !password) {
     throw new Error("subsSearch: cannot login (missing username/password)");
@@ -279,12 +293,21 @@ export async function openSubtitlesDownloadWithRetry({
   // Retry transient upstream errors, and the API's limit of 5 requests a
   // second (429) once the time its retry-after asks for has passed.
   const retryStatus = new Set([429, 502, 503, 504]);
+  let renewed = false;
   let last;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       last = await openSubtitlesDownload({ apiKey, token, fileId });
       if (last?.resp?.ok) return last;
       const status = last?.resp?.status;
+      // The token ran out: log in again and try once more with the new one.
+      if (status === 401 && !renewed) {
+        renewed = true;
+        unilog(3107, `OpenSubtitles /download HTTP 401 (file_id=${fileId}), logging in again`);
+        await renewSubsToken(token, loadSubsLogin());
+        token = subsTokenCache;
+        continue;
+      }
       if (retryStatus.has(status) && attempt < maxAttempts) {
         unilog(1732, `OpenSubtitles /download HTTP ${status} (file_id=${fileId}, attempt=${attempt}/${maxAttempts}), retrying`);
         await sleep(

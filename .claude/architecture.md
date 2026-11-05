@@ -206,6 +206,10 @@ and `./srvr` deploys them.
     is opened again.
   - The API allows 5 requests a second. A search or download answered 429 is
     retried after its `retry-after` (1 s). One play alone sends 4.
+  - The login token runs out while tv-srvr is up, and a login at startup can
+    get one with only hours left. A download, search or quota check refused
+    with a 401 logs in again and tries once more. Downloads refused together
+    share the login (`renewSubsToken`).
   - Only cheap vetting checks the day's quota (`cheapDownloadQuota`): it
     downloads nothing while fewer than 200 are left, so plays keep theirs.
     OpenSubtitles enforces its 1000 a day, and past it downloads fail like

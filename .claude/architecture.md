@@ -21,9 +21,19 @@ and `./srvr` deploys them.
 - `apps/asr` (`asr.js`): Speechmatics ASR, for subtitle vetting.
 - `apps/client`: the web client (Vue, run by Vite locally).
 - `apps/android`: the phone remote (Expo, `App.js`).
+  Gotcha: `android/` is generated and gitignored, and an Expo SDK upgrade means
+  regenerating it with `expo prebuild --clean`. That wipes the app icon, which
+  exists only there (`ic_launcher_foreground.xml`, `mipmap-anydpi-v26/`,
+  `iconBackground` in `colors.xml`), so copy those back. Expo Go updates itself
+  and only runs the latest SDK. A new SDK can also need a newer Android
+  platform and build-tools in hahnca.com's `/opt/android-sdk`.
 - `apps/tvapp`: the TV app (native Java).
 - `packages/share` (`@tv/share`): code the apps share (`compareRelease`,
   `cleanSrt()`, the show sort, the file types, `logHere`).
+  `countryDisp()` is how a stored `originalCountry` reads (`usa` is US; `gbr`
+  and `GB` are UK), for displays, the Country sort and the Foreign filter. The
+  stored codes are not changed. tvapp (`Shows.java`) and the phone (`App.js`)
+  can't import it and keep their own copies, so edit all three together.
 - `unilog/`: the logging system (the reconciler `./srvr` runs, `query.js`).
   Gotcha: `log_events.ts` is LA wall-clock time with no offset, so on the
   fall-back night 01:00–01:59 occurs twice and `ts` comparisons and windows

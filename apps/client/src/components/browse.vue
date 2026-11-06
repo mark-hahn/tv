@@ -669,7 +669,7 @@ import {
   srchTvdbData,
   getGenresByTvdbId,
 } from "../tvdb.js";
-import { pickTvdbSeries } from "@tv/share";
+import { countryDisp, pickTvdbSeries } from "@tv/share";
 import { unilog, logHere } from "../log.js";
 
 export default {
@@ -1759,7 +1759,7 @@ export default {
     const infoLine = computed(() => {
       if (!curTvdb.value) return "";
       const t = curTvdb.value;
-      let line = `${(t.country || "").toUpperCase()} | ${(t.primary_language || "").toUpperCase()} | ${t.network || ""}`;
+      let line = `${countryDisp(t.country)} | ${(t.primary_language || "").toUpperCase()} | ${t.network || ""}`;
 
       // Inject ID from browse record if available
       const browseItem = parsedTitles.value[selectedTitleIdx.value];

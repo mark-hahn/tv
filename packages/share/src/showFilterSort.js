@@ -37,11 +37,12 @@ export const SORT_CHOICES = [
   "Length",
   "Creator",
   "Quality",
+  "Country",
 ];
 
 // The sorts that read low-to-high; every other one puts the largest, or the
 // most recent, first.
-const ASCENDING = ["Alpha", "Length", "Creator", "Safe start"];
+const ASCENDING = ["Alpha", "Length", "Creator", "Safe start", "Country"];
 
 // Which crew credit stands in for a show's creator, best first.
 const CREW_PREF = ["Creator", "Producer", "Executive Producer", "Writer"];
@@ -159,6 +160,16 @@ export const applyComputedProps = (rec) => {
   return rec;
 };
 
+// How a show's originalCountry reads everywhere, and what sorts and filters go
+// by: upper case, with US and UK in place of usa, gbr and GB. The stored code
+// stays as it came. Copied in tvapp's Shows.java and the phone's App.js, which
+// can't import this.
+export function countryDisp(code) {
+  const c = String(code || "").trim().toUpperCase();
+  if (c === "USA") return "US";
+  return c === "GBR" || c === "GB" ? "UK" : c;
+}
+
 // The filter-row toggles, by the name the saved settings store them under.
 // Each is tri-state in use: +1 keep only matches, -1 keep only non-matches,
 // 0 ignore. The web client pairs these with their own icon and colour.
@@ -178,7 +189,7 @@ export const COND_PREDS = {
   ended: (show) => show.ended,
   drama: (show) => !show.genres?.includes("Comedy"),
   sitcom: (show) => !!show.sitcom,
-  foreign: (show) => show?.originalCountry?.toUpperCase() != "USA",
+  foreign: (show) => countryDisp(show?.originalCountry) != "US",
   totry: (show) => show.inToTry,
   anticipating: (show) => !!show.anticipating,
   continue: (show) => show.inContinue,
@@ -263,6 +274,8 @@ export function getSortKey(show, sortChoice, allTvdb = null) {
       const q = show.quality ?? null;
       return q !== null ? q : -1;
     }
+    case "Country":
+      return countryDisp(show.originalCountry);
   }
   return "";
 }
@@ -284,8 +297,8 @@ export function compareShows(
   if (va !== vb) {
     let result;
     if (ASCENDING.includes(sortChoice)) {
-      // A show with no creator at all goes last rather than first.
-      if (sortChoice === "Creator") {
+      // A show with no creator or country at all goes last rather than first.
+      if (sortChoice === "Creator" || sortChoice === "Country") {
         if (va === "" && vb !== "") return 1;
         if (vb === "" && va !== "") return -1;
       }

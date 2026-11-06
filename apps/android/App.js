@@ -155,6 +155,13 @@ function compareShowNames(a, b) {
   return ka > kb ? +1 : ka < kb ? -1 : 0;
 }
 
+// Same as @tv/share's countryDisp and tvapp's: US and UK for usa, gbr and GB.
+function countryDisp(code) {
+  const c = String(code || "").trim().toUpperCase();
+  if (c === "USA") return "US";
+  return c === "GBR" || c === "GB" ? "UK" : c;
+}
+
 function buildSeriesMap(seriesMapIn) {
   if (!seriesMapIn || seriesMapIn.length === 0) return null;
   const result = {};
@@ -2228,7 +2235,7 @@ function Remote({ setSubError }) {
             ? `all ${episodeCount} episodes`
             : `${watchedCount} of ${episodeCount}`;
       }
-      const cntryLang = [show.originalCountry, show.originalLanguage]
+      const cntryLang = [countryDisp(show.originalCountry), show.originalLanguage]
         .filter(Boolean)
         .join(" / ");
       const comment = show.comment;

@@ -638,27 +638,30 @@ export default {
       hasLoadedAllShows: false,
       sortChoices: [
         "Alpha",
-        "Viewed",
-        "Down",
+        // The rest are alphabetical by displayed label: Jev shows as AI,
+        // Viewed as Watched (hdrbot.vue's displaySortChoice)
         "Added",
-        "Ratings",
-        "Size",
-        "Safe start",
-        "Ended",
-        "Premiered",
-        "Length",
-        "Creator",
-        "Quality",
         "Jev",
+        "Country",
+        "Creator",
+        "Down",
+        "Ended",
+        "Length",
+        "Premiered",
+        "Quality",
+        "Ratings",
+        "Safe start",
+        "Size",
+        "Viewed",
       ],
       fltrChoices: [
         "All",
+        "Finished",
+        "No Intro",
+        "Partial",
+        "Playing",
         "Try Drama",
         "Watching",
-        "Finished",
-        "Playing",
-        "Partial",
-        "No Intro",
       ],
       conds: [
         {
@@ -1338,6 +1341,8 @@ export default {
           const q = show.quality ?? null;
           return q !== null ? String(q) : "";
         }
+        case "Country":
+          return getSortKey(show, "Country");
       }
     },
 

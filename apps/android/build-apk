@@ -136,8 +136,10 @@ echo "==> Building APK..."
 # Expo caches the autolinked native-module list under these two directories
 # and reuses it across builds, so a list generated against a broken or older
 # node_modules would silently leave modules out of the app. Regenerating it
-# costs seconds.
+# costs seconds. pipefail: gradle's exit status, not grep's, so a failed build
+# stops here instead of being cached as built.
 ssh $REMOTE "
+  set -o pipefail
   export ANDROID_HOME=/opt/android-sdk
   export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
   cd $BUILD_DIR/android

@@ -1213,14 +1213,10 @@ export default {
         if (originalNetwork.includes(net)) originalNetwork = net;
       });
 
-      if (originalCountry === "gbr") originalCountry = "UK";
-      originalCountry = String(originalCountry || "");
       originalLanguage = String(originalLanguage || "");
       originalNetwork = String(originalNetwork || "");
 
-      const countryDisp = String(originalCountry || "")
-        .trim()
-        .toUpperCase();
+      const countryDisp = epd.countryDisp(originalCountry);
       const languageDisp = capWords(originalLanguage);
       const networkDisp = String(originalNetwork || "")
         .trim()

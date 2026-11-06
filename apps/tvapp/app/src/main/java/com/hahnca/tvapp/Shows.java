@@ -141,7 +141,7 @@ class Shows {
       firstAired = str(rec, "firstAired");
       lastAired = str(rec, "lastAired");
       status = str(rec, "status");
-      originalCountry = str(rec, "originalCountry");
+      originalCountry = countryDisp(str(rec, "originalCountry"));
       countryLang = join(" / ", originalCountry, str(rec, "originalLanguage"));
       network = str(rec, "originalNetwork");
       genres = joinArray(rec.optJSONArray("genres"));
@@ -318,6 +318,13 @@ class Shows {
 
   private static String str(JSONObject rec, String key) {
     return rec.isNull(key) ? "" : rec.optString(key, "");
+  }
+
+  /** Same as @tv/share's countryDisp: US and UK for usa, gbr and GB. */
+  private static String countryDisp(String code) {
+    String c = code.trim().toUpperCase(Locale.US);
+    if (c.equals("USA")) return "US";
+    return c.equals("GBR") || c.equals("GB") ? "UK" : c;
   }
 
   /** The id one of the other databases knows this show by, or empty. */

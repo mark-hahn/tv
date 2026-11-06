@@ -24,7 +24,6 @@ import {
   spaceAvail,
   spaceAvailUsb,
   spaceAvailMedia,
-  flexgetHistory,
   addQbtTorrent,
   addQbtMagnet,
   getUsbFiles,
@@ -943,16 +942,6 @@ app.get("/api/space/srvr", async (req, res) => {
   } catch (error) {
     unilog(224, "spaceAvailMedia error:", error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-app.get("/api/flexget", async (req, res) => {
-  try {
-    const txt = await flexgetHistory();
-    res.type("text/plain").send(txt);
-  } catch (error) {
-    unilog(225, "flexget error:", error);
-    res.status(500).json({ error: error?.message || String(error) });
   }
 });
 

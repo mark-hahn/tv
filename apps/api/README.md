@@ -177,7 +177,6 @@ Uploads are triggered server-side via `POST /downloads` (or `/api/download`).
 
 - `GET /api/qbt/info` (optional filters: `hash`, `category`, `tag`, `filter`)
 - `GET /api/space/avail`
-- `GET /api/flexget`
 
 ### TVDB proxy
 

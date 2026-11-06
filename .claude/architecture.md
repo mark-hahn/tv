@@ -57,9 +57,9 @@ and `./srvr` deploys them.
   `X-Real-IP`; anyone else gets the browser's password prompt, checked against
   `QB_PASS`. Both are opened in a tab, because a cross-origin `fetch` can't
   show that prompt.
-- Gotcha: the password must be letters and digits. `qbt-open` puts it in a
+- Gotcha: the password can't contain a single quote. `qbt-open` puts it in a
   single-quoted string in an inline script, and `encodeURIComponent` leaves
-  quote marks alone.
+  that character alone.
 
 ## Library, play state and episode data
 

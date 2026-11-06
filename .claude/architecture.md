@@ -664,6 +664,12 @@ because the TV is unreachable from any wireless host here.
 - The camera overlay pauses a playing video. The video resumes when the
   camera comes off, unless the Shows key took it off, since that closes the
   video too.
+- Phone keys reach tvapp over `wss://hahnca.com/tv-tvapprc`, so through nginx.
+  nginx reads files on threads (`aio threads;` in `server.conf`). Without that,
+  a read on the busy media disk froze a whole worker and every connection on
+  it, so presses landed late and in a burst, and an even number of OKs
+  cancelled out, which read as OK doing nothing (11-05, during bkupall's rsync
+  and a stills build).
 
 **Scrub stills** (`Stills` in tvapp, `playStills()` in `apps/srvr/src/stills.js`)
 - `getPlayUrl` starts the episode's set and returns `stills: {urlBase,

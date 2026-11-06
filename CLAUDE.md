@@ -185,8 +185,12 @@ Code layout, main flows and gotchas: `.claude/architecture.md`.
   The kernel's default for it is 2, and with 2 every reader waits in line for
   a slot, so I/O priorities do nothing: a scrub-stills build then starves
   nginx's reads of the playing video and tvapp freezes.
-- With 64, idle-class jobs (`ionice -c3`: the stills ffmpegs, `BATCH_SCHED`)
-  wait whenever a normal-priority reader such as nginx wants the disk.
+- With 64, idle-class jobs (`ionice -c3`: the stills ffmpegs, `BATCH_SCHED`,
+  bkupall's rsyncs and restic backups) wait whenever a normal-priority reader
+  such as nginx wants the disk.
+- nginx reads files on threads (`aio threads;` at the top of `server.conf`).
+  Without it a read on this disk froze a whole worker for many seconds, along
+  with the phones' key websockets on it.
 
 ## Android deployment
 

@@ -55,6 +55,13 @@ and `./srvr` deploys them.
   (counts, gaps, `waitStr`, `nextUp`, last aired and played, ...) are
   computed by tv-srvr and never saved (`apps/srvr/src/computedFields.js`);
   `setTvdbFields` ignores them.
+- `rottenRatings` is `critics/audience`, written only by the push 3 scrape
+  in `tryLocalGetTvdb`. Only numbers read from the page are stored. A side
+  a scrape misses keeps its stored number if the page is the same one, else
+  it is `--`: a missing side and a timeout look alike, so a score Rotten
+  really removes stays. A stored 0 there is not kept, since the old code
+  wrote it for a missing side. A scrape with no valid score leaves a stored
+  rating and its link alone, so 0/0 is never stored.
 - A TVDB refresh rebuilds a record from scratch (`getTvdbData` in
   `apps/srvr/src/tvdb.js`): a stored field not copied over there is lost.
   `waitOverDate` (stamped when a wait ends) orders the Safe start sort

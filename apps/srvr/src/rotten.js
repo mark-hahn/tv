@@ -1,6 +1,6 @@
 // node src/rotten.js "rizzoli-and-isles"
 
-import { chromium } from "playwright";
+import { chromium, errors } from "playwright";
 import fs from "fs"; // Added for saving HTML
 import { logHere, smartTitleMatch, unilog } from "@tv/share";
 
@@ -33,6 +33,16 @@ const _shared = {
   hooksInstalled: false,
 };
 
+// A side the scrape missed keeps its stored number, in case it only timed out.
+// A stored 0 there doesn't count: it is the old stand-in for a missing score.
+export function keepOldSides(ratings, oldRatings) {
+  const old = (oldRatings || "").split("/");
+  return ratings
+    .split("/")
+    .map((side, i) => (side === "--" && Number(old[i]) ? old[i] : side))
+    .join("/");
+}
+
 export async function rottenShutdown() {
   const browser = _shared.browser;
   _shared.browser = null;
@@ -61,6 +71,9 @@ function installShutdownHooks() {
   process.once("SIGINT", onSignal);
   process.once("SIGTERM", onSignal);
 }
+
+// rottenShutdown clears this first, so scrapes it interrupts can stay quiet.
+const isShutdown = () => !_shared.browser;
 
 async function getSharedBrowserContext({ headless }) {
   installShutdownHooks();
@@ -167,6 +180,7 @@ async function dismissOverlays(page, query) {
       await delay(200);
     }
   } catch (e) {
+    if (isShutdown()) throw e;
     unilog(698, `Rotten: OneTrust click error for ${query}: ${e.message}`);
   }
 
@@ -295,6 +309,7 @@ async function dismissOverlays(page, query) {
       await delay(200);
     }
   } catch (err) {
+    if (isShutdown()) throw err;
     unilog(700, `Rotten: Polling error for ${query}: ${err.message}`);
   }
 
@@ -601,7 +616,9 @@ export async function rottenSearch(query) {
             html: el.innerHTML || "",
           };
         });
-        const num = Number((val.text || "").match(/\d+/)?.[0] ?? "");
+        // No digits means the page has no score, not a score of 0.
+        const digits = (val.text || "").match(/\d+/)?.[0];
+        const num = digits ? Number(digits) : null;
         // console.log(`rotten getScore ${slot}: found text="${val.text}" -> ${num}`);
 
         // Take screenshot of the scorecard area
@@ -623,6 +640,9 @@ export async function rottenSearch(query) {
 
         return num;
       } catch (e) {
+        // Only a timeout means the page has no score. Any other failure, like
+        // a closed browser, must not read as 0: that would wipe the show's rating.
+        if (!(e instanceof errors.TimeoutError)) throw e;
         if (!retrying) {
           // console.log(`rotten getScore ${slot} failed, attempting to dismiss overlays and retry.`);
           await dismissOverlays(page, query);
@@ -635,7 +655,7 @@ export async function rottenSearch(query) {
           // console.log(`Saved error screenshot to rotten-error-${slot}.png`);
         } catch {}
 
-        return 0;
+        return null;
       }
     };
 
@@ -666,7 +686,7 @@ export async function rottenSearch(query) {
     page = await browser.newPage({ userAgent: USER_AGENT });
     return await runOnce(page);
   } catch (err) {
-    unilog(706, "rottenSearch error", query, err.message);
+    if (!isShutdown()) unilog(706, "rottenSearch error", query, err.message);
     return null;
   } finally {
     if (page && usingShared && !REUSE_PAGE) {

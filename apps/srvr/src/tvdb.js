@@ -3,7 +3,7 @@ import * as path from "node:path";
 import fetch from "node-fetch";
 import { chromium } from "playwright";
 import WebSocket from "ws";
-import { rottenSearch } from "./rotten.js";
+import { keepOldSides, rottenSearch } from "./rotten.js";
 import * as util from "./util.js";
 import {
   smartTitleMatch,
@@ -1140,10 +1140,12 @@ const getRemote = async (id, type, showName) => {
       if (!urlRatings) return null;
       // console.log("getRemote rottenSearch:", urlRatings);
       url = urlRatings.url;
+      // A side the page doesn't have is --. With no real score there is no
+      // rating, so 0/0 is never stored.
       ratings =
-        urlRatings.criticsScore === 0 && urlRatings.audienceScore === 0
-          ? null
-          : urlRatings.criticsScore + "/" + urlRatings.audienceScore;
+        urlRatings.criticsScore || urlRatings.audienceScore
+          ? `${urlRatings.criticsScore ?? "--"}/${urlRatings.audienceScore ?? "--"}`
+          : null;
       break;
 
     default:
@@ -2658,10 +2660,16 @@ const tryLocalGetTvdb = async () => {
     const rottenStartMs = Date.now();
     try {
       const rottenRemote = await getRemote(null, 99, processRecord.name);
-      if (rottenRemote) {
+      const rec = allTvdb[processRecord.name];
+      // A scrape with no valid score must not touch a stored rating or its link.
+      if (rottenRemote?.ratings || (rottenRemote && !rec.rottenRatings)) {
+        if (rottenRemote.ratings && rottenRemote.url === rec.rottenUrl)
+          rottenRemote.ratings = keepOldSides(
+            rottenRemote.ratings,
+            rec.rottenRatings,
+          );
         if (rottenRemote.ratings)
           rottenRemote.name += " (" + rottenRemote.ratings + ")";
-        const rec = allTvdb[processRecord.name];
         const existingRemotes = Array.isArray(rec.remotes) ? rec.remotes : [];
         // Replace any existing Rotten entry with fresh scraped one
         rec.remotes = [

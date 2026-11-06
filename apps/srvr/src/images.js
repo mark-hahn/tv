@@ -380,7 +380,10 @@ export async function tmdbShowId(ids, showName) {
 
 function fanartShow(tvdbId) {
   return remember(`fanart|${tvdbId}`, async () => {
-    const res = (await getJson(`${FANART_API}/${tvdbId}?api_key=${FANART_KEY}`)) ?? {};
+    const found = (await getJson(`${FANART_API}/${tvdbId}?api_key=${FANART_KEY}`)) ?? {};
+    // With nothing under a tvdb id, fanart.tv tries the number as a TMDB id
+    // and answers with the unrelated show that has it.
+    const res = String(found.thetvdb_id) === String(tvdbId) ? found : {};
     const list = (key) =>
       (res[key] ?? []).map((a) => ({ url: a.url, lang: lang(a.lang), score: Number(a.likes) || 0 }));
     return { tvposter: list("tvposter"), tvthumb: list("tvthumb"), showbackground: list("showbackground") };

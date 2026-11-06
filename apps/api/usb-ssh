@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Every ssh and rsync to the USB server goes through this script, so the login
+# is the one password in secrets/qbt-cred.txt. Takes the same arguments as ssh;
+# for rsync pass it as -e. sshpass reads the password from fd 3, which keeps it
+# out of the process list.
+set -euo pipefail
+
+CRED_FILE=/root/dev/apps/tv/apps/api/secrets/qbt-cred.txt
+
+pass=$(sed -n 's/^QB_PASS=//p' "$CRED_FILE")
+[[ -n $pass ]] || {
+  echo "usb-ssh: no QB_PASS in $CRED_FILE" >&2
+  exit 1
+}
+
+# ServerAliveInterval: Debian's ssh defaults it to 300 only under BatchMode,
+# and a password login can't use BatchMode.
+exec sshpass -d3 ssh \
+  -o PubkeyAuthentication=no \
+  -o PreferredAuthentications=password \
+  -o ServerAliveInterval=300 \
+  "$@" 3<<<"$pass"

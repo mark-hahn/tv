@@ -6,6 +6,10 @@ export * from "./videoFiles.js";
 export * from "./srt.js";
 export * from "./releaseCompare.js";
 
+// Every ssh and rsync to the USB server runs this script instead of ssh. It logs
+// in with the one password in apps/api/secrets/qbt-cred.txt.
+export const USB_SSH = "/root/dev/apps/tv/apps/api/usb-ssh";
+
 function normalizeBasic(s) {
   return String(s || "")
     .normalize("NFD")

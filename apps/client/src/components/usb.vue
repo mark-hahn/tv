@@ -1646,21 +1646,9 @@ export default {
         await this.fetchFiles();
       }
     },
-    async usbCp() {
-      try {
-        const resp = await fetch(`${config.torrentsApiUrl}/api/usb/cp-token`);
-        const data = await resp.json();
-        if (!resp.ok || !data.token) {
-          alert("Usb CP login failed: " + (data.error || "no token"));
-          return;
-        }
-        const target =
-          "https://cp.ultra.cc/#/userservice/5ba78e1c-ac41-40bd-8e82-a8261428829e?tok=" +
-          encodeURIComponent(data.token);
-        util.openExternalPage(target);
-      } catch (e) {
-        alert("Usb CP error: " + (e?.message || e));
-      }
+    // A tab, not a fetch, so off the LAN the browser can ask for the usb password.
+    usbCp() {
+      util.openExternalPage(`${config.torrentsApiUrl}/api/usb/cp-token`);
     },
     // opts is the click event when the Force Down button fires it, so only an
     // explicit { skipConfirm: true } from a caller skips the confirm prompt.

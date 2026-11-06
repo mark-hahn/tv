@@ -143,7 +143,8 @@ Code layout, main flows and gotchas: `.claude/architecture.md`.
 - The remote server is **hahnca.com**.
 - Use **SSH** to access the remote server (SSH keys are already available/configured).
 - The usb server is **xobtlu@xobtlu.baron.usbx.me**.
-- Use **SSH** to access the usb server (SSH keys are already available/configured).
+- From hahnca.com, reach the usb server with `/root/dev/apps/tv/apps/api/usb-ssh`, not `ssh`: it takes ssh's arguments and logs in with the password (for rsync, pass it as `-e`). From here, run it through `ssh hahnca.com`.
+- One password covers the usb server's ssh, qBittorrent and control panel: `QB_PASS` in `/root/dev/apps/tv/apps/api/secrets/qbt-cred.txt`. It is stored nowhere else.
 - Nginx config location is `hahnca.com:/etc/nginx/conf.d/server.conf`
 
 ## Where things run

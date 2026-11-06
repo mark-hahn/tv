@@ -3,10 +3,10 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseKeyValueFile } from "./qb-cred.js";
-import { getApiSecretsDir, getApiDataDir } from "./tvPaths.js";
+import { getApiSecretsDir } from "./tvPaths.js";
 import { buildFileTree } from "./fileTree.js";
 import { isTextBuffer } from "./textProbe.js";
-import { logHere, unilog } from "@tv/share";
+import { logHere, unilog, USB_SSH } from "@tv/share";
 
 const execFileAsync = promisify(execFile);
 
@@ -15,8 +15,6 @@ const USB_MOVIES_ROOT = "/home/xobtlu/movies";
 
 // Common ssh options for every USB-server command.
 const SSH_BASE_ARGS = [
-  "-o",
-  "BatchMode=yes",
   "-o",
   "ConnectTimeout=20",
   "-o",
@@ -51,7 +49,7 @@ async function runUsbSsh(
   { timeout = 120000, maxBuffer = 10 * 1024 * 1024 } = {},
 ) {
   const qbHost = await loadQbHostForSsh();
-  const out = await execFileAsync("ssh", [...SSH_BASE_ARGS, qbHost, cmd], {
+  const out = await execFileAsync(USB_SSH, [...SSH_BASE_ARGS, qbHost, cmd], {
     timeout,
     maxBuffer,
     windowsHide: true,
@@ -217,7 +215,7 @@ export async function spaceAvailUsb() {
 
     let stdout = "";
     try {
-      const result = await execFileAsync("ssh", args, {
+      const result = await execFileAsync(USB_SSH, args, {
         timeout: 15000,
         maxBuffer: 1024 * 1024,
         windowsHide: true,
@@ -397,7 +395,7 @@ export async function flexgetHistory() {
   let stdout = "";
   let stderr = "";
   try {
-    const out = await execFileAsync("ssh", args, {
+    const out = await execFileAsync(USB_SSH, args, {
       timeout: 30000,
       maxBuffer: 10 * 1024 * 1024,
       windowsHide: true,
@@ -860,7 +858,7 @@ async function flexgetStatus() {
   const args = [...SSH_BASE_ARGS, qbHost, cmd];
 
   try {
-    const { stdout } = await execFileAsync("ssh", args, {
+    const { stdout } = await execFileAsync(USB_SSH, args, {
       timeout: 60000,
     });
 
@@ -1036,16 +1034,15 @@ export async function deleteUsbMovies(paths) {
 const USB_CP_LOGIN_URL = "https://cp.ultra.cc/api/rest-auth/login/";
 
 export async function usbCpToken() {
-  const credsPath = path.join(getApiDataDir(), "usb-creds.json");
-  const raw = await fs.readFile(credsPath, "utf8");
-  const creds = JSON.parse(raw);
-  if (!creds.Email || !creds.Password) {
-    throw new Error("usb-creds.json missing Email or Password");
+  const credPath = resolveCredPath();
+  const creds = parseKeyValueFile(await fs.readFile(credPath, "utf8"));
+  if (!creds.CP_EMAIL || !creds.QB_PASS) {
+    throw new Error(`Missing CP_EMAIL or QB_PASS in ${credPath}`);
   }
 
   const body = new URLSearchParams();
-  body.append("username", creds.Email);
-  body.append("password", creds.Password);
+  body.append("username", creds.CP_EMAIL);
+  body.append("password", creds.QB_PASS);
 
   const resp = await fetch(USB_CP_LOGIN_URL, {
     method: "POST",

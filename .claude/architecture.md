@@ -40,6 +40,27 @@ and `./srvr` deploys them.
   are off for that hour. Order by `id`, and time ages on `Date.now()` (the
   tv-watchdog heartbeat check does that).
 
+## USB server logins
+
+- One password covers the usb server's ssh, qBittorrent and control panel:
+  `QB_PASS` in `apps/api/secrets/qbt-cred.txt` on hahnca.com, with the
+  control panel's `CP_EMAIL` beside it. tv-api, tv-srvr and tv-down all read
+  that file, and nothing else stores the password.
+- Every ssh and rsync to that server, bkupall's included, runs
+  `apps/api/usb-ssh` (`USB_SSH` in `@tv/share`) instead of `ssh`. It hands
+  the password to sshpass on a file descriptor, so it stays out of `ps`.
+- Gotcha: `BatchMode=yes` blocks password logins, so don't pass it to
+  `usb-ssh`.
+- `qbt-open` (its page carries the password) and `cp-token` (it redirects
+  with a control panel token) are on the public internet behind
+  `requireUsbPass` (`@tv/share/usbAuth`). The LAN passes on nginx's
+  `X-Real-IP`; anyone else gets the browser's password prompt, checked against
+  `QB_PASS`. Both are opened in a tab, because a cross-origin `fetch` can't
+  show that prompt.
+- Gotcha: the password must be letters and digits. `qbt-open` puts it in a
+  single-quoted string in an inline script, and `encodeURIComponent` leaves
+  quote marks alone.
+
 ## Library, play state and episode data
 
 - tvapp plays video itself with Media3 (`apps/tvapp/.../VideoPlayer.java`),

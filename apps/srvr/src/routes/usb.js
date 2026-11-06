@@ -3,7 +3,7 @@
 // ("Shows" plot).
 
 import { execFile } from "child_process";
-import { logHere, unilog} from "@tv/share"
+import { logHere, unilog, USB_SSH } from "@tv/share"
 
 const USB_HOST = "xobtlu@xobtlu.baron.usbx.me";
 const USB_FILES_DIR = "~/files";
@@ -13,14 +13,12 @@ const sshExec = (host, remoteCmd, timeoutMs = SSH_TIMEOUT_MS) =>
   new Promise((resolve, reject) => {
     const args = [
       "-o",
-      "BatchMode=yes",
-      "-o",
       "ConnectTimeout=10",
       host,
       remoteCmd,
     ];
     execFile(
-      "ssh",
+      USB_SSH,
       args,
       { timeout: timeoutMs, maxBuffer: 1024 * 1024 },
       (err, stdout, stderr) => {

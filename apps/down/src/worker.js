@@ -16,6 +16,7 @@ import {
   logHere,
   setUnilogSink,
   unilog,
+  USB_SSH,
   vidDeleteWithSidecars,
   vidIsSampleName,
   vidIsVideoName,
@@ -173,14 +174,12 @@ const sshExec = (host, remoteCmd, timeoutMs = 15000) => {
   return new Promise((resolve, reject) => {
     const args = [
       "-o",
-      "BatchMode=yes",
-      "-o",
       "ConnectTimeout=10",
       host,
       remoteCmd,
     ];
     execFile(
-      "ssh",
+      USB_SSH,
       args,
       { timeout: timeoutMs, maxBuffer: 1024 * 256 },
       (err, stdout, stderr) => {
@@ -518,7 +517,7 @@ const main = () => {
           // had landed.
           [`--partial-dir=${PARTIAL_DIR_PREFIX}${entry.procId}`]),
       "-e",
-      "ssh",
+      USB_SSH,
       "--timeout=20",
       "--info=progress2",
       src,

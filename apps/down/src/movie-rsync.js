@@ -2,6 +2,7 @@
 // and rsyncs each one to /mnt/media/movies on the local server.
 import childProcess from "node:child_process";
 import fs from "node:fs";
+import { logHere, USB_SSH, unilog} from "@tv/share"
 
 const USB_HOST = "xobtlu@xobtlu.baron.usbx.me";
 const USB_MOVIES_PATH = "/home/xobtlu/movies";
@@ -10,7 +11,7 @@ const LOCAL_MOVIES_PATH = "/mnt/media/movies";
 const QB_HOST = "xobtlu.baron.usbx.me";
 const QB_PORT = 12041;
 const QB_USER = "xobtlu";
-const QB_PASS = "90-TYUrtyasd";
+const QB_CRED_PATH = "/root/dev/apps/tv/apps/api/secrets/qbt-cred.txt";
 
 const NORMAL_INTERVAL_MS = 60 * 1000;
 const FAST_INTERVAL_MS = 5 * 1000;
@@ -49,10 +50,13 @@ let _fastModeStart = 0;
 let _prevFinishedNames = new Set();
 
 async function qbLogin() {
+  const credText = await fs.promises.readFile(QB_CRED_PATH, "utf8");
+  const qbPass = credText.match(/^QB_PASS=(.*)$/m)?.[1];
+  if (!qbPass) throw new Error(`no QB_PASS in ${QB_CRED_PATH}`);
   const res = await fetch(`https://${QB_HOST}/qbittorrent/api/v2/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `username=${encodeURIComponent(QB_USER)}&password=${encodeURIComponent(QB_PASS)}`,
+    body: `username=${encodeURIComponent(QB_USER)}&password=${encodeURIComponent(qbPass)}`,
   });
   const setCookie = res.headers.get("set-cookie") || "";
   const m = setCookie.match(/SID=([^;]+)/);
@@ -69,7 +73,8 @@ async function getMovieTorrents() {
   let cookie;
   try {
     cookie = await getQbtCookie();
-  } catch {
+  } catch (e) {
+    unilog(3115, `movie rsync qbt login failed: ${e.message}`);
     _qbCookie = null;
     return [];
   }
@@ -106,7 +111,7 @@ function startCopyFile(filePath, totalBytes) {
     const stat = fs.statSync(destPath);
     if (totalBytes > 0 && stat.size >= totalBytes) {
       // Copy already done — create .tv-done sidecar on USB so it won't be reprocessed
-      childProcess.spawn("ssh", [
+      childProcess.spawn(USB_SSH, [
         USB_HOST,
         `touch -- '${filePath}.tv-done'; rm -f -- '${filePath}.lftp-pget-status'; true`,
       ]);
@@ -201,7 +206,7 @@ async function runParallelDd(filePath, basename, destPath, totalBytes, job) {
       }
 
       const fileOffset = skipBlocks * BS;
-      const proc = childProcess.spawn("ssh", [
+      const proc = childProcess.spawn(USB_SSH, [
         "-o",
         "Compression=no",
         USB_HOST,
@@ -241,7 +246,7 @@ async function runParallelDd(filePath, basename, destPath, totalBytes, job) {
   job.status = "Finished";
   job._endedAt = Date.now();
   pruneFinishedJobs();
-  childProcess.spawn("ssh", [
+  childProcess.spawn(USB_SSH, [
     USB_HOST,
     `touch -- '${filePath}.tv-done'; rm -f -- '${filePath}.lftp-pget-status'`,
   ]);
@@ -249,7 +254,7 @@ async function runParallelDd(filePath, basename, destPath, totalBytes, job) {
 
 async function findVideoFilesInPath(remotePath) {
   return new Promise((resolve) => {
-    const proc = childProcess.spawn("ssh", [
+    const proc = childProcess.spawn(USB_SSH, [
       USB_HOST,
       `find '${remotePath}' -type f \\( -iname '*.mkv' -o -iname '*.mp4' -o -iname '*.avi' -o -iname '*.m4v' -o -iname '*.ts' \\) -printf '%p\t%s\n' 2>/dev/null | while IFS='\t' read -r p s; do [ ! -f "\${p}.tv-done" ] && printf '%s\t%s\n' "\$p" "\$s"; done`,
     ]);

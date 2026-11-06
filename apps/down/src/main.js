@@ -29,6 +29,7 @@ import {
   resolveShowFolderName,
   downVideoExtensions,
   downFileExtensions,
+  USB_SSH,
 } from "@tv/share";
 
 const __filename = urlNode.fileURLToPath(import.meta.url);
@@ -1455,7 +1456,7 @@ async function main() {
     .map((e) => `-iname '*.${e}'`)
     .concat(`-name '${UNRAR_LOCK}'`)
     .join(" -o ");
-  findUsb = `ssh ${usbHost} \"find files -ignore_readdir_race -type f \\( ${findNames} \\) -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\"`;
+  findUsb = `${USB_SSH} ${usbHost} \"find files -ignore_readdir_race -type f \\( ${findNames} \\) -printf '%CY-%Cm-%Cd-%P-%s\\\\n' 2>/dev/null\"`;
 
   // A scan line's file extension, lower case and without the dot.
   var usbLineExt = function (line) {
@@ -1720,7 +1721,7 @@ async function main() {
           // Same measurement the tor pane uses: per-user `quota` in 1K blocks,
           // hard limit (col 3) is the total, blocks (col 1) is used.
           var { stdout: quotaOut } = await execAsync(
-            `ssh ${usbHost} "quota 2>/dev/null"`,
+            `${USB_SSH} ${usbHost} "quota 2>/dev/null"`,
             { timeout: 60 * 1000 },
           );
           for (const line of String(quotaOut).split("\n")) {
@@ -1755,7 +1756,7 @@ async function main() {
           var cutoffSecs = null;
           try {
             var { stdout: timesOut } = await execAsync(
-              `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 -printf '%T@\\n' 2>/dev/null"`,
+              `${USB_SSH} ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 -printf '%T@\\n' 2>/dev/null"`,
               { timeout: 5 * 60 * 1000 },
             );
             var times = timesOut
@@ -1794,7 +1795,7 @@ async function main() {
             var prunedNames = [];
             try {
               var { stdout: typesOut } = await execAsync(
-                `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 ${oldTest} -printf '%y|%f\\n' 2>/dev/null"`,
+                `${USB_SSH} ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 ${oldTest} -printf '%y|%f\\n' 2>/dev/null"`,
                 { timeout: 5 * 60 * 1000 },
               );
               var types = [];
@@ -1814,7 +1815,7 @@ async function main() {
             }
             try {
               await execAsync(
-                `ssh ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 ${oldTest} -exec rm -rf {} + >/dev/null 2>&1"`,
+                `${USB_SSH} ${usbHost} "find ~/files -mindepth 1 -maxdepth 1 ${oldTest} -exec rm -rf {} + >/dev/null 2>&1"`,
                 { timeout: 5 * 60 * 1000 },
               );
               unilog(
@@ -1844,7 +1845,7 @@ async function main() {
         // After prune completes, scan dirs and prune DB entries.
         try {
           var { stdout: dirsOut } = await execAsync(
-            `ssh ${usbHost} "find files -ignore_readdir_race -type d -printf '%P\\n' 2>/dev/null"`,
+            `${USB_SSH} ${usbHost} "find files -ignore_readdir_race -type d -printf '%P\\n' 2>/dev/null"`,
             { timeout: 300000 },
           );
           var dirs = dirsOut
@@ -2111,7 +2112,7 @@ async function main() {
       if (!allFinished) continue;
       const remotePath = `files/${torrentFolder}`.replace(/'/g, `'\\''`);
       try {
-        await execAsync(`ssh ${usbHost} "rm -rf '${remotePath}'"`, {
+        await execAsync(`${USB_SSH} ${usbHost} "rm -rf '${remotePath}'"`, {
           timeout: 300000,
         });
         unilog(1993, `DVD: deleted finished usb folder "${torrentFolder}"`);

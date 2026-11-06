@@ -3,6 +3,7 @@
 // so the outbound connection originates from the USB server's IP.
 
 import { spawn } from "child_process";
+import { USB_SSH } from "@tv/share";
 
 const USB_SSH_TARGET = "xobtlu@xobtlu.baron.usbx.me";
 
@@ -70,9 +71,7 @@ export async function sshCurlFetch(
   const curlCmd = "curl " + args.map(shellEsc).join(" ");
 
   return await new Promise((resolve) => {
-    const child = spawn("ssh", [
-      "-o",
-      "BatchMode=yes",
+    const child = spawn(USB_SSH, [
       "-o",
       "ConnectTimeout=30",
       "-o",

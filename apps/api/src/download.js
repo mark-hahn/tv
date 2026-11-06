@@ -1,12 +1,10 @@
 import fs from "fs";
 import path from "path";
-import Client from "ssh2-sftp-client";
 import { sshCurlFetch } from "./sshTunnel.js";
-import { loadCreds } from "./qb-cred.js";
 import parseTorrent from "parse-torrent";
 import parseTorrentTitle from "parse-torrent-title";
 
-import { getApiDataDir, getApiSecretsDir } from "./tvPaths.js";
+import { getApiDataDir } from "./tvPaths.js";
 import { unilog } from "@tv/share";
 
 const DOWNLOAD_USER_AGENT =
@@ -401,75 +399,6 @@ function normalizeProvider(rawProvider, detailUrl) {
   )
     return "torrentleech";
   return p || "unknown";
-}
-
-let _cachedCreds;
-async function getCreds() {
-  if (_cachedCreds) return _cachedCreds;
-  const credPath = path.join(getApiSecretsDir(), "download-cred.txt");
-  try {
-    if (!fs.existsSync(credPath)) {
-      throw new Error(`Missing required download credentials: ${credPath}`);
-    }
-  } catch (e) {
-    throw new Error(e?.message || String(e));
-  }
-  const { creds } = await loadCreds(credPath);
-  _cachedCreds = creds;
-  return creds;
-}
-
-function parseSshTarget(sshTarget) {
-  // Basic parse for user@host (ignore ports/options)
-  if (!sshTarget) return undefined;
-  const at = sshTarget.lastIndexOf("@");
-  if (at === -1) return { host: sshTarget };
-  const user = sshTarget.slice(0, at);
-  const host = sshTarget.slice(at + 1);
-  return { user: user || undefined, host: host || undefined };
-}
-
-async function getSftpSettings() {
-  const creds = await getCreds();
-
-  const sshParts = parseSshTarget(creds.SSH_TARGET);
-
-  const host = creds.SFTP_HOST || sshParts?.host;
-  const port = Number(creds.SFTP_PORT || 22);
-  const username = creds.SFTP_USER || creds.SFTP_USERNAME || sshParts?.user;
-  const password = creds.SFTP_PASS || creds.SFTP_PASSWORD;
-
-  const remoteWatchDir =
-    creds.REMOTE_WATCH_DIR ||
-    (username ? `/home/${username}/watch/qbittorrent` : undefined);
-
-  if (!host || !username || !password) {
-    throw new Error(
-      "Missing SFTP config. Put SFTP_PASS and either (SFTP_HOST + SFTP_USER) or SSH_TARGET in apps/api/secrets/download-cred.txt.",
-    );
-  }
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error(`Invalid SFTP_PORT: ${port}`);
-  }
-
-  return {
-    sftpConfig: { host, port, username, password },
-    remoteWatchDir,
-  };
-}
-
-function sanitizeFilenameForWatch(name) {
-  const s = String(name || "").trim();
-  if (!s) return "";
-  // Keep it simple: drop path separators and weird chars.
-  return (
-    s
-      .replace(/[\\/]+/g, "_")
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\x00-\x1F\x7F]+/g, "")
-      .replace(/[^a-zA-Z0-9._\-()\[\] ]+/g, "_")
-      .trim()
-  );
 }
 
 function extractBtih(value) {
@@ -953,96 +882,5 @@ export async function fetchTorrentFile(torrent) {
     downloadUrl: absoluteDownloadUrl,
     bytes: torrentData.length,
     torrentData,
-  });
-}
-
-/**
- * Upload a .torrent buffer to the configured remote watch folder via SFTP.
- */
-export async function uploadTorrentToWatchFolder(
-  torrentData,
-  filenameHint = "",
-) {
-  if (!Buffer.isBuffer(torrentData) || torrentData.length === 0) {
-    return fail("validate", "No torrent data provided");
-  }
-
-  const hash = Math.random().toString(36).substring(2, 15);
-  const hint = sanitizeFilenameForWatch(filenameHint);
-  const base = hint ? hint.replace(/\.torrent$/i, "") : hash;
-  const safeBase =
-    String(base || hash)
-      .slice(0, 120)
-      .trim() || hash;
-  const torrentFilename = `${safeBase}-${hash}.torrent`;
-
-  let sftpConfig;
-  let remoteWatchDir;
-  try {
-    ({ sftpConfig, remoteWatchDir } = await getSftpSettings());
-  } catch (e) {
-    return fail("sftp-config", e?.message || String(e));
-  }
-
-  const remotePath = `${remoteWatchDir}/${torrentFilename}`;
-  const tmpRemotePath = `${remoteWatchDir}/.${torrentFilename}.${hash}.tmp`;
-  const sftp = new Client();
-  try {
-    await sftp.connect(sftpConfig);
-
-    // Atomic-ish write for qBittorrent watch folders:
-    // upload to a temp filename (non-.torrent) so qBittorrent doesn't attempt
-    // to parse it while it's still being written, then rename into place.
-    await sftp.put(torrentData, tmpRemotePath);
-    await sftp.rename(tmpRemotePath, remotePath);
-    await sftp.end();
-  } catch (e) {
-    try {
-      // Best-effort cleanup of temp file.
-      await sftp.delete(tmpRemotePath);
-    } catch {
-      /* ignore */
-    }
-    try {
-      await sftp.end();
-    } catch {
-      /* ignore */
-    }
-    return fail("sftp-put", e?.message || String(e), { remotePath });
-  }
-
-  return ok({
-    remotePath,
-    bytes: torrentData.length,
-    filename: torrentFilename,
-  });
-}
-
-/**
- * Download torrent and prepare for qBittorrent
- * @param {Object} torrent - The complete torrent object
- * @returns {Promise<{success:boolean, stage?:string, reason?:string, provider?:string, httpStatus?:number, httpStatusText?:string, savedFile?:string, cookiesSent?:string[], hasCfClearance?:boolean, downloadUrl?:string, detailUrl?:string, warning?:string}>}
- */
-export async function download(torrent) {
-  if (!torrent || typeof torrent !== "object") {
-    return fail("validate", "Torrent data is required");
-  }
-
-  // fetchTorrentFile already validates the torrent bytes in every branch.
-  const fetched = await fetchTorrentFile(torrent);
-  if (!fetched.success) return fetched;
-
-  const hint =
-    torrent?.raw?.filename || torrent?.raw?.title || "download.torrent";
-  const uploaded = await uploadTorrentToWatchFolder(fetched.torrentData, hint);
-  if (!uploaded.success) return uploaded;
-
-  return ok({
-    provider: fetched.provider,
-    method: fetched.method,
-    downloadUrl: fetched.downloadUrl,
-    remotePath: uploaded.remotePath,
-    filename: uploaded.filename,
-    bytes: fetched.bytes,
   });
 }

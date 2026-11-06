@@ -58,7 +58,8 @@ import {
   isReleaseExtra,
 } from "@tv/share";
 import { ChannelPeer } from "@tv/share/channelPeer";
-import { unilog, setUnilogSink, logHere, getPstDateTimeMs } from "@tv/share";
+import { requireUsbPass } from "@tv/share/usbAuth";
+import { unilog, setUnilogSink, logHere, getPstDateTimeMs, USB_SSH } from "@tv/share";
 import parseTorrentTitlePkg from "parse-torrent-title";
 import {
   getApiDataDir,
@@ -66,6 +67,9 @@ import {
   getApiMiscDir,
   getApiSecretsDir,
 } from "./tvPaths.js";
+
+const USB_CP_PAGE =
+  "https://cp.ultra.cc/#/userservice/5ba78e1c-ac41-40bd-8e82-a8261428829e";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1048,8 +1052,6 @@ app.post("/api/usb/mediainfo", async (req, res) => {
     const execAsync = promisify(execFile);
     const sshArgs = [
       "-o",
-      "BatchMode=yes",
-      "-o",
       "ConnectTimeout=20",
       "-o",
       "StrictHostKeyChecking=no",
@@ -1060,7 +1062,7 @@ app.post("/api/usb/mediainfo", async (req, res) => {
     ];
     const escapedPath = fullPath.replace(/'/g, "'\\''");
     const { stdout } = await execAsync(
-      "ssh",
+      USB_SSH,
       [...sshArgs, USB_HOST_FOR_MEDIAINFO, `mediainfo -- '${escapedPath}'`],
       { maxBuffer: 5 * 1024 * 1024 },
     );
@@ -1096,7 +1098,7 @@ app.post("/api/usb/mediainfo", async (req, res) => {
     let srtsCount = 0;
     try {
       const { stdout: srtOut } = await execAsync(
-        "ssh",
+        USB_SSH,
         [
           ...sshArgs,
           USB_HOST_FOR_MEDIAINFO,
@@ -1125,10 +1127,12 @@ app.post("/api/usb/textfile", async (req, res) => {
   }
 });
 
-app.get("/api/usb/cp-token", async (req, res) => {
+// Opened in a tab rather than fetched, so the browser can ask for the usb
+// password, and no other website can read the token.
+app.get("/api/usb/cp-token", requireUsbPass, async (req, res) => {
   try {
     const token = await usbCpToken();
-    res.json({ token });
+    res.redirect(`${USB_CP_PAGE}?tok=${encodeURIComponent(token)}`);
   } catch (err) {
     res.status(500).json({ error: err?.message || String(err) });
   }

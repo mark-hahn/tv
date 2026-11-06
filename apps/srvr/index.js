@@ -34,6 +34,7 @@ import {
 } from "@tv/share";
 import * as epd from "@tv/share";
 import { unilog, logHere } from "@tv/share";
+import { requireUsbPass } from "@tv/share/usbAuth";
 import chokidar from "chokidar";
 import cron from "node-cron";
 import {
@@ -2117,7 +2118,7 @@ app.get("/api/flexget-config", async (req, res) => {
 
 // Open qBittorrent web UI — auto-login page served from hahnca.com so the
 // SID cookie is set for hahnca.com (which proxies /qbt/ to qBittorrent).
-app.get("/api/qbt-open", async (req, res) => {
+app.get("/api/qbt-open", requireUsbPass, async (req, res) => {
   const QBT_CRED_PATH = path.join(
     path.dirname(SRVR_ROOT_DIR),
     "api",

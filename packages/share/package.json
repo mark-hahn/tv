@@ -6,7 +6,8 @@
   "main": "./src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./channelPeer": "./src/channelPeer.js"
+    "./channelPeer": "./src/channelPeer.js",
+    "./usbAuth": "./src/usbAuth.js"
   },
   "scripts": {
     "dev": "node -e \"console.log('dev: @tv/share (noop)')\"",

@@ -491,6 +491,16 @@ and `./srvr` deploys them.
   the video. When it can't be resolved `video` is null, so no client saves a
   page url into `show.trailers`.
 
+## Actors pane modes (web client, `actors.vue`)
+
+- Regulars is the whole series (TVDB merged with TMDB), Season is the regulars
+  of the season in the Season box, Guests is the episode in both boxes.
+- Season is TMDB alone (`getTmdb` with `credits` and `season`): TVDB's cast has
+  no season data. Who counts as a regular is `tmdbRegulars()`, the same rule
+  as the series list, applied to that season's episode counts.
+- The Season box is prefilled on every show load, so Regulars must not follow
+  it or the whole-series list could not be reached.
+
 ## Button background colors in client panes
 
 - App.vue has a global CSS rule that forces `background-color: var(--btn-bg, whitesmoke) !important` on buttons inside `#tor`, `#info`, `#actors`, `#reviews`, `#qbt`, `#down`, etc.

@@ -23,6 +23,20 @@ export async function getTmdb(params) {
     // If requesting series-level cast/credits data
     if (credits === true && seriesId) {
       try {
+        // One season's cast; each person's episode count is for that season.
+        if (season !== undefined) {
+          try {
+            return await moviedb.seasonAggregateCredits({
+              id: seriesId,
+              season_number: parseInt(season),
+            });
+          } catch (error) {
+            if (error.status !== 404) throw error;
+            unilog(3122, `tmdb 404, season ${season} not found for tmdb series ${seriesId}`);
+            return { cast: [] };
+          }
+        }
+
         // Try the moviedb-promise method first
         let creditsData;
         try {

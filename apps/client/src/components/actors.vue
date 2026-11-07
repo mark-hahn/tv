@@ -342,6 +342,12 @@
             Regulars
           </button>
           <button
+            @click.stop="handleSeasonClick"
+            :style="getSeasonButtonStyle()"
+          >
+            Season
+          </button>
+          <button
             @click.stop="handleGuestClick"
             :style="getGuestsButtonStyle()"
           >
@@ -350,7 +356,7 @@
           <input
             v-model="seasonNum"
             @click.stop
-            @keydown.enter.prevent="handleGuestClick"
+            @keydown.enter.prevent="regularsSeason ? handleSeasonClick() : handleGuestClick()"
             @blur.stop="handleSeasonEpisodeBlur"
             type="text"
             maxlength="2"
@@ -779,6 +785,8 @@ export default {
       episodeNum: "",
       errorMessage: "",
       isGuestMode: false,
+      regularsSeason: "", // The season whose regulars are showing; "" outside Season mode
+      tmdbSeriesId: null, // The show's TMDB id, for its season casts
       showingEpisodeActors: false, // Track if we're showing episode actors
       actorSearchText: "",
       _seriesMapInForArrows: null,
@@ -913,7 +921,13 @@ export default {
     },
 
     getRegularButtonStyle() {
-      return this.getActorsModeButtonStyle(!this.isGuestMode);
+      return this.getActorsModeButtonStyle(
+        !this.isGuestMode && !this.regularsSeason,
+      );
+    },
+
+    getSeasonButtonStyle() {
+      return this.getActorsModeButtonStyle(!!this.regularsSeason);
     },
 
     getGuestsButtonStyle() {
@@ -921,6 +935,13 @@ export default {
     },
 
     async handleSeasonEpisodeBlur() {
+      if (this.regularsSeason) {
+        const season = this.normNonNegIntStr(this.seasonNum);
+        if (season && season !== this.regularsSeason) {
+          await this.handleSeasonClick();
+        }
+        return;
+      }
       if (!this.isGuestMode) return;
       const s = String(this.seasonNum || "").trim();
       const e = String(this.episodeNum || "").trim();
@@ -1461,6 +1482,8 @@ export default {
       this.episodeNum = "";
       this.errorMessage = "";
       this.isGuestMode = false;
+      this.regularsSeason = "";
+      this.tmdbSeriesId = null;
       this.showingEpisodeActors = false;
       this.crew = [];
 
@@ -1512,6 +1535,7 @@ export default {
       this.selectedActor = null;
       this.errorMessage = "";
       this.isGuestMode = true;
+      this.regularsSeason = "";
 
       // If input boxes are empty, auto-fill from map first
       if (!this.seasonNum || !this.episodeNum) {
@@ -1628,10 +1652,105 @@ export default {
       );
     },
 
+    tmdbRegulars(castArray) {
+      // Filter to only include regulars (actors who appeared in multiple episodes)
+      // Use binary search to find the minimum episode threshold that gives us < 10 regulars
+      const TARGET_MAX_REGULARS = 10;
+
+      // Find the max episode count in the data
+      const maxEpisodeCount = Math.max(
+        ...castArray.map((a) => a.total_episode_count || 0),
+      );
+
+      let low = 1;
+      let high = maxEpisodeCount;
+      let bestThreshold = maxEpisodeCount; // Default to max if we can't get < 10
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const count = castArray.filter(
+          (a) => (a.total_episode_count || 0) >= mid,
+        ).length;
+
+        if (count < TARGET_MAX_REGULARS) {
+          // Few enough actors, save this threshold and try lower to get more
+          bestThreshold = mid;
+          high = mid - 1;
+        } else {
+          // Too many actors, need higher threshold
+          low = mid + 1;
+        }
+      }
+
+      const regularsOnly = castArray.filter((actor) => {
+        const episodeCount = actor.total_episode_count || 0;
+        return episodeCount >= bestThreshold;
+      });
+
+      return regularsOnly.map((actor) => {
+        return {
+          name: actor.character || actor.roles?.[0]?.character,
+          personName: actor.name,
+          image: null,
+          personImgURL: null,
+          tmdbPersonId: actor.id,
+          url: null,
+          sort: actor.order,
+          isFeatured: false,
+          source: "tmdb",
+          actorEpiCount: actor.total_episode_count || 0,
+        };
+      });
+    },
+
+    // The regulars of the season in the Season box. TVDB's cast is series-wide,
+    // so this list is TMDB's alone.
+    async handleSeasonClick() {
+      this.selectedActor = null;
+      this.errorMessage = "";
+      this.isGuestMode = false;
+      this.showingEpisodeActors = false;
+
+      const season = this.normNonNegIntStr(this.seasonNum);
+      this.regularsSeason = season;
+      if (!season) {
+        this.errorMessage = "Invalid season";
+        return;
+      }
+
+      let cast = [];
+      try {
+        if (this.tmdbSeriesId) {
+          const credits = await srvr.getTmdb({
+            seriesId: this.tmdbSeriesId,
+            credits: true,
+            season,
+          });
+          cast = credits?.cast || [];
+        }
+      } catch (e) {
+        unilog(3124, `season ${season} cast failed for ${this.showName}: ${e.message}`);
+      }
+
+      const list = this.tmdbRegulars(cast);
+      await this.fillMissingImages(list);
+
+      // The pane may have moved to another mode or season during the fetch.
+      if (this.regularsSeason !== season) return;
+
+      // Photo-bearing first, otherwise in TMDB's billing order.
+      list.sort((a, b) => this.hasAnyImage(b) - this.hasAnyImage(a));
+      this.actors = this.dedupeByPersonName(list);
+      if (this.actors.length === 0) {
+        this.errorMessage = `No cast found for season ${season}`;
+      }
+    },
+
     handleRegularClick() {
       this.selectedActor = null;
       this.errorMessage = "";
       this.isGuestMode = false;
+      this.regularsSeason = "";
       this.showingEpisodeActors = false;
       // Restore series actors
       this.actors = [...this.seriesActors];
@@ -1679,6 +1798,7 @@ export default {
 
       // Arrow navigation always moves through episodes; if in regular mode, switch to guest mode.
       if (!this.isGuestMode) this.isGuestMode = true;
+      this.regularsSeason = "";
 
       if (!this.seasonNum || !this.episodeNum) {
         await this.prefillEpisodeInputs();
@@ -1754,6 +1874,7 @@ export default {
 
       // Arrow navigation always moves through episodes; if in regular mode, switch to guest mode.
       if (!this.isGuestMode) this.isGuestMode = true;
+      this.regularsSeason = "";
 
       if (!this.seasonNum || !this.episodeNum) {
         await this.prefillEpisodeInputs();
@@ -1915,6 +2036,7 @@ export default {
     },
 
     async updateActors(data) {
+      this.tmdbSeriesId = null;
       if (!data) {
         this.actors = [];
         this.showName = "";
@@ -1966,6 +2088,7 @@ export default {
         // Check if we got series metadata with an ID
         if (seriesData && typeof seriesData === "object" && seriesData.id) {
           const seriesId = seriesData.id;
+          this.tmdbSeriesId = seriesId;
 
           // Try to get aggregate_credits using the series ID
           // TMDB API: /tv/{series_id}/aggregate_credits returns all cast across all seasons
@@ -1990,54 +2113,7 @@ export default {
           }
 
           if (castArray && castArray.length) {
-            // Filter to only include series regulars (actors who appeared in multiple episodes)
-            // Use binary search to find the minimum episode threshold that gives us < 10 regulars
-            const TARGET_MAX_REGULARS = 10;
-
-            // Find the max episode count in the data
-            const maxEpisodeCount = Math.max(
-              ...castArray.map((a) => a.total_episode_count || 0),
-            );
-
-            let low = 1;
-            let high = maxEpisodeCount;
-            let bestThreshold = maxEpisodeCount; // Default to max if we can't get < 10
-
-            while (low <= high) {
-              const mid = Math.floor((low + high) / 2);
-              const count = castArray.filter(
-                (a) => (a.total_episode_count || 0) >= mid,
-              ).length;
-
-              if (count < TARGET_MAX_REGULARS) {
-                // Few enough actors, save this threshold and try lower to get more
-                bestThreshold = mid;
-                high = mid - 1;
-              } else {
-                // Too many actors, need higher threshold
-                low = mid + 1;
-              }
-            }
-
-            const regularsOnly = castArray.filter((actor) => {
-              const episodeCount = actor.total_episode_count || 0;
-              return episodeCount >= bestThreshold;
-            });
-
-            tmdbList = regularsOnly.map((actor) => {
-              return {
-                name: actor.character || actor.roles?.[0]?.character,
-                personName: actor.name,
-                image: null,
-                personImgURL: null,
-                tmdbPersonId: actor.id,
-                url: null,
-                sort: actor.order,
-                isFeatured: false,
-                source: "tmdb",
-                actorEpiCount: actor.total_episode_count || 0,
-              };
-            });
+            tmdbList = this.tmdbRegulars(castArray);
           }
         }
       } catch (error) {
@@ -2118,6 +2194,7 @@ export default {
       await this.fillMissingImages(this.actors);
       this.seriesActors = [...this.actors];
       this.isGuestMode = false;
+      this.regularsSeason = "";
       this.showingEpisodeActors = false;
 
       // Load crew (Creator, Executive Producer, Producer, Writer)

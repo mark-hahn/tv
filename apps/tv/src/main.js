@@ -448,9 +448,9 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
-// A movie file's frame rate and res, which tvapp picks the tv's refresh rate
-// by: res is 2160 for a file 4K wide (a scope 4K movie is only ~1600 tall),
-// else 0. Each is 0 when ffprobe can't tell.
+// A movie file's frame rate, which tvapp picks the tv's refresh rate by, and
+// res: 2160 for a file 4K wide (a scope 4K movie is only ~1600 tall), else 0.
+// Each is 0 when ffprobe can't tell.
 async function movieRate(file) {
   try {
     const { stdout } = await execFileAsync("ffprobe", [

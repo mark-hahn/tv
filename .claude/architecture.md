@@ -602,13 +602,14 @@ because the TV is unreachable from any wireless host here.
     show's next-up.
 - `VideoPlayer` gets `/api/getPlayUrl?showName[&season&episode]` from tv-srvr
   and plays the file straight off nginx in Media3 ExoPlayer.
-- Refresh rate: the TV goes to 50 Hz for a 25 or 50 fps video and to 48 Hz
-  for 24 or 23.976 fps (`hzFor` in `VideoPlayer`), so every frame shows
-  equally long; at 60 Hz those rates judder. Any other rate plays at the
-  TV's own 60 Hz. The exception is a 24 or 23.976 fps 4K video (`res` 2160
-  or more: `getPlayUrl`'s for an episode, tv-tv's for a movie), which stays
-  at 60 Hz: at 48 Hz the TV shows 4K frames late and the player skips about
-  one in five, while at 60 Hz it shows them all. The frame rate is
+- Refresh rate: the TV goes to 50 Hz for a 25 or 50 fps video (`hzFor` in
+  `VideoPlayer`), since 25 fps judders at 60 Hz. Everything else plays at the
+  TV's own 60 Hz, including 24 and 23.976 fps. Those were on 48 Hz until
+  11-06, when the same 1080p file juddered on all motion at 48 Hz and looked
+  perfect at 60, as 4K did; at 48 Hz the TV also shows 4K frames late and the
+  player skips about one in five. Judge this by eye: Android's judder count
+  was 3.2% for the play that looked perfect and 1.3% for the one that didn't.
+  The TV's Motion settings made no difference. The frame rate is
   `getPlayUrl`'s `fps` (ffprobe), since
   Media3 can't read it from an mkv. The TV has no seamless switch and goes
   dark through one, so a play that switches starts once the new mode is up
@@ -633,9 +634,10 @@ because the TV is unreachable from any wireless host here.
     chosen one;
   - feeds now-playing.
 - A movie: the local pane's TV button in movie mode has tv-tv send
-  `m,<fps>,<res>,<url>` for the refresh rate (from ffprobe, each 0 if
+  `m,<fps>,<res>,<url>`, `fps` for the refresh rate (from ffprobe, each 0 if
   unknown; `res` is 2160 for a file 3840 or more wide, since a scope 4K
-  movie is only about 1600 tall, else 0), and `VideoPlayer.playMovie`
+  movie is only about 1600 tall, else 0, and no longer sets the rate), and
+  `VideoPlayer.playMovie`
   plays it at once over whatever is
   up, without the list, from the start. nginx serves `/mnt/media/movies` at
   `/movies`. Its title is its file name; there is no `getPlayUrl`, no
@@ -752,7 +754,7 @@ actor filter → filter text → top of list. At the top Back goes to the TV's h
 | `f,<text>` | filter text |
 | `s,<name>` | select that show |
 | `p,<season>,<episode>` | play that episode; sent after an `s` |
-| `m,<fps>,<res>,<url>` | play that movie file at once (the local pane's TV button); fps and res set the refresh rate |
+| `m,<fps>,<res>,<url>` | play that movie file at once (the local pane's TV button); fps sets the refresh rate |
 | `c` | the Custom list changed |
 | `h` | hide key: the watched mark on the Map episode, else hide/unhide the show |
 | `v,<url>` / `v,off` | camera on / off |

@@ -136,16 +136,13 @@ class VideoPlayer extends FrameLayout {
   private static final int PART_GAP_DP = 15;
   // The time bar's row of text, the time included, is dimmed to 60% gray.
   private static final int BAR_TEXT_COLOR = 0xFF999999;
-  // A video plays with the tv at a refresh rate its frame rate divides (see
-  // hzFor), so every frame shows equally long; at 60 Hz 25 fps judders, its
-  // frames held 2, 3, 2, 3, 2 refreshes, and 24 fps 3, 2. The tv stays on a
-  // rate until a video of another plays or tvapp leaves the front
-  // (defaultRate). The tv has no seamless switch and goes dark through one, so
-  // a play that switches starts once the display reports the new mode and
-  // SWITCH_SETTLE_MS more, or after SWITCH_WAIT_MS.
+  // A 25 or 50 fps video plays with the tv at 50 Hz (see hzFor), so every
+  // frame shows equally long; at 60 Hz 25 fps judders, its frames held 2, 3,
+  // 2, 3, 2 refreshes. The tv stays on a rate until a video of another plays
+  // or tvapp leaves the front (defaultRate). The tv has no seamless switch and
+  // goes dark through one, so a play that switches starts once the display
+  // reports the new mode and SWITCH_SETTLE_MS more, or after SWITCH_WAIT_MS.
   private static final long SWITCH_POLL_MS = 100;
-  // A video this tall or taller stays off 48 Hz (see hzFor).
-  private static final int RES_4K = 2160;
   private static final long SWITCH_SETTLE_MS = 500;
   private static final long SWITCH_WAIT_MS = 4000;
 
@@ -439,7 +436,7 @@ class VideoPlayer extends FrameLayout {
     exo.setMediaItem(
         mediaItem(p), resumeMs > 0 ? Math.max(0, resumeMs - RESUME_BACK_MS) : p.optLong("trimPosMs"));
     exo.prepare();
-    if (!switchRate(p.optDouble("fps", 0), res)) exo.play();
+    if (!switchRate(p.optDouble("fps", 0))) exo.play();
     setVisibility(VISIBLE);
   }
 
@@ -448,14 +445,14 @@ class VideoPlayer extends FrameLayout {
     preferMode(0);
   }
 
-  // Puts the tv on the refresh rate for fps and res (see hzFor), each 0 if
-  // unknown. True when the display switches: the video plays once it is done.
-  private boolean switchRate(double fps, int res) {
+  // Puts the tv on the refresh rate for fps (see hzFor), 0 if unknown. True
+  // when the display switches: the video plays once it is done.
+  private boolean switchRate(double fps) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false;
     Display d = getDisplay();
     if (d == null) return false;
     int from = d.getMode().getModeId();
-    int mode = modeFor(d, fps, res);
+    int mode = modeFor(d, fps);
     if (!preferMode(mode)) return false;
     Log.i(TAG, "display mode " + mode + " for " + fps + " fps, from " + from);
     switchFrom = from;
@@ -464,20 +461,20 @@ class VideoPlayer extends FrameLayout {
     return true;
   }
 
-  // The refresh rate a video of fps and res (its height in lines) plays at:
-  // 50 Hz for 25 and 50 fps, 48 for 24 and 23.976 below 4K (the tv's 48 is
-  // exactly 48, so 23.976 shows one frame a refresh longer every ~21 s), else
-  // 0, the tv's own (60 Hz). At 48 Hz the tv shows a 4K video's frames late
-  // and the player skips a fifth of them; at 60 it shows them all.
-  private static int hzFor(double fps, int res) {
+  // The refresh rate a video of fps plays at: 50 Hz for 25 and 50 fps, else 0,
+  // the tv's own (60 Hz). 24 and 23.976 fps stay at 60, frames held 3, 2
+  // refreshes: on this tv they look smooth there and judder on all motion at
+  // 48 Hz, where it also shows a 4K video's frames late and the player skips a
+  // fifth of them.
+  private static int hzFor(double fps) {
     long r = Math.round(fps);
-    return r == 25 || r == 50 ? 50 : r == 24 && res < RES_4K ? 48 : 0;
+    return r == 25 || r == 50 ? 50 : 0;
   }
 
-  // The display's mode at its size for hzFor(fps, res), else 0, the tv's own.
+  // The display's mode at its size for hzFor(fps), else 0, the tv's own.
   @TargetApi(Build.VERSION_CODES.M)
-  private static int modeFor(Display d, double fps, int res) {
-    int hz = hzFor(fps, res);
+  private static int modeFor(Display d, double fps) {
+    int hz = hzFor(fps);
     if (hz == 0) return 0;
     Display.Mode now = d.getMode();
     for (Display.Mode m : d.getSupportedModes())

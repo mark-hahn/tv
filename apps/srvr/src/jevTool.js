@@ -126,10 +126,10 @@ export const makeShowsTool = (states, { jevScore, jevMin } = {}) => {
       ),
       tool(
         "select",
-        "Filter the user's show list down to these shows. Call it when the " +
-          "user asks you to select, filter or pick out shows. Pass every " +
-          "matching show's exact name from the table's name column; a later " +
-          "call replaces an earlier one.",
+        "Filter the user's show list down to these shows. Call it whenever " +
+          "your answer is a set of shows, not just when the user says select " +
+          "or filter. Pass every matching show's exact name from the table's " +
+          "name column; a later call replaces an earlier one.",
         { names: z.array(z.string()).describe("Exact show names.") },
         async ({ names }) => {
           const unknown = names.filter((n) => !known.has(n));

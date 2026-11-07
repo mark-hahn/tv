@@ -168,8 +168,10 @@ const LLM_SYSTEM =
   "the sql tool over a table of them instead: look up only what the " +
   "question needs, and do sorting, counting and totals in SQL rather than " +
   "over rows you fetch. To judge what shows are about, read their overview. " +
-  "When the user asks you to select, filter or pick out shows, also call the " +
-  "select tool with them, which filters the user's show list to them. " +
+  "When your answer is a set of shows, however the user asked (list, which, " +
+  "find, select, filter, pick out), also call the select tool with them, " +
+  "which filters the user's show list to them. Don't call it for a count or " +
+  "for facts about shows. " +
   "Answer from the data, and from what you know of the shows where the data " +
   "says nothing. Be brief. Markdown is rendered.";
 // Added for Auto, which gives Claude the jev tool too.

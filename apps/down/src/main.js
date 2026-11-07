@@ -29,6 +29,7 @@ import {
   resolveShowFolderName,
   downVideoExtensions,
   downFileExtensions,
+  vidIsSampleName,
   USB_SSH,
 } from "@tv/share";
 
@@ -2890,6 +2891,16 @@ async function main() {
         process.nextTick(checkFile);
         return;
       }
+      // Never downloaded, forced or not: a forced torrent lists every file it
+      // has and skips the blocked list below.
+      if (vidIsSampleName(fname)) {
+        blockedCount++;
+        if (skipLoggedOnce(usbFilePath))
+          unilog(3119, `sample skipped: ${fname} (${title || "unknown show"})`);
+        process.nextTick(checkFile);
+        return;
+      }
+
       for (blkName in blocked) {
         if (!processingForced && fname.indexOf(blkName) > -1) {
           blockedCount++;

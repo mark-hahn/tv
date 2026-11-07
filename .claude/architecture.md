@@ -113,6 +113,9 @@ and `./srvr` deploys them.
   mpeg, mpg), subtitles (`.srt`, `.ass`, `.ssa`) and `.nfo`. wmv, rm, ogv,
   flv, 3gp and m2ts are never downloaded: Media3 can't read or seek them, or
   the TV can't decode them.
+- A scene sample (`vidIsSampleName`) is never downloaded, forced or not. A
+  forced torrent sends all its files and forcing skips the blocked names, so
+  `sample` on that list isn't enough.
 - Its usb scan (`find`) lists only those, the DVD pass's VOB/IFO/BUP files
   and the `!unrar.lock` that qbt-unrar.sh keeps in a folder while it
   unpacks; no other file comes over ssh. Forced files get the same filter.

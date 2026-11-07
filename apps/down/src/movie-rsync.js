@@ -2,7 +2,7 @@
 // and rsyncs each one to /mnt/media/movies on the local server.
 import childProcess from "node:child_process";
 import fs from "node:fs";
-import { logHere, USB_SSH, unilog} from "@tv/share"
+import { logHere, USB_SSH, unilog, vidIsSampleName } from "@tv/share"
 
 const USB_HOST = "xobtlu@xobtlu.baron.usbx.me";
 const USB_MOVIES_PATH = "/home/xobtlu/movies";
@@ -274,7 +274,8 @@ async function findVideoFilesInPath(remotePath) {
             path: line.slice(0, tab),
             size: parseInt(line.slice(tab + 1)) || 0,
           };
-        });
+        })
+        .filter((f) => !vidIsSampleName(f.path.split("/").pop()));
       resolve(results);
     });
     proc.on("error", () => resolve([]));

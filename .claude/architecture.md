@@ -576,7 +576,7 @@ because the TV is unreachable from any wireless host here.
 - Trailers never autoplay.
 
 **Sort/filter buttons**
-- Sorts: `Alpha Watched Added Custom`. Filters: `Clear Drama Comedy To Try
+- Sorts: `Watched Added Alpha Custom`. Filters: `Clear Drama Comedy To Try
   Continue Mark Linda Ready Trash`.
 - The first Sort or Filter press focuses its group. Later presses step down
   it, wrapping; up/down step too.

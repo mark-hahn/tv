@@ -64,7 +64,7 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   private static final String SORT_WATCHED = "Watched";
   private static final String SORT_ADDED = "Added";
   private static final String SORT_CUSTOM = "Custom";
-  private static final String[] SORT_LABELS = {SORT_ALPHA, SORT_WATCHED, SORT_ADDED, SORT_CUSTOM};
+  private static final String[] SORT_LABELS = {SORT_WATCHED, SORT_ADDED, SORT_ALPHA, SORT_CUSTOM};
   // The shared settings already filtered and sorted into a show list, by the
   // same @tv/share code the web client runs on its own copy of the data.
   private static final String SHARED_FILTER_SHOWS_URL =
@@ -700,13 +700,13 @@ public class MainActivity extends Activity implements CtrlServer.Listener, Video
   /**
    * Off the Custom list, because something else is narrowing the list now. The
    * settings it came from carried their own sort, so there is no sort of this
-   * app's own to fall back to: it goes alphabetical.
+   * app's own to fall back to: it goes to the default, Watched.
    */
   private void dropCustom(boolean keepSelection) {
     if (!customOn) return;
     Log.i(TAG, "custom off");
     setCustomOn(false);
-    applySort(Shows.Sort.ALPHA, keepSelection);
+    applySort(Shows.Sort.WATCHING, keepSelection);
   }
 
   /**

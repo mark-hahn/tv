@@ -637,11 +637,13 @@ export default {
       downActiveShowNames: [],
       hasLoadedAllShows: false,
       sortChoices: [
-        "Alpha",
-        // The rest are alphabetical by displayed label: Jev shows as AI,
-        // Viewed as Watched (hdrbot.vue's displaySortChoice)
+        // Viewed, shown as Watched, is the default and comes first. The rest
+        // are alphabetical by displayed label: Jev shows as AI (hdrbot.vue's
+        // displaySortChoice)
+        "Viewed",
         "Added",
         "Jev",
+        "Alpha",
         "Country",
         "Creator",
         "Down",
@@ -652,7 +654,6 @@ export default {
         "Ratings",
         "Safe start",
         "Size",
-        "Viewed",
       ],
       fltrChoices: [
         "All",
@@ -1261,9 +1262,9 @@ export default {
         }
       }
 
-      // If no order button is active, default to 'Alpha'
+      // If no order button is active, default to 'Viewed'
       const previousSort = this.sortChoice;
-      this.sortChoice = activeSortOrder || "Alpha";
+      this.sortChoice = activeSortOrder || "Viewed";
 
       // Trigger re-filtering of shows
       await this.select();
@@ -3266,7 +3267,7 @@ export default {
       if (isInitialLoad) {
         this.sortByNew = true;
         this.sortBySize = false;
-        this.sortChoice = "Alpha";
+        this.sortChoice = "Viewed";
         try {
           const saved = localStorage.getItem("showHistory");
           if (saved) {

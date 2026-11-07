@@ -294,11 +294,6 @@
             :movieMode="movieMode"
             @select-show="handleLocalSelectShow"
           ></Local>
-          <Jev
-            v-show="!simpleMode && currentPane === 'jev'"
-            style="width: 100%; height: 100%"
-            :show="currentShow"
-          ></Jev>
           <Log
             v-show="!simpleMode && currentPane === 'log'"
             style="width: 100%; height: 100%"
@@ -699,7 +694,6 @@ import Qbt from "./qbt.vue";
 import Down from "./down.vue";
 import Usb from "./usb.vue";
 import Local from "./local.vue";
-import Jev from "./jev.vue";
 import Log from "./log.vue";
 import Plot from "./plot.vue";
 import Queues from "./queues.vue";
@@ -741,7 +735,6 @@ export default {
     Usb,
     Down,
     Local,
-    Jev,
     Log,
     Plot,
     Queues,
@@ -1093,7 +1086,6 @@ export default {
         { label: "Down", key: "down" },
         { label: "Queues", key: "queues" },
         { label: "Local", key: "local" },
-        { label: "AI", key: "jev" },
         { label: "Log", key: "log" },
         { label: "Plot", key: "plot" },
       ];
@@ -1886,7 +1878,7 @@ export default {
       if (!k) return;
 
       // --- Guard layer ---
-      // Preview mode: tabs to the right of AI are disabled.
+      // Preview mode: these tabs are disabled.
       if (
         this.previewMode &&
         ["flex", "qbt", "usb", "down", "local"].includes(k)
@@ -2386,16 +2378,8 @@ export default {
       this.torEpisodeRequest = { show, episodes, seq: this._torEpisodeSeq };
     });
 
-    // A selection the list made itself, for an AI query's filter, rather
-    // than a click: keepPaneOnce comes just before its setUpSeries.
-    evtBus.on("keepPaneOnce", () => {
-      this._keepPaneOnce = true;
-    });
-
     // show-selected: fired when the user picks a new show from the list.
     evtBus.on("setUpSeries", (show) => {
-      const keepPane = this._keepPaneOnce;
-      this._keepPaneOnce = false;
       // --- State update (always) ---
       this.currentShow = show;
       this.currentTvdbData = null; // stale until series pane publishes new data
@@ -2412,7 +2396,6 @@ export default {
       }
 
       // --- Guard layer (keep current pane, no switch) ---
-      if (keepPane) return;
       // Priority 1: map — list.vue handles map content update separately.
       if (prevPane === "map") return;
 

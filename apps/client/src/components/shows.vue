@@ -221,10 +221,6 @@ export default {
 
   computed: {
     sortColumnWidth() {
-      // No row has anything to show, as with the AI sort after Claude picked
-      // shows: hide the column.
-      if (!this.shows.some((sh) => String(this.getSortDisplayValue(sh) ?? "")))
-        return "0";
       const widths = {
         Alpha: "0",
         Viewed: "75px",
@@ -237,7 +233,6 @@ export default {
         Premiered: "75px",
         Length: "25px",
         Creator: "0",
-        Jev: "45px",
       };
       return widths[this.sortChoice] || "75px";
     },

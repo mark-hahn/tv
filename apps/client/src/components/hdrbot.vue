@@ -172,13 +172,9 @@ export default {
   methods: {
     sortChange(e) {
       this.$emit("sort-action", e.target.value);
-      // Back to the current sort, so a choice that does nothing (Jev with no
-      // jev query) shows nothing; one that took re-renders over this.
-      e.target.value = this.selectedSort;
     },
     displaySortChoice(sortChoice) {
       if (sortChoice === "Viewed") return "Watched";
-      if (sortChoice === "Jev") return "AI";
       return String(sortChoice || "");
     },
     condFltrColor(cond) {

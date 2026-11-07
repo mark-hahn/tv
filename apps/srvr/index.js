@@ -19,7 +19,6 @@ import * as season0 from "./src/season0.js";
 import * as util from "./src/util.js";
 import * as email from "./src/email.js";
 import * as tmdb from "./src/tmdb.js";
-import { jevQuery, monthCost as jevMonthCost } from "./src/jev.js";
 import { handleFix, readFixState, tailFixLog } from "./src/fix.js";
 import { parse as parseTorrentTitle } from "parse-torrent-title";
 import {
@@ -1536,27 +1535,6 @@ app.post(
 );
 app.post("/api/searchActorsOutsideLibrary", apiWrapper(tvdb.searchActorsOutsideLibrary));
 app.post("/api/getTmdb", apiWrapper(tmdb.getTmdb));
-app.post("/api/jevQuery", apiWrapper(jevQuery));
-app.get(
-  "/api/jevMonthCost",
-  apiWrapper(async () => ({ monthCost: jevMonthCost() })),
-);
-// Claude's side of jevQuery, streamed: one JSON object a line as the question
-// runs, then {done: <the result>} or {error}. X-Accel-Buffering stops nginx
-// holding the lines back until the end.
-app.post("/api/jevQueryStream", async (req, res) => {
-  res.locals.slowExempt = true;
-  res.setHeader("Content-Type", "application/x-ndjson");
-  res.setHeader("X-Accel-Buffering", "no");
-  const send = (obj) => res.write(JSON.stringify(obj) + "\n");
-  try {
-    send({ done: await jevQuery(req.body, send) });
-  } catch (e) {
-    unilog(2754, `claude query failed: ${e.message}`);
-    send({ error: e.message });
-  }
-  res.end();
-});
 app.post("/api/getPersonImages", apiWrapper(tmdb.getPersonImages));
 app.post("/api/getStreamProviders", apiWrapper(tmdb.getStreamProviders));
 // A GET, unlike the other tmdb calls: the tv app asks for one card's image at

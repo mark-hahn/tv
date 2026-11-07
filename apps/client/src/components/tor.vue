@@ -2568,8 +2568,8 @@ export default {
     // A file's factors for compareRelease from its name and size.
     nameFactors(name, bytes) {
       const group = String(
-        parseTorrentTitle(String(name || "").replace(/\.[a-z0-9]{2,4}$/i, ""))
-          ?.group || "",
+        parseTorrentTitle
+          .parse(String(name || "").replace(/\.[a-z0-9]{2,4}$/i, ""))?.group || "",
       ).toLowerCase();
       return {
         ...releaseFactors(name),
@@ -5199,6 +5199,20 @@ export default {
       util.openExternalPage(first.detailUrl);
     },
 
+    // checkPicks for Send and Hold. A check that can't finish sends nothing
+    // and says why, so the click is never silently lost.
+    async askPicks() {
+      try {
+        return await this.checkPicks([...this.selectedItems], true);
+      } catch (e) {
+        unilog(3120, `send check failed: ${e.message}`);
+        this.showError(
+          `Nothing was sent. The check before sending failed:\n\n${this.getErrorMessage(e)}`,
+        );
+        return [];
+      }
+    },
+
     // Send: enqueue download for each selected torrent
     async torSendClick() {
       this.sendFlash = true;
@@ -5206,10 +5220,7 @@ export default {
       this._sendFlashTimer = window.setTimeout(() => {
         this.sendFlash = false;
       }, 500);
-      for (const { torrent, force } of await this.checkPicks(
-        [...this.selectedItems],
-        true,
-      )) {
+      for (const { torrent, force } of await this.askPicks()) {
         void this.enqueueDownload(torrent, { forceDownload: force });
       }
     },
@@ -5223,10 +5234,7 @@ export default {
       this._holdFlashTimer = window.setTimeout(() => {
         this.holdFlash = false;
       }, 500);
-      for (const { torrent, force } of await this.checkPicks(
-        [...this.selectedItems],
-        true,
-      )) {
+      for (const { torrent, force } of await this.askPicks()) {
         void this.enqueueDownload(torrent, { forceDownload: force, hold: true });
       }
     },

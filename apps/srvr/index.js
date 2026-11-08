@@ -2286,15 +2286,16 @@ app.get(
 
 // The glued words of the subtitle files of a show's videos split
 // (subPrepare.fixGluedSidecars; scripts/fix-glued-subs.js drives it, show by
-// show). With dryRun=1 nothing is written.
+// show). With dryRun=1 nothing is written; with unwatchedAsr=1 only unwatched
+// episodes with a `+` file are done.
 app.get(
   "/api/fixGluedSubs",
-  apiWrapper(async ({ showName, dryRun }) => {
+  apiWrapper(async ({ showName, dryRun, unwatchedAsr }) => {
     const rec = tvdb.getAllTvdbSync()?.[showName];
     if (!rec) throw new Error(`fixGluedSubs: no show ${showName}`);
     const videos = [];
     epd.forEachEpisode(rec.episodeData, (season, episode, ep) => {
-      if (!ep.file) return;
+      if (!ep.file || (unwatchedAsr === "1" && ep.watched)) return;
       videos.push(
         epd.getFullPath(
           rec.episodeData,
@@ -2306,9 +2307,26 @@ app.get(
       );
     });
     const files = [];
-    for (const video of videos)
-      files.push(...(await subPrepare.fixGluedSidecars(video, { dryRun: dryRun === "1" })));
-    return { videos: videos.length, files };
+    let done = 0;
+    for (const video of videos) {
+      if (unwatchedAsr === "1") {
+        const asr = await fsp.stat(`${video.replace(/\.[^.]+$/, "")}.asr.srt`).catch(() => null);
+        if (!asr) continue;
+      }
+      done++;
+      const fixed = await subPrepare.fixGluedSidecars(video, { dryRun: dryRun === "1" });
+      files.push(...fixed.map((f) => ({ ...f, dir: path.dirname(video) })));
+    }
+    return { videos: done, files };
+  }),
+);
+
+// A sidecar put back from a file on the server (subPrepare.replaceSidecar).
+app.get(
+  "/api/replaceSidecar",
+  apiWrapper(async ({ videoPath, file, textFile }) => {
+    await subPrepare.replaceSidecar(videoPath, file, textFile);
+    return { ok: true };
   }),
 );
 

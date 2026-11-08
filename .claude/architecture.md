@@ -297,48 +297,56 @@ and `./srvr` deploys them.
   a log line, never an error entry.
 - Glued words (`apps/srvr/src/subGlue.js`): words run together where a
   release's converter dropped a line break ("thisbefore") are split, in
-  every sidecar but `+`. A word that is not common itself is split into the
-  likeliest common words it can be read as, by counts from OpenSubtitles'
-  English text (`data/glueWords.txt` on hahnca.com, built by
-  `scripts/glue-words.js` from `data/glue-src/`), when all of:
+  every sidecar but `+`. The word table is `data/glueWords.txt` on
+  hahnca.com, built by `scripts/glue-words.js` from `data/glue-src/`:
+  OpenSubtitles' English word counts and Debian's dictionaries. A word is
+  split when all of:
   - it is at least 4 letters long; it is not capitalized mid-sentence
     (after "Mr.", "Mrs.", "Ms." or "Dr." too), nor anywhere in its file so
     (a name), unless its first word is "I"; not in capitals or with a
     capital inside; not a dropped g ("stuffin'"), a stutter, part of a
-    hyphenated word, or a contraction that is one ("C'mon", "I'ma");
+    hyphenated word or of a word with an accented letter ("piñatas"), or a
+    contraction that is one ("C'mon", "I'ma");
+  - it is not in an English dictionary (Debian's huge American and British
+    lists, names included). A count in OpenSubtitles does not make a word
+    real: that text has glued words too ("ofthe" 4,893 times);
+  - it can be read as 2 or 3 words of the mid-size dictionaries, lower case
+    only, the likeliest reading by their counts. Two-letter words come from
+    a short list (`TWO_LETTER`), and the halves of contractions ("re", "ll",
+    "don") are never used, so "youre" stays;
   - another word of its cue is very common English (the 105 or so words
     that turn up a million times, "the", "you", "on"), so other languages
-    are left alone; or a word it is likely split into is, in a file where
-    at least half the cues have such a word ("Wedon't call itanything!";
-    a French file has a quarter, so its "sois" is never "so is");
-  - it is not in an English dictionary (Debian's huge American and British
-    lists, names included);
-  - it turns up at most twice in its file and in no other episode's
-    subtitle files of the show: names, slang and compounds recur. The T
-    and H copies of videos of its own release group are left out of that,
-    since a release's converter glues the same words in every episode
+    are left alone; or a word it is split into is, in a file where at least
+    half the cues have such a word ("Wedon't call itanything!"; a French
+    file has a quarter, so its "sois" is never "so is");
+  - it turns up at most twice in its file and in at most one other episode's
+    subtitle files of the show: names, slang and a show's own words recur.
+    The T and H copies of videos of its own release group are left out of
+    that, since a release's converter glues the same words in every episode
     ("youthink");
-  - the words apart are 100 times likelier than the word, or another
-    sidecar of the video has them apart within 10 s of the cue; a sibling
-    alone is not enough, since opn files have stray spaces of their own and
-    compounds are spelled both ways;
-  - no V or `+` file of the video has the word itself within 10 s of the
-    cue;
-  - and its file has at least 3 such words with a word as common as "the"
-    or "his" in them: a release that glues words glues many, and the other
-    files hold compounds ("airfreight").
+  - the words apart are 100 times likelier than the word by their counts and
+    its own, or another sidecar of the video (the `+` file too) has them
+    apart within 10 s of the cue.
+  Compounds written as one word that are in no dictionary get split too
+  ("rearview"); that is accepted, since they read correctly. Words split
+  wrongly go in `NEVER_SPLIT` in subGlue.js ("doof"). To put a file back from
+  a backup use `/api/replaceSidecar?videoPath=&file=&textFile=`: a write
+  behind tv-srvr's back reads as a hand timing.
   "an" before a consonant or "a" before a vowel is never a split. A
   video's sidecars are gone over again until none changes. A rewritten file
   keeps its check (no timing moves), and the watcher's change event for it
   is not a hand timing. It runs in a sub queue entry after the copy-out and
   naming, before vetting, and from the watcher for a sidecar tv-srvr
-  named arriving later. `/api/fixGluedSubs?showName=[&dryRun=1]` does a
-  show; `scripts/fix-glued-subs.js [--dry]` drives it over the library.
+  named arriving later. `/api/fixGluedSubs?showName=[&dryRun=1][&unwatchedAsr=1]` does a
+  show (the last: only its unwatched episodes with a `+` file); `scripts/fix-glued-subs.js [--dry]` drives it over the library.
   The first pass (10-21) split 586 words in 76 files; their originals are in
   `data/glue-backup/` on hahnca.com. The second (10-25, after the rules
   above for 4-letter words, titles, hyphens, cues English only by their
   glued words, and the same release's copies) split 55 words in 15 files;
-  their originals are in `data/glue-backup-1025/`.
+  their originals are in `data/glue-backup-1025/`. The rules above date from
+  11-08; the table they replaced is `data/glueWords.txt.bak-20261108`. That day's
+  pass over unwatched episodes with a `+` file split 536 words in 372 files;
+  originals and per-split stats are in `data/glue-backfill-1108/`.
 - Subtitle vetting (`apps/srvr/src/subVet.js`, the judge `subJudge.js`;
   the design in `subs-final-plan.md`, the work log in `subs-test.md`)
   decides which files a video keeps and which get a ✓. It replaced the older

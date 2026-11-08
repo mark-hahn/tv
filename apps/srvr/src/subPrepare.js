@@ -352,6 +352,20 @@ export async function glueSidecars(videoPath, { only = null, dryRun = false } = 
   return [...out].map(([file, fixes]) => ({ file, fixes }));
 }
 
+// A sidecar of the video replaced by the text of textFile, such as a backup
+// of it from before a glue fix. Its check stays, so the text must have the
+// same timing.
+export async function replaceSidecar(videoPath, file, textFile) {
+  return withVideo(videoPath, async () => {
+    if (!subs.listSidecars(videoPath).some((s) => s.file === file))
+      throw new Error(`replaceSidecar: ${file} is not a sidecar of ${videoPath}`);
+    const full = path.join(path.dirname(videoPath), file);
+    await fsp.writeFile(full, await fsp.readFile(textFile, "utf8"), "utf8");
+    subs.restatCheck(full);
+    await noteRewrite(full);
+  });
+}
+
 // The video is gone, and so is what was learned about it.
 export function forgetVideo(videoPath) {
   subs.forgetVideo(videoPath);

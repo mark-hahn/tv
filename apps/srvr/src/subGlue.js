@@ -1,29 +1,28 @@
 // Glued words in subtitle files: two or more words run together, the space
 // between them lost, most often where a release's converter dropped a line
-// break ("thisbefore", "you'reexploiting"). A word that is not a common word
-// itself is split into the likeliest words it can be read as, by how often
-// each turns up in OpenSubtitles' English text (glueWords.txt, built by
-// scripts/glue-words.js), when all of:
+// break ("thisbefore", "you'reexploiting"). Two tests: a word in an English
+// dictionary (Debian's huge lists, names included) is never split, and one
+// that is not is split whenever it can be read as two to MAX_PARTS words of
+// a plain dictionary (Debian's mid-size lists, lower case only), the
+// likeliest reading by how often each word turns up in OpenSubtitles'
+// English text (glueWords.txt, built by scripts/glue-words.js). Besides:
+//   - its cue must be English: another of its words is a very common English
+//     one, or a word it is split into is and half its file's cues have
+//     another such word (a French file's "sois" is not "so is");
+//   - the halves of contractions ("re", "ll", "don") and two-letter words
+//     but TWO_LETTER are never words it is split into ("youre" stays);
 //   - it is not capitalized mid-sentence (after "Mr." too), nor anywhere in
 //     its file so (a name), unless its first word is "I"; a word in capitals,
 //     or with a capital inside it, is left alone, and so are a dropped g
-//     ("stuffin'") and a stutter ("ffff");
-//   - it is not in an English dictionary;
-//   - it turns up at most MAX_REPEATS times in its file, and in no other
-//     episode's subtitle files of the show: names, slang and compounds recur,
-//     glued words do not, but for the T and H copies of the video's release
-//     group, which are left out: its converter glues the same words in every
-//     episode ("youthink");
-//   - the words apart are SPLIT_ODDS times likelier than the word, or another
-//     sidecar of the video has them apart near the cue;
-//   - no OpenSubtitles download or .asr.srt of the video has the word itself
-//     near the cue, and another word of its cue is a very common English
-//     one, or a word one of its glued words is likely split into is and half
-//     its file's cues have another such word;
-//   - it is not part of a hyphenated word;
-//   - and its file has at least MIN_FILE_GLUED such words with a word like
-//     "the" or "his" in them: a release that glues words glues many, while
-//     the others hold compounds ("airfreight").
+//     ("stuffin'"), a stutter ("ffff") and part of a hyphenated word;
+//   - it turns up at most MAX_REPEATS times in its file and in at most
+//     MAX_OTHER_EPISODES other episodes' subtitle files of the show: names,
+//     slang and a show's own words recur, glued words do not, but for the T
+//     and H copies of the video's release group, which are left out: its
+//     converter glues the same words in every episode ("youthink");
+//   - the words apart are SPLIT_ODDS times likelier than the word as
+//     written, by their counts and its own, or another sidecar of the video
+//     has them apart near the cue.
 // "an" before a consonant, or "a" before a vowel, is never a split.
 
 import fsp from "fs/promises";
@@ -38,13 +37,33 @@ import {
 import { sidecarType } from "./subOrigin.js";
 
 const TV_DIR = "/mnt/media/tv";
+
 const GLUE_WORDS_PATH = "/root/dev/apps/tv/apps/srvr/data/glueWords.txt";
-// How often a word must turn up in OpenSubtitles' text to be a common word:
-// one a glued word can be split into, and one that is never split itself.
-// "a" and "i" are the only one-letter words a glued word is split into.
+// How often a word must turn up in OpenSubtitles' text to be a common word
+// (the dropped-g test, and subOcr.js's counts).
 export const MIN_PART = 200;
+// The two-letter words a glued word can be split into: even the plain
+// dictionary has abbreviations ("cf", "kg", "re").
+const TWO_LETTER = new Set([
+  "ah", "am", "an", "as", "at", "aw", "ax", "be", "by", "do", "eh", "ex", "go",
+  "ha", "he", "hi", "ho", "if", "in", "is", "it", "ma", "me", "my", "no", "of",
+  "oh", "on", "or", "ow", "ox", "pa", "so", "to", "uh", "um", "up", "us", "we",
+  "ye", "yo",
+]);
 // How much likelier the words apart must be than the word as written.
 const SPLIT_ODDS = 100;
+// How often a glued word can turn up in its file, and in how many other
+// episodes of its show.
+const MAX_REPEATS = 2;
+const MAX_OTHER_EPISODES = 1;
+// Words in no dictionary that the rules split wrongly ("doof": do of). Add to
+// this when one turns up.
+const NEVER_SPLIT = new Set([
+  "anois", "assesin", "atas", "dogsit", "doinit", "doof", "exceptis", "forseen",
+  "herob", "ishy", "mathing", "meso", "middleism", "nowish", "penwomanship",
+  "probat", "promy", "redrum", "tono", "unclearable", "ushe", "wellstone",
+  "windo", "yoas",
+]);
 // How often a word the list does not have is counted as turning up.
 const UNSEEN = 0.5;
 // The shortest word looked at ("Igot").
@@ -68,14 +87,8 @@ const VE_HEADS = new Set([
 // ("don" "t"), which a glued word is never split into but before an
 // apostrophe.
 const FRAGMENTS = new Set(["re", "ve", "ll", ...NT_HEADS].filter((w) => w !== "can" && w !== "won"));
-const MAX_REPEATS = 2;
-const MIN_FILE_GLUED = 3;
-// How often a word must turn up for a glued word with it in to count towards
-// MIN_FILE_GLUED ("the", "his", "but"): two other words run together are
-// most often a compound ("airfreight").
-const PLAIN_MIN = 500000;
 // A cue is read only when another of its words, or a word one of its glued
-// words is likely split into ("Wedon't call itanything!"), turns up this
+// words is split into ("Wedon't call itanything!"), turns up this
 // often: the rest are another language, or too short to tell.
 const ENGLISH_MIN = 1000000;
 // A cue English only by what its glued words are split into is read only in
@@ -102,10 +115,12 @@ const wordsOf = (text) => lower(text).match(/[a-z]+(?:'[a-z]+)*/g) ?? [];
 
 let tablePromise = null;
 
-// The word table: {counts, never, total}. counts has the common words' counts
-// in OpenSubtitles' text, never the real words a glued word's split would
-// otherwise be taken for, total the count of all words. subOcr.js reads it
-// too (wordTable).
+// The word table: {counts, pieces, own, real, total}. counts has the common
+// words' counts in OpenSubtitles' text, pieces the plain dictionary's words,
+// those a glued word is split into, with theirs (0 for none), own those of
+// the list's words that would be split, real the huge dictionaries' words,
+// never split, total the count of all words. subOcr.js reads it too
+// (wordTable).
 function table() {
   tablePromise ??= loadTable().catch((e) => {
     tablePromise = null;
@@ -118,7 +133,9 @@ export const wordTable = table;
 
 async function loadTable() {
   const counts = new Map();
-  const never = new Set();
+  const pieces = new Map();
+  const own = new Map();
+  const real = new Set();
   let total = 0;
   for (const line of (await fsp.readFile(GLUE_WORDS_PATH, "utf8")).split("\n")) {
     if (!line) continue;
@@ -127,17 +144,21 @@ async function loadTable() {
       continue;
     }
     const sp = line.indexOf(" ");
-    if (sp < 0) never.add(line);
+    if (sp < 0) real.add(line);
+    else if (line[0] === "+") pieces.set(line.slice(1, sp), Number(line.slice(sp + 1)));
+    else if (line[0] === "=") own.set(line.slice(1, sp), Number(line.slice(sp + 1)));
     else counts.set(line.slice(0, sp), Number(line.slice(sp + 1)));
   }
   if (!total) throw new Error(`${GLUE_WORDS_PATH} has no #total line`);
-  return { counts, never, total };
+  if (!pieces.size) throw new Error(`${GLUE_WORDS_PATH} has no +pieces: rebuild it`);
+  return { counts, pieces, own, real, total };
 }
 
 const common = (w, t) => (t.counts.get(w) ?? 0) >= MIN_PART;
 const isPart = (w, t) =>
-  (w.length >= 2 || w === "a" || w === "i") && !FRAGMENTS.has(w) && common(w, t);
-const logP = (w, t) => Math.log((t.counts.get(w) ?? UNSEEN) / t.total);
+  (w.length >= 3 ? t.pieces.has(w) : w.length === 2 ? TWO_LETTER.has(w) : w === "a" || w === "i") &&
+  !FRAGMENTS.has(w);
+const logP = (w, t) => Math.log((t.pieces.get(w) || UNSEEN) / t.total);
 
 // Whether w'suffix is a contraction.
 function contraction(w, suffix, t) {
@@ -148,7 +169,7 @@ function contraction(w, suffix, t) {
   return isPart(w, t);
 }
 
-// The likeliest way to write w, letters only, as two to MAX_PARTS common
+// The likeliest way to write w, letters only, as two to MAX_PARTS plain
 // words, "a" or "i" only first: {parts, score}, score the sum of their log
 // likelihoods, or null. With suffix, the last word is one that takes it as a
 // contraction.
@@ -171,32 +192,31 @@ function segment(w, t, suffix) {
 }
 
 // How tok, a lower-case word with plain apostrophes, would be split:
-// {parts, likely, known}, or null when it is a common word or can't be split.
-// likely when the parts are SPLIT_ODDS times likelier than tok, known when tok
-// is a real word (t.never). A contraction's ending stays on its word ("whatshe's": what she's),
-// and one run into the next word is split after it ("you'reexploiting":
-// you're exploiting).
+// {parts, likely}, or null when it is a real word or can't be split; likely
+// when the parts are SPLIT_ODDS times likelier than tok as written. A
+// contraction's ending stays on its word ("whatshe's": what she's), and one
+// run into the next word is split after it ("you'reexploiting": you're
+// exploiting).
 export function splitGlued(tok, t) {
   const m = /^([a-z]+)(?:'([a-z]+))?$/.exec(tok);
-  if (!m) return null;
+  if (!m || t.real.has(tok)) return null;
   const [, head, tail] = m;
   let parts, score, asOne;
   if (tail === undefined || SUFFIXES.includes(tail)) {
-    if (common(head, t)) return null;
+    if (t.real.has(head) || NEVER_SPLIT.has(head)) return null;
     const seg = segment(head, t, tail);
     if (!seg) return null;
     parts = seg.parts;
     if (tail !== undefined) parts[parts.length - 1] += `'${tail}`;
     score = seg.score;
-    asOne = logP(head, t);
+    asOne = Math.log((t.own.get(head) || t.counts.get(head) || UNSEEN) / t.total);
   } else {
     const suffix = SUFFIXES.find((s) => tail.startsWith(s) && tail.length > s.length);
     if (!suffix || !contraction(head, suffix, t)) return null;
     const rest = tail.slice(suffix.length);
     if (rest.length < MIN_RUN_INTO_LEN) return null;
-    const seg = isPart(rest, t)
-      ? { parts: [rest], score: logP(rest, t) }
-      : segment(rest, t);
+    const seg =
+      isPart(rest, t) || t.real.has(rest) ? { parts: [rest], score: logP(rest, t) } : segment(rest, t);
     if (!seg || seg.parts.length >= MAX_PARTS) return null;
     parts = [`${head}'${suffix}`, ...seg.parts];
     score = logP(head, t) + seg.score;
@@ -209,15 +229,13 @@ export function splitGlued(tok, t) {
       (parts[i - 1] === "a" && /^[aeio]/.test(parts[i]))
     )
       return null;
-  const likely = score - asOne > Math.log(SPLIT_ODDS);
-  return { parts, likely, known: t.never.has(tok) || t.never.has(head) };
+  return { parts, likely: score - asOne > Math.log(SPLIT_ODDS) };
 }
 
 // ---- the words of a show's other episodes ----
 
 // showDir -> {at, words}; words maps a word to a Map from where it came from
-// (copyGroup) to the one episode it is in, or to "*" when it is in more than
-// one.
+// (copyGroup) to the Set of episodes it is in.
 const showWordsCache = new Map();
 
 const showDirOf = (videoPath) =>
@@ -272,9 +290,8 @@ async function showWords(showDir) {
       for (const w of new Set(wordsOf(await fsp.readFile(path.join(dir, d.name), "utf8")))) {
         let byFrom = words.get(w);
         if (!byFrom) words.set(w, (byFrom = new Map()));
-        const k = byFrom.get(from);
-        if (k === undefined) byFrom.set(from, key);
-        else if (k !== key) byFrom.set(from, "*");
+        if (!byFrom.has(from)) byFrom.set(from, new Set());
+        byFrom.get(from).add(key);
       }
     }
   }
@@ -282,18 +299,22 @@ async function showWords(showDir) {
   return words;
 }
 
-// Those of toks in a subtitle file of another episode of the video's show,
-// leaving out the T and H copies of videos of its own release group: the
-// release's converter glues the same words in every episode.
+// Those of toks in the subtitle files of more than MAX_OTHER_EPISODES other
+// episodes of the video's show, leaving out the T and H copies of videos of
+// its own release group: the release's converter glues the same words in
+// every episode.
 async function seenInOtherEpisodes(videoPath, toks) {
   const words = await showWords(showDirOf(videoPath));
   const videoName = path.basename(videoPath);
   const mine = episodeKey(path.dirname(videoPath), videoName);
   const group = releaseGroup(videoName.replace(/\.[^.]+$/, ""));
   return new Set(
-    [...toks].filter((w) =>
-      [...(words.get(w) ?? [])].some(([from, k]) => k !== mine && !(group && from === group)),
-    ),
+    [...toks].filter((w) => {
+      const others = new Set();
+      for (const [from, keys] of words.get(w) ?? [])
+        if (!(group && from === group)) for (const k of keys) if (k !== mine) others.add(k);
+      return others.size > MAX_OTHER_EPISODES;
+    }),
   );
 }
 
@@ -322,15 +343,14 @@ function written(f) {
 }
 
 // The srt text of a sidecar of videoPath with its glued words split, read
-// beside siblings, the video's other sidecars ([{text, outside}], outside for
-// an OpenSubtitles download or its .asr.srt, which come from outside the
-// release): {text, fixes: [{from, to, confirmed}]}, confirmed when a sibling
-// has the words apart; null when nothing is glued.
+// beside siblings, the video's other sidecars ([{text}]): {text, fixes:
+// [{from, to, likely, confirmed}]}, confirmed when a sibling has the words
+// apart near the cue; null when nothing is glued.
 export async function fixGlued(videoPath, text, siblings) {
   const t = await table();
   const entries = parseSrt(text);
-  const counts = new Map();
   const names = new Set();
+  const counts = new Map();
   const found = [];
   // Those of cues English only by what their glued words are split into.
   const bySplit = [];
@@ -351,6 +371,8 @@ export async function fixGlued(videoPath, text, siblings) {
         // A dropped letter ("stuffin'", "'bout") or a stutter ("ffff").
         const around = `${line[m.index - 1] ?? ""}${line[m.index + word.length] ?? ""}`;
         if (/['’]/.test(around) || /^(.{1,3})\1+$/.test(tok)) continue;
+        // A piece of a word with an accented letter ("piñatas").
+        if (/[\p{L}\p{M}]/u.test(around)) continue;
         // Part of a hyphenated word ("aRangoo-o-onian").
         if (
           /[A-Za-z]-$/.test(line.slice(0, m.index)) ||
@@ -366,39 +388,24 @@ export async function fixGlued(videoPath, text, siblings) {
     if (english) {
       englishCues++;
       found.push(...inCue);
-    } else if (inCue.some((f) => f.likely && f.parts.some(veryCommon))) bySplit.push(...inCue);
+    } else if (inCue.some((f) => f.parts.some(veryCommon))) bySplit.push(...inCue);
   });
   if (englishCues >= entries.length * ENGLISH_FILE_SHARE) found.push(...bySplit);
   const iFirst = (f) => f.parts[0] === "i" || f.parts[0].startsWith("i'");
   const cands = found.filter(
     (f) =>
       (iFirst(f) || (!names.has(f.tok) && (!f.capital || f.start))) &&
-      !f.known &&
       counts.get(f.tok) <= MAX_REPEATS,
   );
-  // Enough glued words with a plain word in them.
-  const enough = (fs) =>
-    new Set(
-      fs
-        .filter((f) => f.parts.some((p) => (t.counts.get(p.split("'")[0]) ?? 0) >= PLAIN_MIN))
-        .map((f) => f.tok),
-    ).size >= MIN_FILE_GLUED;
-  if (!enough(cands)) return null;
-  const sibs = siblings.map((s) => ({ entries: parseSrt(s.text), outside: s.outside }));
+  if (cands.length === 0) return null;
+  const seen = await seenInOtherEpisodes(videoPath, new Set(cands.map((f) => f.tok)));
+  const sibs = siblings.map((s) => parseSrt(s.text));
   for (const f of cands) {
-    const e = entries[f.ei];
     const phrase = ` ${f.parts.join(" ")} `;
-    const near = sibs.map((s) => ({ outside: s.outside, text: nearText(s.entries, e) }));
-    f.confirmed = near.some((s) => s.text.includes(phrase));
-    f.denied = near.some((s) => s.outside && s.text.includes(` ${f.tok} `));
+    f.confirmed = sibs.some((s) => nearText(s, entries[f.ei]).includes(phrase));
   }
-  const unsure = cands.filter((f) => !f.denied && (f.likely || f.confirmed));
-  const seen =
-    unsure.length > 0
-      ? await seenInOtherEpisodes(videoPath, new Set(unsure.map((f) => f.tok)))
-      : new Set();
-  const fixes = unsure.filter((f) => !seen.has(f.tok));
-  if (!enough(fixes)) return null;
+  const fixes = cands.filter((f) => !seen.has(f.tok) && (f.likely || f.confirmed));
+  if (fixes.length === 0) return null;
   // From the end of each line back, so the offsets of the rest hold.
   for (const f of [...fixes].sort((a, b) => b.offset - a.offset)) {
     const e = entries[f.ei];
@@ -409,6 +416,6 @@ export async function fixGlued(videoPath, text, siblings) {
   }
   return {
     text: cleanSrt(serializeSrt(entries)),
-    fixes: fixes.map((f) => ({ from: f.word, to: written(f), confirmed: f.confirmed })),
+    fixes: fixes.map((f) => ({ from: f.word, to: written(f), likely: f.likely, confirmed: f.confirmed })),
   };
 }

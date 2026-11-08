@@ -31,3 +31,6 @@ apps/asr/gemini-api-key.txt
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# stamped by ./run; claude3 warns before a prompt when files are newer
+.deployed

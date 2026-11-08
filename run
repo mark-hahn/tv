@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+touch .deployed # claude3's page warns before a prompt when files are newer than this
 cd apps/client
 exec ./node_modules/.bin/vite
 

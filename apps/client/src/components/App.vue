@@ -1869,8 +1869,9 @@ export default {
       this.allTvdb = tvdbData || {};
     },
     clickTab(key) {
-      // Clicking the selected tab again goes back to the tab before it.
-      if (key === this.currentPane && this.lastPane) this.selectTab(this.lastPane);
+      // Clicking the selected tab again goes back to the tab before it (not in preview mode).
+      if (key === this.currentPane && this.lastPane && !this.previewMode)
+        this.selectTab(this.lastPane);
       else this.selectTab(key);
     },
     selectTab(key) {

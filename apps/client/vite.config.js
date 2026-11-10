@@ -281,6 +281,7 @@ export default defineConfig(({ command }) => ({
       : []),
   ],
   server: {
+    strictPort: true, // fail rather than move to another port when it's taken
     fs: {
       // Allow importing prompt/key from ../api (client-only Mistral pane).
       allow: [

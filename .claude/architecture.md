@@ -7,7 +7,13 @@ a "see Media disk" below points at its section of that name.
 ## Layout
 
 The server processes run under pm2 on hahnca.com (`ecosystem.config.cjs`),
-and `./srvr` deploys them.
+and `./srvr` deploys them. `./run` deploys only what is stale
+(`./srvr --if-stale`) and starts the client's Vite detached, with its output in
+`vite.log`.
+Gotcha: `--if-stale` decides from an rsync dry run using the deploy's excludes,
+so a file under an app that changes on its own locally must be excluded there
+(as `vite-console.log` is) or that app always looks stale. It ignores
+`pnpm-lock.yaml`, which the server's `pnpm install` rewrites.
 
 - `apps/srvr` (tv-srvr, `index.js`): the show data (`data/tvdb.db`), the
   `/api` the web client and the players use, the library sweep, the flexget

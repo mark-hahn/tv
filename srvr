@@ -51,7 +51,7 @@ trap cleanup_ssh EXIT
 ssh -f -N -M -S "$SSH_CONTROL_PATH" "$SSH_HOST"
 
 usage() {
-  echo "Usage: $(basename "$0") [api|down|srvr|client|share|asr|watchdog|android|all]" >&2
+  echo "Usage: $(basename "$0") [api|down|srvr|client|share|asr|watchdog|android|all|--if-stale]" >&2
   echo "Env: TV_REMOTE_BASE (default: /root/dev/apps/tv on remote)" >&2
   exit 1
 }
@@ -121,7 +121,7 @@ sync_monorepo_root() {
   echo "[remote] sync root files -> $SSH_HOST:$TV_REMOTE_BASE/"
   run_ssh "$SSH_HOST" "mkdir -p '$TV_REMOTE_BASE/apps' '$TV_REMOTE_BASE/packages'"
   
-  run_rsync -az \
+  run_rsync -az "$@" \
     "$ROOT_DIR/package.json" \
     "$ROOT_DIR/pnpm-workspace.yaml" \
     "$ROOT_DIR/pnpm-lock.yaml" \
@@ -132,6 +132,7 @@ sync_monorepo_root() {
 
 remote_sync_app() {
   local project="$1"
+  shift
   local local_dir
   local remote_dir
   local_dir="$(local_app_dir_for_project "$project")"
@@ -163,7 +164,7 @@ remote_sync_app() {
   # dirname ensures apps/ or packages/ exists.
   run_ssh "$SSH_HOST" "mkdir -p '$(dirname "$remote_dir")'"
 
-  run_rsync -az    \
+  run_rsync -az "$@"   \
     "${extra_excludes[@]}" \
     --exclude 'node_modules/' \
     --exclude '.turbo/' \
@@ -182,6 +183,7 @@ remote_sync_app() {
     --exclude 'reelgood-titles.json' \
     --exclude 'reelgood.log' \
     --exclude 'calls.log' \
+    --exclude 'vite-console.log' \
     --exclude 'package-lock.json' \
     --exclude 'yarn.lock' \
     "$local_dir" "$SSH_HOST:$(dirname "$remote_dir")/"
@@ -257,7 +259,49 @@ remote_deploy_one_no_restart() {
 
 SHARE_DEPENDENTS="api down srvr client"
 
+# True when a dry run of this sync ("$@": a sync function and its args) would
+# copy anything. Directory times don't count: the server's own files change them.
+# ponytail: pnpm-lock.yaml doesn't count, the server's pnpm install rewrites it;
+# a lockfile-only change (package.json untouched) needs a plain ./srvr.
+would_copy() {
+  local out
+  if ! out="$("$@" --dry-run --itemize-changes --omit-dir-times)"; then
+    echo "Error: stale check failed: $*" >&2
+    exit 1
+  fi
+  grep -qvE '^\[remote\]| pnpm-lock\.yaml$' <<<"$out"
+}
+
 case "${1:-all}" in
+  --if-stale)
+    # Root files feed every app (deps, pm2 config), so a change there is a full deploy.
+    if would_copy sync_monorepo_root; then
+      echo "[local] root files differ from the server: full deploy"
+      "$0" all
+      exit 0
+    fi
+    stale=()
+    for project in share api srvr asr tv watchdog down client; do
+      if [[ "${stale[0]:-}" == share && $SHARE_DEPENDENTS == *"$project"* ]] \
+        || would_copy remote_sync_app "$project"; then
+        stale+=("$project")
+      fi
+    done
+    echo "[local] stale: ${stale[*]:-none}"
+    # Restarts come after every deploy: a reconcile can stop a restarting tv-srvr.
+    for project in "${stale[@]}"; do
+      remote_deploy_one_no_restart "$project"
+    done
+    sync_android_key_labels
+    for project in "${stale[@]}"; do
+      [[ "$project" == share ]] || remote_pm2_restart_project "$project"
+    done
+    # Whatever is still down: it was already stopped or missing, or a reconcile stopped it.
+    online="$(run_ssh "$SSH_HOST" "pm2 jlist | jq -r '.[] | select(.pm2_env.status == \"online\") | .name'")"
+    for project in api down srvr tv watchdog; do
+      grep -qx "$(pm2_name_for_project "$project")" <<<"$online" || remote_pm2_restart_project "$project"
+    done
+    ;;
   client)
     remote_deploy_one_no_restart client
     sync_android_key_labels

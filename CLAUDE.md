@@ -8,7 +8,6 @@ Code layout, main flows and gotchas: `.claude/architecture.md`.
   library, release comparison, tv-down's downloads, subtitles, tvapp), read
   its section there: those sections hold the area's design rules.
 - Working with me:
-  - do not open or read gpt.md or scratch.md even if in attached file to prompt
   - don't read doc files in ./doc unless i tell you to
   - When asked to do a simple one-off action (generate a file, run a command), just do it and report completion in 1-2 lines.
   - Don't produce research/investigation reports, format/byte-level breakdowns, or step-by-step narration of what you checked unless something went wrong or the user asked to see it.

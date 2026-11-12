@@ -1,14 +1,23 @@
 #!/usr/bin/env bash
 
 # Deploy what is stale (./srvr --if-stale), then make sure the client's vite is running. A failed
-# deploy is reported and vite starts anyway. A vite already running from this repo is left alone,
+# deploy is reported (a !! line, and a non-zero exit at the end) and vite starts anyway. A vite already running from this repo is left alone,
 # so this can be run from a terminal at any time; RESTART_VITE=1 (the claude3 page's "v" prompt)
 # stops it and starts a fresh one, which reloads the page. Arguments go to a newly started vite.
 # If anything else holds vite's port, it shows an error and neither starts nor restarts vite.
 # vite runs detached with its output in vite.log, so it outlives this script and whatever started
 # it. The script waits for vite's ready line, prints the log so far, and exits.
 VITE_PORT=5173 # vite's default; strictPort in vite.config.js stops it moving off this
-./srvr --if-stale && touch .deployed # claude3's page warns before a prompt when files are newer than this
+trap 'echo; echo "====== ENDED ======"' EXIT # claude3's Run output ends on this line
+if ./srvr --if-stale; then
+  # claude3's page warns before a prompt when files under these paths are newer than .deployed
+  printf '%s\n' package.json pnpm-workspace.yaml turbo.json ecosystem.config.cjs packages/share \
+    apps/api apps/srvr apps/asr apps/tv apps/watchdog apps/down apps/client > .deployed
+  deploy_rc=0
+else
+  deploy_rc=$?
+  echo "!! deploy failed (./srvr --if-stale exit $deploy_rc); vite is started anyway"
+fi
 log="$PWD/vite.log"
 cd apps/client
 vite="$PWD/node_modules/.bin/vite"
@@ -17,7 +26,7 @@ running="$PWD/node_modules/.bin/../vite/bin/vite.js"
 # Checked before anything stops vite. With a --port argument this port isn't needed.
 holder=$(ss -ltnpH "sport = :$VITE_PORT" | grep -oP 'pid=\K[0-9]+' | head -1)
 if [[ -n $holder && "$*" != *--port* ]] && ! pgrep -f "$running" | grep -qx "$holder"; then
-  echo "Error: port $VITE_PORT is in use by pid $holder ($(ps -o args= -p "$holder")); vite not started or restarted" >&2
+  echo "!! port $VITE_PORT is in use by pid $holder ($(ps -o args= -p "$holder")); vite not started or restarted"
   exit 1
 fi
 if [[ $RESTART_VITE == 1 ]] && pkill -f "$running"; then
@@ -25,7 +34,7 @@ if [[ $RESTART_VITE == 1 ]] && pkill -f "$running"; then
 fi
 if pgrep -f "$running" >/dev/null; then
   echo "vite already running (hot update); left alone, output in vite.log"
-  exit 0
+  exit $deploy_rc
 fi
 : > "$log"
 setsid nohup "$vite" "$@" > "$log" 2>&1 < /dev/null &
@@ -35,4 +44,5 @@ for _ in {1..100}; do
   sleep 0.2
 done
 cat "$log"
+exit $deploy_rc
 

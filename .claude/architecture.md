@@ -9,7 +9,15 @@ a "see Media disk" below points at its section of that name.
 The server processes run under pm2 on hahnca.com (`ecosystem.config.cjs`),
 and `./srvr` deploys them. `./run` deploys only what is stale
 (`./srvr --if-stale`) and starts the client's Vite detached, with its output in
-`vite.log`.
+`vite.log`. claude3's Run button runs `./run`. After a restart `./srvr` waits
+10 s and fails with `!!` lines and the log tail unless each restarted process is
+online and has not restarted again (`check_pm2_up`). On success `./run` writes
+the deployed paths into `.deployed` (root config, `packages/share`, the server
+apps and `apps/client`; not `apps/android`, `apps/tvapp` or `unilog`), and
+claude3 warns when files under them change.
+Gotcha: the deploy's unilog reconcile rewrites `logHere` sites in the sources
+during the run, so after a deploy that placed new sites the warning stays up
+until the next Run, which finds nothing stale.
 Gotcha: `--if-stale` decides from an rsync dry run using the deploy's excludes,
 so a file under an app that changes on its own locally must be excluded there
 (as `vite-console.log` is) or that app always looks stale. It ignores

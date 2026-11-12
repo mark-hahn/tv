@@ -48,7 +48,7 @@ trap cleanup_ssh EXIT
 # -M: master mode
 # -N: no remote command (just forward/establish socket)
 # -f: background
-ssh -f -N -M -S "$SSH_CONTROL_PATH" "$SSH_HOST"
+ssh -o BatchMode=yes -f -N -M -S "$SSH_CONTROL_PATH" "$SSH_HOST"
 
 usage() {
   echo "Usage: $(basename "$0") [api|down|srvr|client|share|asr|watchdog|android|all|--if-stale]" >&2
@@ -213,6 +213,8 @@ remote_pm2_restart_all_silent() {
     && pm2 save >/dev/null 2>&1"
 }
 
+RESTARTED=() # pm2 names restarted by this run, for check_pm2_up
+
 remote_pm2_restart_project() {
   local project="$1"
   local pm2_name
@@ -221,6 +223,31 @@ remote_pm2_restart_project() {
   run_ssh "$SSH_HOST" "cd '$TV_REMOTE_BASE' \
     && pm2 start ecosystem.config.cjs --env production --only '$pm2_name' >/dev/null 2>&1 \
     && pm2 save >/dev/null 2>&1"
+  RESTARTED+=("$pm2_name")
+}
+
+# Fails, with !! lines and the process's last log lines, unless each pm2 name given is online and
+# has not restarted since 10 s ago: a crash at startup shows as pm2 restarting it.
+# ponytail: a crash after those 10 s is missed.
+check_pm2_up() {
+  (( $# )) || return 0
+  echo "[remote] waiting 10s to check $* stay up"
+  sleep 10
+  local rows now name line status up fail=0
+  rows="$(run_ssh "$SSH_HOST" "date +%s%3N; pm2 jlist | jq -r '.[] | [.name, .pm2_env.status, .pm2_env.pm_uptime] | @tsv'")"
+  now="$(head -1 <<<"$rows")"
+  for name in "$@"; do
+    line="$(grep -P "^$name\t" <<<"$rows" || true)"
+    IFS=$'\t' read -r _ status up <<<"$line"
+    if [[ "$status" == online ]] && (( now - up >= 9000 )); then
+      echo "[remote] $name up"
+    else
+      echo "!! $name not staying up after restart (status ${status:-missing})"
+      run_ssh "$SSH_HOST" "pm2 logs '$name' --lines 15 --nostream" || true
+      fail=1
+    fi
+  done
+  return $fail
 }
 
 remote_deploy_one_no_restart() {
@@ -301,6 +328,7 @@ case "${1:-all}" in
     for project in api down srvr tv watchdog; do
       grep -qx "$(pm2_name_for_project "$project")" <<<"$online" || remote_pm2_restart_project "$project"
     done
+    check_pm2_up "${RESTARTED[@]}"
     ;;
   client)
     remote_deploy_one_no_restart client
@@ -314,6 +342,7 @@ case "${1:-all}" in
     # Sync ecosystem config so new pm2 entries are registered
     run_rsync -az "$ROOT_DIR/ecosystem.config.cjs" "$SSH_HOST:$TV_REMOTE_BASE/"
     remote_pm2_restart_project "$1"
+    check_pm2_up "${RESTARTED[@]}"
     ;;
   all|"" )
     sync_monorepo_root
@@ -333,6 +362,7 @@ case "${1:-all}" in
     sync_android_key_labels
 
     remote_pm2_restart_all_silent
+    check_pm2_up tv-api tv-down tv-srvr tv-tv tv-watchdog
     ;;
   *)
     usage

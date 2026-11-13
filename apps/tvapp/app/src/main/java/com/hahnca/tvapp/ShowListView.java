@@ -90,10 +90,10 @@ class ShowListView extends ScrollView {
   // The band the description dissolves into the card over when it has more text
   // than cardMisc has room for.
   private static final float DESC_FADE_DP = 11f;
-  // The order NameRow drops its metadata in, one more per step, the same as the
-  // video time bar's: watched, seasons, status, years, country. Indexes into
-  // NameRow's parts.
-  private static final int[] INFO_DROP_ORDER = {4, 3, 5, 1, 0};
+  // The order NameRow drops its metadata in, one more per step: episode length
+  // first, then the video time bar's order -- watched, seasons, status, years,
+  // country. Indexes into NameRow's parts.
+  private static final int[] INFO_DROP_ORDER = {7, 4, 3, 5, 1, 0};
   // The name row's metadata, which stays as bright as the name beside it.
   private static final int FIELD_COLOR = 0xFFFFFFFF;
   // Everything in cardMisc below that row -- description, actor names, map
@@ -1285,10 +1285,11 @@ class ShowListView extends ScrollView {
   /**
    * The card's one-line header, which fits itself to the width it is given:
    * the name, then the time bar's parts -- country, years, episode, seasons,
-   * watched, status, resolution and IMDB rating, the episode and resolution
+   * watched, status, resolution, average episode length and IMDB rating, the episode and resolution
    * being those of the show's next-up. When they are wider than the row, parts are dropped
-   * a step at a time in INFO_DROP_ORDER until what is left fits; with all of
-   * them gone, the name's end is trimmed.
+   * in INFO_DROP_ORDER until what is left fits, and then any dropped part that
+   * fits in the room left is put back; with all of them gone, the name's end is
+   * trimmed.
    */
   private class NameRow extends LinearLayout {
 
@@ -1309,12 +1310,8 @@ class ShowListView extends ScrollView {
       infoView = view;
     }
 
-    /** One step past the last one, which is the most stripped the row gets. */
-    private int stepCount() {
-      return INFO_DROP_ORDER.length + 1;
-    }
-
-    String infoFor(int step) {
+    /** The metadata without the parts dropped[k] marks, k indexing INFO_DROP_ORDER. */
+    String infoFor(boolean[] dropped) {
       int[] up = show.nextUp;
       String[] parts = {
         show.originalCountry.toUpperCase(Locale.US),
@@ -1322,11 +1319,12 @@ class ShowListView extends ScrollView {
         up == null ? "" : episodeText(up[0], up[1], up[2]),
         seasonsText(show),
         watchedText(show),
-        show.status,
+        statusText(show),
         up == null || up[3] <= 0 ? "" : String.valueOf(up[3]),
+        runtimeText(show),
         show.imdbRatings
       };
-      for (int i = 0; i < step; i++) parts[INFO_DROP_ORDER[i]] = "";
+      for (int k = 0; k < dropped.length; k++) if (dropped[k]) parts[INFO_DROP_ORDER[k]] = "";
       return joinSpaced(parts);
     }
 
@@ -1342,16 +1340,19 @@ class ShowListView extends ScrollView {
           avail -= lp.leftMargin + lp.rightMargin;
           if (child != nameView && child != infoView && lp.width > 0) avail -= lp.width;
         }
-        int last = stepCount() - 1;
-        for (int step = 0; step <= last; step++) {
-          String infoText = infoFor(step);
-          float wide =
-            nameView.getPaint().measureText(show.name) + infoView.getPaint().measureText(infoText);
-          if (step == last || Math.ceil(wide) <= avail) {
-            setTextIfNew(infoView, infoText);
-            break;
-          }
+        // Every droppable part out, then each put back if it still fits, the
+        // last in INFO_DROP_ORDER first. That is the same as dropping in order
+        // until it fits, except that a short part dropped early comes back when
+        // a wider one dropped after it leaves room for it.
+        boolean[] dropped = new boolean[INFO_DROP_ORDER.length];
+        Arrays.fill(dropped, true);
+        float nameWide = nameView.getPaint().measureText(show.name);
+        for (int k = dropped.length - 1; k >= 0; k--) {
+          dropped[k] = false;
+          float wide = nameWide + infoView.getPaint().measureText(infoFor(dropped));
+          if (Math.ceil(wide) > avail) dropped[k] = true;
         }
+        setTextIfNew(infoView, infoFor(dropped));
       }
       super.onMeasure(widthSpec, heightSpec);
     }
@@ -1394,7 +1395,7 @@ class ShowListView extends ScrollView {
     }
 
     TextView info = new TextView(getContext());
-    info.setText(nameRow.infoFor(0));
+    info.setText(nameRow.infoFor(new boolean[INFO_DROP_ORDER.length]));
     nameRow.setInfoView(info);
     info.setTextColor(FIELD_COLOR);
     info.setTextSize(TypedValue.COMPLEX_UNIT_SP, INFO_TEXT_SIZE_SP);
@@ -1504,12 +1505,27 @@ class ShowListView extends ScrollView {
 
   static String watchedText(Shows.Show show) {
     if (show.episodeCount <= 0 || show.watchedCount < 0) return "";
-    return "Watched " + show.watchedCount + " of " + show.episodeCount;
+    return "Saw " + show.watchedCount + " of " + show.episodeCount;
+  }
+
+  static String runtimeText(Shows.Show show) {
+    return show.averageRuntime <= 0 ? "" : show.averageRuntime + " Min";
+  }
+
+  static String statusText(Shows.Show show) {
+    switch (show.status) {
+      case "Continuing":
+        return "Cont";
+      case "Ended":
+        return "End";
+      default:
+        return show.status;
+    }
   }
 
   static String seasonsText(Shows.Show show) {
     if (show.seasonCount <= 0) return "";
-    return show.seasonCount == 1 ? "1 Season" : show.seasonCount + " Seasons";
+    return show.seasonCount + " Sea";
   }
 
   /** "premiere year-last aired year", or whichever of the two the record has. */

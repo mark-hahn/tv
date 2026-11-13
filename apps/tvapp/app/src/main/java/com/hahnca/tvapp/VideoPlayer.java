@@ -315,7 +315,7 @@ class VideoPlayer extends FrameLayout {
     ready = false;
     pausedAt = -1;
     int res = p.optInt("res");
-    if (show == null) title.setParts(p.optString("showName"), "", "", "", "", "", "", "");
+    if (show == null) title.setParts(p.optString("showName"), "", "", "", "", "", "", "", "", "");
     else
       title.setParts(
           p.optString("showName"),
@@ -324,8 +324,10 @@ class VideoPlayer extends FrameLayout {
           ShowListView.episodeText(p.optInt("season"), p.optInt("episode"), p.optInt("seasonEps")),
           ShowListView.seasonsText(show),
           ShowListView.watchedText(show),
-          show.status,
-          res > 0 ? String.valueOf(res) : "");
+          ShowListView.statusText(show),
+          res > 0 ? String.valueOf(res) : "",
+          ShowListView.runtimeText(show),
+          show.imdbRatings);
     subsPicked = false;
     subOfs = 0;
     clearCues();
@@ -1180,13 +1182,15 @@ class VideoPlayer extends FrameLayout {
 
   /**
    * The time bar's parts after the time: name, country, years, episode,
-   * seasons, watched, status and resolution. The ones in DROP_ORDER go,
-   * in that order, until the rest fit the bar; empty ones are never shown.
+   * seasons, watched, status, resolution, average episode length and IMDB
+   * rating, as on the list's card. The ones in DROP_ORDER go, in that order,
+   * until the rest fit the bar, and then any that fits in the room left comes
+   * back; empty ones are never shown.
    */
   private static class TitleRow extends LinearLayout {
-    // Watched, seasons, status, years, country.
-    private static final int[] DROP_ORDER = {5, 4, 6, 2, 1};
-    private final TextView[] parts = new TextView[8];
+    // Episode length, watched, seasons, status, years, country.
+    private static final int[] DROP_ORDER = {8, 5, 4, 6, 2, 1};
+    private final TextView[] parts = new TextView[10];
 
     TitleRow(Context context, TextView like, int partGap) {
       super(context);
@@ -1216,10 +1220,21 @@ class VideoPlayer extends FrameLayout {
         shown[i] = parts[i].length() > 0;
         if (shown[i]) wide += partWidth(i);
       }
-      for (int i = 0; i < DROP_ORDER.length && wide > avail; i++) {
-        int d = DROP_ORDER[i];
-        if (shown[d]) wide -= partWidth(d);
-        shown[d] = false;
+      // Every droppable part out, then each put back if it still fits, the
+      // last in DROP_ORDER first, so a short part dropped early comes back
+      // when a wider one dropped after it leaves room for it.
+      if (wide > avail) {
+        for (int d : DROP_ORDER) {
+          if (shown[d]) wide -= partWidth(d);
+          shown[d] = false;
+        }
+        for (int k = DROP_ORDER.length - 1; k >= 0; k--) {
+          int d = DROP_ORDER[k];
+          if (parts[d].length() > 0 && wide + partWidth(d) <= avail) {
+            shown[d] = true;
+            wide += partWidth(d);
+          }
+        }
       }
       // Only a real change, so a settled row does not ask for another layout.
       for (int i = 0; i < parts.length; i++) {

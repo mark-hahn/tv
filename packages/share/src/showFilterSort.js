@@ -282,31 +282,35 @@ export function getSortKey(show, sortChoice, allTvdb = null) {
 
 /**
  * Orders two shows by one of the SORT_CHOICES, breaking ties by show name.
+ * `sortChoices` may also be a list of them, each later one breaking ties in
+ * the ones before it (the web client passes its recent sort choices).
  * Reversing the list reverses the tie-break along with the sort itself, so a
  * run of tied shows reads bottom-to-top exactly as it read top-to-bottom.
  */
 export function compareShows(
   a,
   b,
-  sortChoice,
+  sortChoices,
   allTvdb = null,
   reversed = false,
 ) {
-  const va = getSortKey(a, sortChoice, allTvdb);
-  const vb = getSortKey(b, sortChoice, allTvdb);
-  if (va !== vb) {
-    let result;
-    if (ASCENDING.includes(sortChoice)) {
-      // A show with no creator or country at all goes last rather than first.
-      if (sortChoice === "Creator" || sortChoice === "Country") {
-        if (va === "" && vb !== "") return 1;
-        if (vb === "" && va !== "") return -1;
+  for (const sortChoice of [].concat(sortChoices)) {
+    const va = getSortKey(a, sortChoice, allTvdb);
+    const vb = getSortKey(b, sortChoice, allTvdb);
+    if (va !== vb) {
+      let result;
+      if (ASCENDING.includes(sortChoice)) {
+        // A show with no creator or country at all goes last rather than first.
+        if (sortChoice === "Creator" || sortChoice === "Country") {
+          if (va === "" && vb !== "") return 1;
+          if (vb === "" && va !== "") return -1;
+        }
+        result = va > vb ? +1 : -1;
+      } else {
+        result = va > vb ? -1 : +1;
       }
-      result = va > vb ? +1 : -1;
-    } else {
-      result = va > vb ? -1 : +1;
+      return reversed ? -result : result;
     }
-    return reversed ? -result : result;
   }
   const byName = compareShowNames(a, b);
   return reversed ? -byName : byName;

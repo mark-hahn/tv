@@ -9,6 +9,14 @@
 # it. The script waits for vite's ready line, prints the log so far, and exits.
 VITE_PORT=5173 # vite's default; strictPort in vite.config.js stops it moving off this
 trap 'echo; echo "====== ENDED ======"' EXIT # claude3's Run output ends on this line
+# The unilog reconcile writes ids into the sources, so it runs before the deploy copies any. The
+# line after it tells claude3 the stamp counts from there: what was written before it is deployed.
+# Failing, it is left to each project's own reconcile in the deploy, and the stamp counts from the start.
+if ./recon all; then
+  echo "== sources frozen $(date +%s%3N)"
+else
+  echo "!! unilog reconcile failed; the deploy reconciles each project again"
+fi
 if ./srvr --if-stale; then
   # claude3's page warns before a prompt when files under these paths are newer than .deployed
   printf '%s\n' package.json pnpm-workspace.yaml turbo.json ecosystem.config.cjs packages/share \

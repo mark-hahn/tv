@@ -272,7 +272,9 @@ export async function reconcileFilesWithDb(
 
     let k = 0;
     const r = reconcileText(text, file, () => realIds[k++], { vue });
-    if (!dryRun) fs.writeFileSync(file, r.text, "utf8");
+    // Unchanged files are left alone: a rewrite bumps the mtime, and claude3 then
+    // counts the file as saved during the deploy (R stays lit until the next Run).
+    if (!dryRun && r.text !== text) fs.writeFileSync(file, r.text, "utf8");
     summary.push({
       file,
       changed: r.changed,

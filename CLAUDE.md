@@ -120,7 +120,6 @@ Code layout, main flows and gotchas: `.claude/architecture.md`.
     validate before deploy with `node unilog/check.js <project|all>` (reports duplicate
     ids).
   - do not use no-unilog unless you have my permission
-  - when a loghere logging site is added to a client source file in ./apps/client, then when the llm turn is finished and you are about to stop, then before you stop tell me in bold letters that the client changed and needs Reconciliation.
   - Never Run Unilog Reconciliation:
     - Only add or change source logging sites with `logHere(...)` placeholders.
     - If an existing `unilog(id, ...)` site needs to change, replace that source call with `logHere(...)`; do not preserve, choose, edit, or reason from the numeric id.

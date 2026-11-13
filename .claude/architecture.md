@@ -15,9 +15,14 @@ online and has not restarted again (`check_pm2_up`). On success `./run` writes
 the deployed paths into `.deployed` (root config, `packages/share`, the server
 apps and `apps/client`; not `apps/android`, `apps/tvapp` or `unilog`), and
 claude3 warns when files under them change.
-Gotcha: the deploy's unilog reconcile rewrites `logHere` sites in the sources
-during the run, so after a deploy that placed new sites the warning stays up
-until the next Run, which finds nothing stale.
+The unilog reconcile rewrites `logHere` sites in the sources, so `./run` runs
+it first (`./recon all`), before anything is copied, and then prints
+`== sources frozen <epoch ms>`: claude3 counts a Run's stamp from that line's
+time instead of the Run's start, so the files it rewrote don't keep R lit.
+Each project's reconcile inside `./srvr` then finds nothing to do, and a file
+it processes but doesn't change is not written (`reconcileFilesWithDb`).
+Gotcha: the reconcile, and anything else in `./run` that writes under the
+stamped paths, must stay before that line.
 Gotcha: `--if-stale` decides from an rsync dry run using the deploy's excludes,
 so a file under an app that changes on its own locally must be excluded there
 (as `vite-console.log` is) or that app always looks stale. It ignores
@@ -48,6 +53,9 @@ so a file under an app that changes on its own locally must be excluded there
   and `GB` are UK), for displays, the Country sort and the Foreign filter. The
   stored codes are not changed. tvapp (`Shows.java`) and the phone (`App.js`)
   can't import it and keep their own copies, so edit all three together.
+  The web client sorts by its last 3 sort choices (`recentSorts` in
+  `list.vue`), newest first, older ones breaking ties before the name;
+  tv-srvr, tvapp and the phone sort by one choice plus the name.
 - `unilog/`: the logging system (the reconciler `./srvr` runs, `query.js`).
   Gotcha: `log_events.ts` is LA wall-clock time with no offset, so on the
   fall-back night 01:00–01:59 occurs twice and `ts` comparisons and windows

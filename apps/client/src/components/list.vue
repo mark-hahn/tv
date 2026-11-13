@@ -619,6 +619,7 @@ export default {
       currentPlayingEpisode: null,
       nowPlayingShowNames: new Set(),
       sortChoice: "Viewed",
+      recentSorts: [],
       reversed: false,
       fltrChoice: "All",
       showSearching: false,
@@ -2238,6 +2239,7 @@ export default {
       this.sortChoice = sortChoice;
       this.reversed = false;
       this.sortShows();
+      unilog(3132, `sort by ${this.recentSorts.join(", ")}`);
       setTimeout(() => {
         const cur = this.shows.find((s) => s.name === this.highlightName);
         this.saveVisShow(cur ?? this.shows[0], true);
@@ -2715,9 +2717,14 @@ export default {
     },
 
     sortShows() {
+      // The last 3 sort choices, newest first; older ones break ties.
+      this.recentSorts = [
+        this.sortChoice,
+        ...this.recentSorts.filter((c) => c !== this.sortChoice),
+      ].slice(0, 3);
       this.shows = sortShowList(
         this.shows,
-        this.sortChoice,
+        this.recentSorts,
         allTvdb,
         this.reversed,
       );

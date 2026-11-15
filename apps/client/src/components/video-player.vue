@@ -91,6 +91,17 @@
           "
           >{{ testTelemetry }}</span
         >
+        <span
+          v-if="textScanning"
+          style="
+            color: red;
+            font-size: 13px;
+            margin-left: 10px;
+            user-select: none;
+            flex-shrink: 0;
+          "
+          >haiku</span
+        >
       </div>
       <!-- Intro mode: mark controls (right, next to X) -->
       <template v-if="mode === 'intro'">
@@ -659,6 +670,7 @@
         <div v-if="windowed" style="color: yellow; font-size: 13px">
           {{ stripStatusText }}
         </div>
+        <div v-if="textScanning" style="color: red; font-size: 13px">haiku</div>
         <label
           style="
             margin-left: auto;
@@ -711,7 +723,13 @@
         <img
           :src="still.url"
           loading="lazy"
+          :title="stillsText[still.ms / 1000]"
           style="width: 200px; display: block"
+          :style="
+            stillsText[still.ms / 1000] != null
+              ? { outline: '3px solid red', outlineOffset: '-3px' }
+              : null
+          "
         />
         <div
           style="
@@ -923,6 +941,19 @@ export default {
     stills() {
       return this.stillsByOffset[this.stillOffset] ?? [];
     },
+    // Haiku is scanning the selected offset's set for text (shown as a red
+    // "haiku" in the pane's top bar and the strip's header).
+    textScanning() {
+      const scan = this.stillsStatus?.textScan;
+      return scan === "queued" || scan === "running";
+    },
+    // The selected offset's stills with big on-screen text, text by time in
+    // seconds, from the server's scan of the set (stills.js scanText).
+    stillsText() {
+      return Object.fromEntries(
+        (this.stillsStatus?.text ?? []).map((t) => [t.sec, t.text]),
+      );
+    },
     stripFileName() {
       return String(this.path || "").split("/").pop();
     },
@@ -935,7 +966,14 @@ export default {
         st.elapsedMs != null ? ` · ${(st.elapsedMs / 1000).toFixed(1)} s` : "";
       const how = st.dense == null ? "" : ` · ${st.dense ? "nokey" : "noref"} ${st.decode ?? ""}`;
       if (!st.done) return `stills ${st.count}/${st.total || "?"}${took}${how}`;
-      return `ready · ${st.count} stills${took}${how}`;
+      const text = this.textScanning
+        ? ""
+        : st.textError
+          ? ` · text scan failed: ${st.textError}`
+          : st.text
+            ? ` · ${st.text.length} with text`
+            : "";
+      return `ready · ${st.count} stills${took}${how}${text}`;
     },
     testTelemetry() {
       const parts = [];
@@ -1467,7 +1505,10 @@ export default {
           url: `${st.urlBase}/${String(i + 1).padStart(5, "0")}.jpg`,
         }));
       }
-      if (st.done || st.error) return;
+      // A finished set's text scan follows it, so polling goes on until that
+      // is in too.
+      const scanning = st.textScan === "queued" || st.textScan === "running";
+      if ((st.done || st.error) && !scanning) return;
       this._stillsPollTimer = setTimeout(() => this._pollStills(), STILLS_POLL_MS);
     },
     _stopStillsPoll() {

@@ -19,6 +19,7 @@ Code layout, main flows and gotchas: `.claude/architecture.md`.
   - when modifying files use local changes and don't replace entire files because another copilot conversation might be changing the same file
   - when a problem is reported with wrong data like a show not having data fields correct then only work on fixing the problem/bug -- don't fix the wrong data unless i ask you to
   - don't clean up debug logging until i tell you to
+  - always report video times as m:ss (e.g. 14:05, not 845 s)
   - never do git commit, push, pop, or anything else that modifies git repo unless i tell you to
   - you can do git reads without permission
   - you do not need my permission to run bash or ssh to remote server if you are not modifying anything

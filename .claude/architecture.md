@@ -114,6 +114,31 @@ so a file under an app that changes on its own locally must be excluded there
   shows them in season 0, and an episode card says where one belongs. They
   are left out of intro marking, trim and skip.
 
+## Intro film strip (`apps/srvr/src/stills.js`, `video-player.vue`)
+
+- A still every 5 s over the first 20 min of the episode intro marking
+  opens (`selectIntroFile`), 400 px wide, in `/mnt/media/stills/<show>/
+  <season>/<file>/`. tv-srvr's sweep (every 5 s, `sweepIntroStills`) builds
+  sets ahead for every `needsIntro` show with no intro yet; opening the pane
+  builds any other at once (`/api/stills`), taking the slot from a sweep
+  build. Offsets 1–4 s are extra sets, built when picked.
+- Text scan: every newly built set (sweep pre-build, `needsIntro` turning on,
+  check intro opening it, an offset picked; all end in `buildStills`) is
+  tiled into contact sheets with each still's time drawn on it and shown to
+  Claude Haiku in one call (~8k tokens, 2–9 s). The stills with text laid
+  over the picture (title cards, logos, credits; never subtitles), and whose
+  letters Haiku estimates at `TEXT_MIN_HEIGHT_PCT` (3%) of frame height or
+  more, and that reaches the middle band (25–75% of frame height, full
+  width; `TEXT_BAND_*_PCT`, to rule out captions and subtitles) are saved in
+  the set's `text.json` and come back in `/api/stills`; the pane borders them
+  in red and shows a red `haiku` while the scan runs. The prompt leans to
+  false positives, which are quick to check by eye. No backfill (user,
+  11-15): a set already on disk, or whose scan failed, is never scanned;
+  only a rebuild scans it. Claude runs through
+  the Agent SDK on the Max login (as the finance app), never the API; scans
+  pause for an hour once the plan's limits are used up rather than spend
+  credits.
+
 ## Which release is better
 
 - Every comparison of two files or torrents for one episode goes through

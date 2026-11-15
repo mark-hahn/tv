@@ -21,6 +21,12 @@
 // the sweep build in it is killed and requeued, so an open strip pane never
 // waits out work nobody asked for.
 //
+// Text scan: each newly built set (never one adopted from disk) is
+// tiled into contact sheets and shown to Claude once, on the Max subscription,
+// which lists the stills with big on-screen text (title cards, logos, credits).
+// Their times go in the set's TEXT_NAME and out in stillsStatus; the pane
+// borders those stills in red. Scans run one at a time, apart from the builds.
+//
 // Window: WINDOW_SECS of 480p from the requested start as fragmented mp4 on
 // the response, into the client's MediaSource. The first fragment is on the
 // wire ~0.4s after the request and the encode runs ~12x realtime, so playback
@@ -29,7 +35,9 @@
 
 import fsp from "fs/promises";
 import * as cp from "child_process";
+import * as os from "node:os";
 import * as path from "node:path";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 import { logHere, unilog} from "@tv/share"
 
 const TV_DIR = "/mnt/media/tv";
@@ -72,6 +80,54 @@ const PROBE_SPAN_SECS = 120;
 const WINDOW_SECS = 140;
 const WINDOW_HEIGHT = 480;
 const SIDECAR_NAME = "src.json";
+// A set's text scan (scanText): which of its stills show big on-screen text.
+const TEXT_NAME = "text.json";
+// The scan is one Claude call over contact sheets of the set: TEXT_COLS x
+// TEXT_ROWS stills a sheet, each TEXT_TILE_WIDTH wide with its time drawn on
+// it. 240 stills make 5 sheets, about 8k tokens; on Haiku that took 2-9 s and
+// found every title card tried (11-15).
+const TEXT_MODEL = "claude-haiku-5-5";
+const TEXT_EFFORT = "low";
+const TEXT_COLS = 8;
+const TEXT_ROWS = 6;
+const TEXT_TILE_WIDTH = 200;
+const TEXT_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+// Scans stop this long once the plan's limits are used up, rather than spend
+// usage credits.
+const TEXT_OVERAGE_PAUSE_MS = 60 * 60 * 1000;
+const TEXT_SYSTEM =
+  "You find on-screen text in video stills. Answer only with the requested lines.";
+// Leans to false positives: each bordered still gets checked against the
+// video, which is quick once you know where to look, while a missed title or
+// credit is lost.
+const TEXT_PROMPT =
+  "These are contact sheets of stills from the first 20 minutes of a TV " +
+  "episode. Each tile's time in seconds is the yellow label in its top-left " +
+  "corner. List every tile that has text laid over the picture: a title card, " +
+  "the show's name, a network or studio logo, a credit, a caption, however " +
+  "small, faint, partial or fading in or out. A person checks every tile you " +
+  "list, so a wrong one costs little and a missed one costs a lot: when " +
+  "unsure, list it. Ignore the yellow labels, subtitles (lines of spoken " +
+  "dialogue, usually near the bottom), and text that is part of the scene " +
+  "itself (signs, clothes, screens) unless it is large. For each tile, " +
+  "estimate the height of its largest overlaid text's capital letters as a " +
+  "percent of the whole tile's height, and where that text's top and bottom " +
+  "edges are, as percents of the tile's height down from its top edge. One " +
+  "line per tile: `<seconds>s: <height>%: <top>-<bottom>%: <the text, or " +
+  "what it looks like if unreadable>`. If none, say none.";
+// A still's text must reach into the middle band of the frame, full width and
+// from TEXT_BAND_TOP_PCT to TEXT_BAND_BOTTOM_PCT of its height down, by
+// Haiku's estimate of where it sits. Titles land there; captions and
+// subtitles mostly sit near the top or bottom (11-15).
+const TEXT_BAND_TOP_PCT = 25;
+const TEXT_BAND_BOTTOM_PCT = 75;
+// Stills whose text Haiku estimates smaller than this, as a percent of the
+// frame's height, are dropped. 5 lost Reacher S04E04's Amazon MGM card
+// (estimated 4%), which is wanted, so it is 3 (11-15). For scale: the place
+// caption at 0:55 in Vigil S03E01 measures 2.8% (60 of 2160 rows) and Haiku
+// puts it at 2-3%, so it lands either side; Slow Horses S06's credits measure
+// 5.5%. Haiku's estimates are whole percents, off by about one.
+const TEXT_MIN_HEIGHT_PCT = 3;
 // Message a preempted build rejects with; pump() requeues on job.preempted
 // rather than on this, so it never needs matching.
 const PREEMPTED = "preempted by an urgent build";
@@ -101,11 +157,11 @@ function jobKey(resolved, offset) {
   return `${resolved}#${offset}`;
 }
 
-// Drop one set's images and sidecar, leaving other offsets' subdirs alone.
+// Drop one set's images, sidecar and text scan, leaving other offsets' subdirs alone.
 async function clearSet(dir) {
   await fsp.mkdir(dir, { recursive: true });
   for (const name of await fsp.readdir(dir)) {
-    if (name.endsWith(".jpg") || name === SIDECAR_NAME)
+    if (name.endsWith(".jpg") || name === SIDECAR_NAME || name === TEXT_NAME)
       await fsp.rm(path.join(dir, name), { force: true });
   }
 }
@@ -345,6 +401,7 @@ async function buildStills(job) {
   );
   const secs = ((Date.now() - job.startedAt) / 1000).toFixed(1);
   unilog(2430, `${count} stills offset ${job.offset}s (${job.dense ? "nokey" : "noref"}, ${job.decode}, keyframe gap ${maxGap.toFixed(1)}s) in ${secs}s: ${path.basename(job.path)}`);
+  queueTextScan(job);
 }
 
 // Take the build slot for an urgent job by killing the sweep build sitting in
@@ -399,6 +456,162 @@ function pump() {
     });
 }
 
+// Text scans waiting, in run order, and whether one is running. One at a time:
+// each is a Claude call, and the sweep can adopt a pile of sets at startup.
+const textPending = [];
+let textRunning = false;
+// Scans are held off until this time once the plan's limits are used up.
+let textPausedUntil = 0;
+
+// A set's scan result, { model, stills: [{ sec, text, pct, top, bottom }] }, or null for a set
+// that has none.
+async function readText(dir) {
+  try {
+    return JSON.parse(await fsp.readFile(path.join(dir, TEXT_NAME), "utf8"));
+  } catch (e) {
+    if (e.code !== "ENOENT")
+      unilog(3135, `unreadable ${TEXT_NAME} in ${dir}: ${e.message}`);
+    return null;
+  }
+}
+
+function queueTextScan(job) {
+  if (job.textScan === "queued" || job.textScan === "running") return;
+  job.textScan = "queued";
+  job.textError = null;
+  if (job.urgent) textPending.unshift(job);
+  else textPending.push(job);
+  pumpText();
+}
+
+function pumpText() {
+  if (textRunning || textPending.length === 0) return;
+  const job = textPending.shift();
+  textRunning = true;
+  job.textScan = "running";
+  scanText(job)
+    .then(() => {
+      job.textScan = "done";
+    })
+    .catch((e) => {
+      job.textScan = "failed";
+      job.textError = e.message;
+      unilog(3136, `text scan failed for ${path.basename(job.path)}: ${e.message}`);
+    })
+    .finally(() => {
+      textRunning = false;
+      pumpText();
+    });
+}
+
+// One Claude Code session through the Agent SDK, on the Max login in
+// ~/.claude/.credentials.json, never the API: no tools, settings or CLAUDE.md,
+// so the prompt is just the sheets, and no API key in its env, which would
+// quietly move it to API billing. A session that reports the plan's limits used
+// up is stopped, and scans pause, rather than spend usage credits.
+async function askClaude(content) {
+  const env = { ...process.env };
+  delete env.ANTHROPIC_API_KEY;
+  delete env.ANTHROPIC_AUTH_TOKEN;
+  const abort = new AbortController();
+  async function* oneMessage() {
+    yield { type: "user", session_id: "", message: { role: "user", content }, parent_tool_use_id: null };
+  }
+  let result = null;
+  let error = null;
+  for await (const msg of query({
+    prompt: oneMessage(),
+    options: {
+      model: TEXT_MODEL,
+      systemPrompt: TEXT_SYSTEM,
+      tools: [],
+      settingSources: [],
+      persistSession: false,
+      maxTurns: 1,
+      effort: TEXT_EFFORT,
+      env,
+      strictMcpConfig: true,
+      abortController: abort,
+    },
+  })) {
+    if (msg.type === "rate_limit_event" && msg.rate_limit_info?.isUsingOverage) {
+      textPausedUntil = Date.now() + TEXT_OVERAGE_PAUSE_MS;
+      abort.abort();
+      throw new Error("plan limits used up, not spending usage credits");
+    }
+    // Login and billing failures arrive here rather than as a thrown error.
+    if (msg.type === "assistant" && msg.error) error = msg.error;
+    if (msg.type === "result") result = msg;
+  }
+  if (error) throw new Error(`claude: ${error}`);
+  if (!result || result.is_error) throw new Error(`claude: ${result?.subtype ?? "no result"}`);
+  return result;
+}
+
+// Tile the set into contact sheets, each still labeled with its time, ask
+// Claude which show big text, and save their times as TEXT_NAME in the set's
+// dir. clearSet drops it with the set, so a rebuilt set is scanned again.
+async function scanText(job) {
+  if (Date.now() < textPausedUntil)
+    throw new Error("plan limits used up, not spending usage credits");
+  const startedAt = Date.now();
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "stills-text-"));
+  try {
+    const label = `%{eif\\:n*${STILL_GAP_SECS}+${job.offset}\\:d}s`;
+    await runFfmpeg([
+      "-framerate", "1",
+      "-i", path.join(job.dir, "%05d.jpg"),
+      "-vf",
+      `scale=${TEXT_TILE_WIDTH}:-2,drawtext=fontfile=${TEXT_FONT}:text='${label}':x=3:y=3:fontsize=14:fontcolor=yellow:box=1:boxcolor=black@0.7,tile=${TEXT_COLS}x${TEXT_ROWS}:padding=2:color=white`,
+      "-q:v", "3",
+      path.join(tmp, "%02d.jpg"),
+    ]);
+    const content = [];
+    for (const name of (await fsp.readdir(tmp)).sort())
+      content.push({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: "image/jpeg",
+          data: (await fsp.readFile(path.join(tmp, name))).toString("base64"),
+        },
+      });
+    content.push({ type: "text", text: TEXT_PROMPT });
+    const result = await askClaude(content);
+    // Only times on this set's grid count; anything else is a misread label.
+    const marks = new Set(
+      Array.from({ length: job.total }, (_, i) => job.offset + i * STILL_GAP_SECS),
+    );
+    const found = new Map();
+    for (const m of String(result.result ?? "").matchAll(
+      /^[`\s-]*(\d+)\s*s\s*:\s*(\d+(?:\.\d+)?)\s*%\s*:\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*%\s*:\s*(.+?)[`\s]*$/gm,
+    )) {
+      const sec = Number(m[1]);
+      const pct = Number(m[2]);
+      const top = Number(m[3]);
+      const bottom = Number(m[4]);
+      const text = m[5];
+      // Haiku can still list a subtitle, calling it one.
+      if (/^\W*subtitle/i.test(text)) continue;
+      if (pct < TEXT_MIN_HEIGHT_PCT) continue;
+      if (top >= TEXT_BAND_BOTTOM_PCT || bottom <= TEXT_BAND_TOP_PCT) continue;
+      if (marks.has(sec) && !found.has(sec))
+        found.set(sec, { sec, text, pct, top, bottom });
+    }
+    const stills = [...found.values()];
+    const out = path.join(job.dir, TEXT_NAME);
+    // By rename, so a status read never sees half a file.
+    await fsp.writeFile(out + ".tmp", JSON.stringify({ model: TEXT_MODEL, stills }), "utf8");
+    await fsp.rename(out + ".tmp", out);
+    const u = result.usage ?? {};
+    const tokens =
+      (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+    unilog(3137, `text scan: ${stills.length} of ${job.total} stills with text, ${tokens} tokens, ${((Date.now() - startedAt) / 1000).toFixed(1)}s: ${path.basename(job.path)}`);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+}
+
 // Make sure this episode's stills at `offset` exist or are on their way. A
 // valid set on disk is adopted without a build; otherwise the build is queued
 // — at the front when `urgent` (someone is opening this episode right now),
@@ -428,6 +641,12 @@ export async function startStills(
         }
         preemptForUrgent();
       }
+      // Its text scan, if still waiting, goes ahead of the sweep's.
+      const scanAt = textPending.indexOf(existing);
+      if (scanAt > 0) {
+        textPending.splice(scanAt, 1);
+        textPending.unshift(existing);
+      }
     }
     return existing;
   }
@@ -446,6 +665,9 @@ export async function startStills(
     dense: null,
     decode: null,
     durationSec: 0,
+    // Text scan: null, "queued", "running", "done" or "failed".
+    textScan: null,
+    textError: null,
   };
   jobs.set(jobKey(resolved, offset), job);
   const sc = await validSidecar(dir, await fsp.stat(resolved), offset);
@@ -696,6 +918,10 @@ export async function stillsStatus(videoFilePath, offset = 0) {
       job && job.startedAt !== null
         ? (job.doneAt ?? Date.now()) - job.startedAt
         : null,
+    // Times (secs) and words of the stills that show big text, once scanned.
+    text: (await readText(dir))?.stills ?? null,
+    textScan: job?.textScan ?? null,
+    textError: job?.textError ?? null,
   };
 }
 

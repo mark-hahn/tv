@@ -1298,6 +1298,12 @@ const getRemotes = async (show, tvdbRemotes, fast = false) => {
   const url = `https://www.google.com/search` + `?q=${encoded}%20tv%20show`;
   remotes.push({ name: "Google", url });
 
+  if (show.tvdbId)
+    remotes.push({
+      name: "TVDB",
+      url: `https://thetvdb.com/dereferrer/series/${show.tvdbId}`,
+    });
+
   // Parallelize independent remote fetches (Wikipedia, tvdbRemotes, IMDB)
   const remotesByName = {};
 

@@ -651,6 +651,10 @@
           gap: 8px;
           padding: 4px 8px;
           user-select: none;
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          background: #000;
         "
       >
         <div

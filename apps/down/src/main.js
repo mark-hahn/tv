@@ -3699,12 +3699,15 @@ async function main() {
       if (tvJsonTitles) {
         tvJsonTitles[fname] = { error: false };
       }
+      // Season 0 (specials) is recorded too: a sidecar queued later in this
+      // cycle finds its video here. The two-files-for-one-episode choice
+      // above only reads season > 0 keys.
       if (
         cycleSeMap &&
         fromFlex &&
         !isSidecarFile &&
         Number.isInteger(season) &&
-        season > 0 &&
+        season >= 0 &&
         Number.isInteger(episode) &&
         episode > 0
       ) {

@@ -167,7 +167,8 @@ so a file under an app that changes on its own locally must be excluded there
   and the `!unrar.lock` that qbt-unrar.sh keeps in a folder while it
   unpacks; no other file comes over ssh. Forced files get the same filter.
 - A subtitle or `.nfo` file follows its episode's video: it is taken only
-  when that video is on disk or on its way, and skipped quietly when its
+  when that video is on disk or on its way (queued earlier in the same
+  cycle counts, season-0 specials too: `cycleSeMap`), and skipped quietly when its
   name has no season and episode (`tvshow.nfo`, a pack's own nfo). An `.nfo`
   is taken only beside its own video: its name starts with the video's name
   less the extension, compared without case, as tv-srvr's sidecar cleanup

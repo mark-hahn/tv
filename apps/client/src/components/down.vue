@@ -563,6 +563,9 @@ const BEEP_COUNT = 1;
 const BEEP_VOLUME = 0.25;
 const LID_URL = "/__lid";
 const LID_TIMEOUT_MS = 6000;
+// The "all USB downloads finished" notification waits this long for the
+// queue to stay empty.
+const NOTIFY_DEBOUNCE_MS = 30 * 1000;
 
 export default {
   name: "TvProc",
@@ -606,6 +609,7 @@ export default {
       _oldDownloadingCount: 0,
       _lastFinishedEnded: 0,
       _lastNotifiedEnded: 0,
+      _notifyTimer: null,
       _tvprocInitialized: false,
       _lastStartProcAt: 0,
       _startProcInFlight: false,
@@ -1837,6 +1841,16 @@ export default {
           }
         }
 
+        // More work showed up before the debounce ran out: that batch's end
+        // sends the notification instead.
+        if (
+          (newDownloading.length > 0 || newFutures.length > 0) &&
+          this._notifyTimer
+        ) {
+          clearTimeout(this._notifyTimer);
+          this._notifyTimer = null;
+        }
+
         // Notify only once per newly observed finished timestamp, and only when everything is done.
         // With concurrent downloads, this means: no active downloads and no future queue.
         if (
@@ -1856,7 +1870,15 @@ export default {
             const lastTitle = String(
               oldDownloading?.[oldDownloading.length - 1]?.title || "",
             ).trim();
-            this.notifyAllUsbFinished(lastTitle);
+            // Debounced: the notification goes out only when the queue stays
+            // empty for NOTIFY_DEBOUNCE_MS, so torrents finishing on usb a
+            // little apart give one notification.
+            if (!this._notifyTimer) {
+              this._notifyTimer = setTimeout(() => {
+                this._notifyTimer = null;
+                this.notifyAllUsbFinished(lastTitle);
+              }, NOTIFY_DEBOUNCE_MS);
+            }
           }
 
           // No further action needed here; the queue is empty.

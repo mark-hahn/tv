@@ -1,0 +1,70 @@
+#!/bin/bash
+# Put the phone on the laptop's usb cable onto adb over wifi, so hahnca.com can install
+# to it without the cable: attaches the phone to wsl if needed, reads its wifi address,
+# switches its adb to tcp, checks that hahnca.com can connect, and records the address
+# there for hvac2's ./apk. tcp mode lasts until the phone reboots or something runs
+# `adb usb` (apps/android/build-apk does, after each of its installs).
+# Usage: ./adb-tcp [device-serial]   (the serial is needed only when several phones are on adb)
+set -euo pipefail
+
+PS=/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
+REMOTE=hahnca.com
+ADB_PORT=5555
+# The laptop's adb key, kept on hahnca.com; the phones already trust it.
+REMOTE_VENDOR_KEY=/root/.android/wsl-adbkey
+# "<ip>:<port> <serial>", read by hvac2's ./apk when it is given no address.
+REMOTE_PHONE_FILE=/root/.android/phone-wifi
+ATTACH_WAIT_S=15
+
+usb_devices() { adb devices | awk -F'\t' '$2 == "device" && $1 !~ /:/ {print $1}'; }
+
+if [[ -z $(usb_devices) ]]; then
+  BUSID=$("$PS" -NoProfile -Command "usbipd list" | tr -d '\r' | awk '/Shared/{print $1; exit}')
+  if [[ -z $BUSID ]]; then
+    echo "==> No phone on adb and no shared usb device in usbipd:"
+    "$PS" -NoProfile -Command "usbipd list" | tr -d '\r'
+    exit 1
+  fi
+  echo "==> Attaching usb busid $BUSID to wsl..."
+  "$PS" -NoProfile -Command "usbipd attach --wsl --busid $BUSID" >/dev/null
+  timeout $ATTACH_WAIT_S adb wait-for-usb-device || { echo "==> No phone on adb after attaching:"; adb devices; exit 1; }
+fi
+
+mapfile -t DEVS < <(usb_devices)
+if [[ $# -eq 1 ]]; then
+  SERIAL=$1
+elif (( ${#DEVS[@]} == 1 )); then
+  SERIAL=${DEVS[0]}
+else
+  echo "==> Phones on adb: ${DEVS[*]:-none}. Pass the serial of the one to use."
+  adb devices
+  exit 1
+fi
+MODEL=$(adb -s "$SERIAL" shell getprop ro.product.model | tr -d '\r')
+
+IP=$(adb -s "$SERIAL" shell ip -4 addr show wlan0 | grep -o 'inet [0-9.]*' | cut -d' ' -f2)
+[[ -n $IP ]] || { echo "==> $MODEL ($SERIAL) has no wifi address -- is it on wifi?"; exit 1; }
+DEV=$IP:$ADB_PORT
+
+echo "==> Switching $MODEL ($SERIAL) to adb over wifi at $DEV..."
+# adbd restarts on this, and when it was already on tcp adb reports "error: closed" and
+# fails; the connect check below is what tells whether it worked
+adb -s "$SERIAL" tcpip $ADB_PORT >/dev/null 2>&1 || true
+sleep 3
+
+echo "==> Checking that $REMOTE can connect..."
+ssh $REMOTE "
+  export ADB_VENDOR_KEYS=$REMOTE_VENDOR_KEY
+  connected() { adb devices | grep -q '^$DEV[[:space:]]*device'; }
+  adb start-server >/dev/null 2>&1
+  adb connect $DEV >/dev/null 2>&1; sleep 2
+  if ! connected; then
+    # a server that was started without the vendor key cannot authenticate to the phone
+    adb kill-server >/dev/null 2>&1
+    adb start-server >/dev/null 2>&1
+    adb connect $DEV >/dev/null 2>&1; sleep 2
+  fi
+  connected || { echo '==> $REMOTE cannot connect to $DEV:'; adb devices; exit 1; }
+  echo '$DEV $SERIAL' > $REMOTE_PHONE_FILE
+"
+echo "==> Done: $MODEL is on wifi adb at $DEV, recorded in $REMOTE:$REMOTE_PHONE_FILE."

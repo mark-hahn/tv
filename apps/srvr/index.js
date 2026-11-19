@@ -3659,6 +3659,7 @@ function appendWatchgapLog(line) {
 
 // Auto collection rules (applied in the background tvdb update, per show).
 const CONTINUE_IDLE_DAYS = 30;
+const CONTINUE_CLEAR_DAYS = 10; // a show watched this recently leaves Continue
 
 // True when any episode that has aired (or already has a file) is unwatched.
 function hasUnwatchedEpisodes(rec) {
@@ -3690,7 +3691,8 @@ function daysSinceLastPlayed(rec) {
 // Linda, goes into To Try. Once a show has any watched episode: To Try no
 // longer applies, and a show with episodes left that has sat unwatched for
 // CONTINUE_IDLE_DAYS goes into Continue. A show already in Mark or Linda is
-// left out of Continue.
+// left out of Continue. A show in Continue that was watched within
+// CONTINUE_CLEAR_DAYS comes back out.
 // Returns the change strings for the push2 log line.
 function applyAutoCollections(showName, rec) {
   const changes = [];
@@ -3719,6 +3721,11 @@ function applyAutoCollections(showName, rec) {
     );
   }
   const idleDays = daysSinceLastPlayed(rec);
+  if (rec.inContinue && idleDays !== null && idleDays <= CONTINUE_CLEAR_DAYS) {
+    rec.inContinue = false;
+    changes.push(`inContinue:true->false(watched ${idleDays}d ago)`);
+    unilog(3146, `cleared continue for ${showName}: watched ${idleDays} days ago`);
+  }
   if (
     !rec.inContinue &&
     !rec.inMark &&

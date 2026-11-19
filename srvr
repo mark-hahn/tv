@@ -299,21 +299,44 @@ would_copy() {
   grep -qvE '^\[remote\]| pnpm-lock\.yaml$' <<<"$out"
 }
 
+# Sets `stale` to the projects whose files differ from the server's. Fails when the monorepo
+# root differs too: root files feed every app (deps, pm2 config), so that is a full deploy.
+find_stale() {
+  local project
+  stale=()
+  if would_copy sync_monorepo_root; then
+    return 1
+  fi
+  for project in share api srvr asr tv watchdog down client; do
+    if [[ "${stale[0]:-}" == share && $SHARE_DEPENDENTS == *"$project"* ]] \
+      || would_copy remote_sync_app "$project"; then
+      stale+=("$project")
+    fi
+  done
+}
+
+# After a deploy of all or part of the repo: when the server then holds everything, stamp
+# .deployed, which claude3's R button reads, as ./run does. Otherwise a partial deploy (./srvr srvr)
+# leaves R lit though ./run would find nothing to copy. touch keeps the paths ./run wrote into it;
+# it is time-stamped from before the check, so a file saved meanwhile still counts as undeployed.
+# The check is a subshell: a failed dry run only skips the stamp, the deploy stays a success.
+stamp_if_current() {
+  [[ -f "$ROOT_DIR/.deployed" ]] || return 0
+  local started
+  started="$(date +%s.%N)"
+  if (find_stale && (( ${#stale[@]} == 0 ))); then
+    touch -d "@$started" "$ROOT_DIR/.deployed"
+    echo "[local] server holds every file: .deployed stamped"
+  fi
+}
+
 case "${1:-all}" in
   --if-stale)
-    # Root files feed every app (deps, pm2 config), so a change there is a full deploy.
-    if would_copy sync_monorepo_root; then
+    if ! find_stale; then
       echo "[local] root files differ from the server: full deploy"
       "$0" all
       exit 0
     fi
-    stale=()
-    for project in share api srvr asr tv watchdog down client; do
-      if [[ "${stale[0]:-}" == share && $SHARE_DEPENDENTS == *"$project"* ]] \
-        || would_copy remote_sync_app "$project"; then
-        stale+=("$project")
-      fi
-    done
     echo "[local] stale: ${stale[*]:-none}"
     # Restarts come after every deploy: a reconcile can stop a restarting tv-srvr.
     for project in "${stale[@]}"; do
@@ -333,6 +356,7 @@ case "${1:-all}" in
   client)
     remote_deploy_one_no_restart client
     sync_android_key_labels
+    stamp_if_current
     ;;
   api|down|srvr|tv|share|asr|watchdog)
     if [[ "$1" != "share" && $SHARE_DEPENDENTS == *"$1"* ]]; then
@@ -343,6 +367,7 @@ case "${1:-all}" in
     run_rsync -az "$ROOT_DIR/ecosystem.config.cjs" "$SSH_HOST:$TV_REMOTE_BASE/"
     remote_pm2_restart_project "$1"
     check_pm2_up "${RESTARTED[@]}"
+    stamp_if_current
     ;;
   all|"" )
     sync_monorepo_root
@@ -363,6 +388,7 @@ case "${1:-all}" in
 
     remote_pm2_restart_all_silent
     check_pm2_up tv-api tv-down tv-srvr tv-tv tv-watchdog
+    stamp_if_current
     ;;
   *)
     usage

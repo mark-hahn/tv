@@ -805,7 +805,12 @@ const getSharedFilterShows = async (params) => {
   );
   const sorted = sortShowList(
     filtered,
-    settings.sortChoice || "Alpha",
+    // The web client's recent sort choices break ties, as its own list does;
+    // settings saved before Send carried them have only sortChoice.
+    [
+      settings.sortChoice || "Alpha",
+      ...(settings.recentSorts || []).filter((c) => c !== settings.sortChoice),
+    ],
     derived,
     !!settings.reversed,
   );

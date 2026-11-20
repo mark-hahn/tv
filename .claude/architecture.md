@@ -55,7 +55,11 @@ so a file under an app that changes on its own locally must be excluded there
   can't import it and keep their own copies, so edit all three together.
   The web client sorts by its last 3 sort choices (`recentSorts` in
   `list.vue`), newest first, older ones breaking ties before the name;
-  tv-srvr, tvapp and the phone sort by one choice plus the name.
+  the phone sorts by one choice plus the name. The Send button puts
+  `recentSorts` in the shared Custom settings (`custom-settings.json`), the
+  web client restores it from them, and `getSharedFilterShows` (what tvapp's
+  Custom asks) sorts by it, so Custom orders ties the same on the web client
+  and tvapp. Settings saved before that have only `sortChoice`.
 - `unilog/`: the logging system (the reconciler `./srvr` runs, `query.js`).
   Gotcha: `log_events.ts` is LA wall-clock time with no offset, so on the
   fall-back night 01:00–01:59 occurs twice and `ts` comparisons and windows

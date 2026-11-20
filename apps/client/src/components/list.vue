@@ -989,6 +989,8 @@ export default {
             this.fltrChoice = String(shared.fltrChoice || "All");
           if (shared.sortChoice !== undefined)
             this.sortChoice = String(shared.sortChoice || "Viewed");
+          if (Array.isArray(shared.recentSorts))
+            this.recentSorts = shared.recentSorts;
           const condFilters =
             shared.condFilters && typeof shared.condFilters === "object"
               ? shared.condFilters
@@ -1038,6 +1040,8 @@ export default {
               this.fltrChoice = String(shared.fltrChoice || "All");
             if (shared.sortChoice !== undefined)
               this.sortChoice = String(shared.sortChoice || "Viewed");
+            if (Array.isArray(shared.recentSorts))
+              this.recentSorts = shared.recentSorts;
 
             const condFilters =
               shared.condFilters && typeof shared.condFilters === "object"
@@ -1080,6 +1084,7 @@ export default {
           filterStr: this.filterStr,
           condFilters,
           sortChoice: this.sortChoice,
+          recentSorts: this.recentSorts,
           reversed: this.reversed,
           selectedShow: this.highlightName,
         };
@@ -1162,6 +1167,9 @@ export default {
         // Apply sortChoice from sharedFilters if present.
         if (shared && shared.sortChoice !== undefined) {
           this.sortChoice = String(shared.sortChoice || "Viewed");
+        }
+        if (shared && Array.isArray(shared.recentSorts)) {
+          this.recentSorts = shared.recentSorts;
         }
 
         await this.select();

@@ -15,10 +15,12 @@ function capCache(map) {
 const IMDB_GQL_URL = "https://api.graphql.imdb.com/";
 const IMDB_GQL_UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-// Without a browser Origin/Referer the endpoint answers 403 at the edge,
-// before the query is even parsed.
+// Without a browser Origin/Referer and the x-imdb-client-name header the
+// endpoint answers 403 at the edge (CloudFront), before the query is parsed.
+// Origin/Referer alone stopped being enough (verified 11-20).
 const IMDB_GQL_ORIGIN = "https://www.imdb.com";
 const IMDB_GQL_REFERER = "https://www.imdb.com/";
+const IMDB_GQL_CLIENT_NAME = "imdb-web-next";
 
 export async function getImdbReviews(imdbId) {
   if (!imdbId || typeof imdbId !== "string") {
@@ -58,6 +60,7 @@ export async function getImdbReviews(imdbId) {
       "User-Agent": IMDB_GQL_UA,
       Origin: IMDB_GQL_ORIGIN,
       Referer: IMDB_GQL_REFERER,
+      "x-imdb-client-name": IMDB_GQL_CLIENT_NAME,
     },
     body: JSON.stringify({ query }),
     signal: AbortSignal.timeout(20000),

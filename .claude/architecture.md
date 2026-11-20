@@ -39,6 +39,10 @@ so a file under an app that changes on its own locally must be excluded there
 - `apps/watchdog` (tv-watchdog): watches tv-srvr's liveness and error rate.
 - `apps/asr` (`asr.js`): Speechmatics ASR, for subtitle vetting.
 - `apps/client`: the web client (Vue, run by Vite locally).
+  Gotcha: tv-srvr sends no `Cache-Control`, and Firefox answered a reload's
+  `getAllTvdb` from its cache without asking (nginx saw only the preflight), so
+  the list came back as old as the last real fetch. `httpCall` in `srvr.js`
+  sends `cache: "no-cache"` so every call revalidates by ETag.
 - `apps/android`: the phone remote (Expo, `App.js`).
   Gotcha: `android/` is generated and gitignored, and an Expo SDK upgrade means
   regenerating it with `expo prebuild --clean`. That wipes the app icon, which

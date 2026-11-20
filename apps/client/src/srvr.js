@@ -369,7 +369,14 @@ const httpCall = async (endpoint, param, method = "GET", timeoutMs = 30000) => {
   let url = `${HTTP_URL}${endpoint}`;
   const TIMEOUT_MS = timeoutMs;
 
-  const options = { method, headers: { "Content-Type": "application/json" } };
+  // "no-cache" makes the browser revalidate (ETag, so an unchanged answer is a
+  // cheap 304). tv-srvr sends no Cache-Control, and Firefox answered a reload's
+  // getAllTvdb from its cache without asking, so the list came back old.
+  const options = {
+    method,
+    headers: { "Content-Type": "application/json" },
+    cache: "no-cache",
+  };
 
   if (method === "GET" && param) {
     const params = new URLSearchParams(

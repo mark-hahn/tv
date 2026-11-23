@@ -15,6 +15,7 @@ import {
   start as startTvmaze,
   searchShowsByName,
   unmarkShowBrowsed,
+  markShowBrowsedByTvdbId,
 } from "./tvmaze.js";
 import {
   getQbtInfo,
@@ -2359,12 +2360,14 @@ app.post("/api/ackBrowsed", (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /api/removeBrowseCard — remove a show from browse-cards.json without touching db
+// POST /api/removeBrowseCard — the client's snooze: remove a show from
+// browse-cards.json and mark it browsed so it can't come back as a candidate
 app.post("/api/removeBrowseCard", (req, res) => {
   const { tvdbId, name } = req.body || {};
   if (!tvdbId && !name)
     return res.status(400).json({ error: "missing tvdbId or name" });
   removeResultTitleByTvdbId(tvdbId || null, name || null);
+  if (tvdbId) markShowBrowsedByTvdbId(tvdbId);
   publishBrowseHasMoreInBackground();
   res.json({ ok: true });
 });

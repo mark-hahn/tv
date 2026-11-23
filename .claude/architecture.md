@@ -555,6 +555,19 @@ so a file under an app that changes on its own locally must be excluded there
   the video. When it can't be resolved `video` is null, so no client saves a
   page url into `show.trailers`.
 
+## Browse pane and snooze (`browse.vue`, tv-api `browse.js`/`tvmaze.js`, tv-srvr)
+
+- Next calls tv-api `getBrowseShow`: the first row of `tvmaze.sqlite` with
+  `browsed=0` that has premiered or premieres within `BROWSE_MAX_FUTURE_DAYS`
+  (60) and passes the filters. It is appended to `browse-cards.json` and the
+  client acks it (`ackBrowsed`), which sets `browsed=1`.
+- The snooze list lives in tv-srvr (`snooze-list.json`); tv-api never reads it.
+  A snoozed show stays out of Next only because `browsed=1`, which
+  `removeBrowseCard` (the client's snooze) sets by tvdb id. A show snoozed from
+  the Upcoming list was never browsed, so without that it came up as soon as
+  its premiere entered the 60-day window. Unsnooze and auto-unsnooze call
+  `unackBrowsed` to put it back.
+
 ## Actors pane modes (web client, `actors.vue`)
 
 - Regulars is the whole series (TVDB merged with TMDB), Season is the regulars

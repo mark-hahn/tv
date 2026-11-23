@@ -1186,20 +1186,30 @@ export function markShowBrowsed(tvmazeId) {
   _db.prepare("UPDATE shows SET browsed = 1 WHERE tvmaze_id = ?").run(tvmazeId);
 }
 
-export function unmarkShowBrowsed(tvdbId) {
+function setBrowsedByTvdbId(tvdbId, browsed) {
   if (!_db) openDb();
   const numId = Number(tvdbId);
   const result = _db
-    .prepare("UPDATE shows SET browsed = 0 WHERE tvdb_id = ?")
-    .run(numId);
+    .prepare("UPDATE shows SET browsed = ? WHERE tvdb_id = ?")
+    .run(browsed, numId);
   // Fallback: tvdb_id column may be NULL/stale — also check data_json externals
   if (result.changes === 0 && numId > 0) {
     _db
       .prepare(
-        "UPDATE shows SET browsed = 0 WHERE CAST(json_extract(data_json, '$.externals.thetvdb') AS INTEGER) = ?",
+        "UPDATE shows SET browsed = ? WHERE CAST(json_extract(data_json, '$.externals.thetvdb') AS INTEGER) = ?",
       )
-      .run(numId);
+      .run(browsed, numId);
   }
+}
+
+export function unmarkShowBrowsed(tvdbId) {
+  setBrowsedByTvdbId(tvdbId, 0);
+}
+
+// Snoozing a show that was never browsed (picked from the Upcoming list) must
+// still keep it out of getCandidateShows when its premiere enters the window.
+export function markShowBrowsedByTvdbId(tvdbId) {
+  setBrowsedByTvdbId(tvdbId, 1);
 }
 
 export function getTvmazeIdByTvdbId(tvdbId) {

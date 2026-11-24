@@ -75,8 +75,9 @@
               Tabs
             </button>
             <button
-              v-if="!movieMode"
               @click.stop="showStream = !showStream"
+              :disabled="movieMode && !movieStreamShow"
+              :class="{ 'btn-disabled': movieMode && !movieStreamShow }"
               :style="{
                 fontSize: '13px',
                 cursor: 'pointer',
@@ -263,6 +264,7 @@
               {{ seed.label }}
             </button>
             <button
+              v-if="!movieMode"
               @click.stop="torAllClick"
               :disabled="selectedItems.size === 0"
               :class="{ 'btn-disabled': selectedItems.size === 0 }"
@@ -298,6 +300,7 @@
               Group
             </button>
             <button
+              v-if="!movieMode"
               @click.stop="torShowFilterClick"
               :disabled="selectedItems.size === 0 && showFilter === null"
               :class="{
@@ -344,6 +347,7 @@
               "
             />
             <button
+              v-if="!movieMode"
               @click.stop="torChkSubClick"
               :disabled="selectedItems.size === 0"
               :class="{ 'btn-disabled': selectedItems.size === 0 }"
@@ -465,7 +469,8 @@
         <div>Show not aired yet</div>
       </div>
       <Stream
-        :show="currentShow"
+        :show="movieMode ? movieStreamShow : currentShow"
+        :movie="movieMode"
         :visible="showStream"
       />
       <div
@@ -1565,6 +1570,9 @@ export default {
       if (req) void this.searchMapEpisodes(req);
     },
     movieMode(val) {
+      this.showStream = false;
+      // Movie mode has no Show button to turn this filter off.
+      this.showFilter = null;
       if (!val) {
         this.torrents = [];
         this.movieSrchText = "";
@@ -1591,6 +1599,11 @@ export default {
   },
 
   computed: {
+    // Movie mode's Stream looks up the title in the movie title box.
+    movieStreamShow() {
+      const name = this.movieSrchText.trim();
+      return name ? { name } : null;
+    },
     headerShowName() {
       const name =
         this.showName || this.currentShow?.name || this.activeShow?.name || "";

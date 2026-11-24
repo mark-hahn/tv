@@ -91,6 +91,8 @@ export default {
   props: {
     show: { type: Object, default: null },
     visible: { type: Boolean, default: false },
+    // show is a movie title ({ name }) from the tor pane's movie mode.
+    movie: { type: Boolean, default: false },
   },
   data() {
     return {
@@ -113,10 +115,11 @@ export default {
     async fetchProviders() {
       const name = this.show?.name;
       if (!name) return;
+      const cacheKey = (this.movie ? "movie:" : "show:") + name;
 
-      if (this.cache[name]) {
-        this.providers = this.cache[name].providers;
-        this.tmdbLink = this.cache[name].tmdbLink;
+      if (this.cache[cacheKey]) {
+        this.providers = this.cache[cacheKey].providers;
+        this.tmdbLink = this.cache[cacheKey].tmdbLink;
         this.error = null;
         return;
       }
@@ -126,7 +129,9 @@ export default {
       this.providers = [];
       try {
         // The tvdb id lets tv-srvr find the show without a search by name.
-        const params = { showName: name, tvdbId: this.show?.tvdbId || this.show?.id };
+        const params = this.movie
+          ? { showName: name, movie: true }
+          : { showName: name, tvdbId: this.show?.tvdbId || this.show?.id };
         if (this.show?.firstAired) {
           const y = String(this.show.firstAired).slice(0, 4);
           if (y.length === 4) params.year = y;
@@ -134,7 +139,7 @@ export default {
         const res = await srvr.getStreamProviders(params);
         this.providers = res.providers || [];
         this.tmdbLink = res.tmdbLink || null;
-        this.cache[name] = {
+        this.cache[cacheKey] = {
           providers: this.providers,
           tmdbLink: this.tmdbLink,
         };

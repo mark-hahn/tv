@@ -157,16 +157,32 @@ export async function getPersonImages({ people }) {
   return Promise.all((people ?? []).map((person) => personImage(person.name)));
 }
 
+// A movie title as typed in the tor pane: "Dune 2021" or "Dune (2021)" is
+// searched as Dune of 2021 first, then as typed ("Blade Runner 2049").
+async function tmdbMovieId(title) {
+  const m = title.match(/^(.+?)\s*\(?((?:19|20)\d\d)\)?$/);
+  if (m) {
+    const res = await moviedb.searchMovie({ query: m[1], year: Number(m[2]) });
+    if (res.results?.length) return res.results[0].id;
+  }
+  return (await moviedb.searchMovie({ query: title })).results?.[0]?.id;
+}
+
 export async function getStreamProviders(params) {
   // The show by its own ids first; a search by name only when they find none.
-  const tmdbId = await tmdbShowId(showIdsFor(params), params.showName);
+  // A movie (the tor pane's movie mode) by its title alone.
+  const tmdbId = params.movie
+    ? await tmdbMovieId(String(params.showName || "").trim())
+    : await tmdbShowId(showIdsFor(params), params.showName);
   if (!tmdbId) {
-    return { providers: [], error: "show not found" };
+    return { providers: [], error: params.movie ? "movie not found" : "show not found" };
   }
   const match = { id: Number(tmdbId) };
 
   const COUNTRIES = ["US", "GB", "AU"];
-  const wpRes = await moviedb.tvWatchProviders({ id: match.id });
+  const wpRes = params.movie
+    ? await moviedb.movieWatchProviders({ id: match.id })
+    : await moviedb.tvWatchProviders({ id: match.id });
   const allResults = wpRes.results || {};
 
   const TYPES = ["flatrate", "rent", "buy"];

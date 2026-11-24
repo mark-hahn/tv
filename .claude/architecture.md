@@ -568,6 +568,16 @@ so a file under an app that changes on its own locally must be excluded there
   its premiere entered the 60-day window. Unsnooze and auto-unsnooze call
   `unackBrowsed` to put it back.
 
+## Stream providers (`stream.vue`, tv-srvr `getStreamProviders` in `tmdb.js`)
+
+- TMDB's watch providers (flatrate, rent, buy; US, GB, AU; "with ads"
+  plans left out), shown by the tor pane's Stream and used by the browse
+  pane's Stream. A show is found by its ids, else by name.
+- In the tor pane's movie mode Stream sends the movie title box with
+  `movie: true`: a TMDB movie search, by title and year when the box ends
+  in one ("Dune 2021", "Dune (2021)"), else by the whole text ("Blade
+  Runner 2049"). The first result is taken.
+
 ## Actors pane modes (web client, `actors.vue`)
 
 - Regulars is the whole series (TVDB merged with TMDB), Season is the regulars

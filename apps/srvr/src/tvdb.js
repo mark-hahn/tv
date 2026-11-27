@@ -328,7 +328,7 @@ function stripDeadFields(data) {
  * @param {number} tvdbId - The TVDB ID
  * @returns {Array} seriesMap with episode data
  */
-async function getSeriesMap(tvdbId) {
+async function getSeriesMap(tvdbId, showName) {
   if (!tvdbId) return [];
 
   const seriesMap = [];
@@ -368,20 +368,12 @@ async function getSeriesMap(tvdbId) {
       });
 
       if (!res.ok) {
-        unilog(715, "getSeriesMap: failed to fetch episodes", {
-          tvdbId,
-          page,
-          status: res.status,
-        });
+        unilog(3152, `getSeriesMap: failed to fetch episodes for ${showName}: tvdbId ${tvdbId}, page ${page}, status ${res.status}`);
         partial = true;
         break;
       }
     } catch (e) {
-      unilog(716, "getSeriesMap: fetch error", {
-        tvdbId,
-        page,
-        error: e.message,
-      });
+      unilog(3153, `getSeriesMap: fetch error for ${showName}: tvdbId ${tvdbId}, page ${page}: ${e.message}`);
       partial = true;
       break;
     }
@@ -539,16 +531,7 @@ async function getSeriesMap(tvdbId) {
   }
 
   if (missingEpisodeNumSamples.length > 0) {
-    unilog(
-      717,
-      "warn",
-      "getSeriesMap: episodes missing numeric episode number",
-      {
-        tvdbId,
-        missingEpisodeNumBySeason,
-        sample: missingEpisodeNumSamples,
-      },
-    );
+    unilog(3155, `getSeriesMap: episodes missing numeric episode number for ${showName}: tvdbId ${tvdbId}, by season ${JSON.stringify(missingEpisodeNumBySeason)}, sample ${JSON.stringify(missingEpisodeNumSamples)}`);
   }
 
   seriesMap.partial = partial;

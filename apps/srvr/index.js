@@ -1442,7 +1442,7 @@ app.post(
       if (!tvdbId)
         return { success: false, error: showName ? "Show not found" : "Missing showName" };
       try {
-        return { success: true, seriesMap: await tvdb.getSeriesMap(tvdbId) };
+        return { success: true, seriesMap: await tvdb.getSeriesMap(tvdbId, params.showName) };
       } catch (err) {
         unilog(2845, `preview map for tvdbId ${tvdbId}: ${err.message}`);
         return { success: false, error: err.message };
@@ -1774,7 +1774,7 @@ app.get(
 // undefined when TVDB could not be read in full, so the old values are kept.
 async function snoozeWaitStr({ tvdbId, name }) {
   try {
-    const seriesMap = await tvdb.getSeriesMap(tvdbId);
+    const seriesMap = await tvdb.getSeriesMap(tvdbId, name);
     if (seriesMap.partial) return undefined;
     const ed = [];
     let premiere = null;

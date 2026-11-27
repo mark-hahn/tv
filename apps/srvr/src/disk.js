@@ -383,7 +383,7 @@ export async function refreshEpisodeData(showName, rec, opts = {}) {
   const freshSeason0 = new Map();
   if (sources.includes("tvdb") && rec.tvdbId) {
     try {
-      tvdbMap = await tvdb.getSeriesMap(rec.tvdbId);
+      tvdbMap = await tvdb.getSeriesMap(rec.tvdbId, showName);
       for (const [seasonNum, episodes] of tvdbMap || []) {
         if (!Number.isInteger(seasonNum)) continue;
         for (const [epNum, epData] of episodes) {

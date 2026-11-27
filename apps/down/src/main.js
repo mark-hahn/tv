@@ -53,9 +53,6 @@ const DVD_EXTS = ["vob", "ifo", "bup"];
 // A subtitle file tv-down takes. An .ass or .ssa one lands under its .srt
 // name, and the worker converts it to SubRip as it lands.
 const SUB_FILE_RE = /\.(srt|ass|ssa)$/i;
-// A file that follows its episode's video instead of being judged as one: a
-// subtitle file or an .nfo.
-const SIDECAR_FILE_RE = /\.(srt|ass|ssa|nfo)$/i;
 const UNRAR_LOCK = "!unrar.lock";
 
 let downChannelPeer = null;
@@ -2919,11 +2916,10 @@ async function main() {
 
       // Provide a clear reason when the parser can't produce S/E.
       if (!title || !Number.isInteger(season) || !Number.isInteger(episode)) {
-        // A subtitle or .nfo file with no episode of its own is skipped,
-        // never an error entry: those share names like "2_eng,English.srt"
-        // or "tvshow.nfo", so one entry would block every other file of that
-        // name.
-        if (SIDECAR_FILE_RE.test(fname)) {
+        // A subtitle file with no episode of its own is skipped, never an
+        // error entry: those share names like "2_eng,English.srt", so one
+        // entry would block every other file of that name.
+        if (SUB_FILE_RE.test(fname)) {
           if (skipLoggedOnce(usbFilePath))
             unilog(3033, `${title || "unknown show"}: no season and episode for "${usbFilePath}", skipping`);
           return process.nextTick(checkFile);
@@ -3484,14 +3480,11 @@ async function main() {
       }
     }
 
-    // A subtitle or .nfo file follows its episode's video: it is taken when
-    // that video is on disk or on its way, and none of the video gates below
+    // A subtitle file follows its episode's video: it is taken when that
+    // video is on disk or on its way, and none of the video gates below
     // apply to it. tv-srvr names a subtitle as one of the video's S files
-    // once it lands. An .nfo is taken only beside its own video: its name
-    // starts with the video's name less the extension, compared without
-    // case, as tv-srvr's sidecar cleanup (oldFiles.js) reads it, so another
-    // release's nfo never lands.
-    var isSidecarFile = SIDECAR_FILE_RE.test(fname);
+    // once it lands.
+    var isSidecarFile = SUB_FILE_RE.test(fname);
     if (isSidecarFile && !processingForced) {
       var srtSeStr = `S${String(season).padStart(2, "0")}E${String(episode).padStart(2, "0")}`;
       var srtSeRe = new RegExp(srtSeStr, "i");
@@ -3506,17 +3499,10 @@ async function main() {
       var cycleVideo =
         cycleSeMap && cycleSeMap[(seriesName || "") + "\x00" + srtSeStr];
       if (cycleVideo) epVideos.push(cycleVideo.dest);
-      var nfoName = /\.nfo$/i.test(fname)
-        ? String(destTitle || fname).toLowerCase()
-        : null;
-      if (nfoName)
-        epVideos = epVideos.filter((v) =>
-          nfoName.startsWith(v.replace(/\.[^.]+$/, "").toLowerCase()),
-        );
       if (!epVideos.length) {
         existsCount++;
         if (skipLoggedOnce(usbFilePath))
-          unilog(3035, `${seriesName || "unknown show"} ${srtSeStr}: no ${nfoName ? "matching video" : "video"} for "${fname}", skipping`);
+          unilog(3158, `${seriesName || "unknown show"} ${srtSeStr}: no video for "${fname}", skipping`);
         return process.nextTick(checkFile);
       }
     }

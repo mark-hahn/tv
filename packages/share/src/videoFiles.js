@@ -44,15 +44,14 @@ export const downVideoExtensions = [
   "mpg",
 ];
 
-// Every file tv-down downloads from usb by itself: those videos, subtitles
-// (.ass and .ssa ones converted to .srt as they land) and .nfo files. Any
-// other file of a torrent stays on usb.
+// Every file tv-down downloads from usb by itself: those videos and subtitles
+// (.ass and .ssa ones converted to .srt as they land). Any other file of a
+// torrent stays on usb.
 export const downFileExtensions = [
   ...downVideoExtensions,
   "srt",
   "ass",
   "ssa",
-  "nfo",
 ];
 
 // Files that come with releases and nobody wants downloaded: checksums,
@@ -60,6 +59,7 @@ export const downFileExtensions = [
 // which are unpacked on usb. tv-down skips them like any file not in
 // downFileExtensions, but the questions about skipped files leave them out.
 const RELEASE_EXTRA_EXTS = new Set([
+  "nfo",
   "nzb",
   "sfv",
   "srr",

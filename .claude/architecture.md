@@ -165,7 +165,7 @@ so a file under an app that changes on its own locally must be excluded there
 - tv-down downloads only the file types in `downFileExtensions`
   (`packages/share/src/videoFiles.js`): the videos tvapp's player can open
   and seek (`downVideoExtensions`: mkv, webm, mp4, m4v, mov, avi, divx, ts,
-  mpeg, mpg), subtitles (`.srt`, `.ass`, `.ssa`) and `.nfo`. wmv, rm, ogv,
+  mpeg, mpg) and subtitles (`.srt`, `.ass`, `.ssa`). wmv, rm, ogv,
   flv, 3gp and m2ts are never downloaded: Media3 can't read or seek them, or
   the TV can't decode them.
 - A scene sample (`vidIsSampleName`) is never downloaded, forced or not. A
@@ -174,18 +174,18 @@ so a file under an app that changes on its own locally must be excluded there
 - Its usb scan (`find`) lists only those, the DVD pass's VOB/IFO/BUP files
   and the `!unrar.lock` that qbt-unrar.sh keeps in a folder while it
   unpacks; no other file comes over ssh. Forced files get the same filter.
-- A subtitle or `.nfo` file follows its episode's video: it is taken only
+- Release `.nfo` files are not downloaded (11-27): Emby ignores them and
+  nothing of ours reads them. They count as release extras, so the
+  skipped-files lists leave them out.
+- A subtitle file follows its episode's video: it is taken only
   when that video is on disk or on its way (queued earlier in the same
   cycle counts, season-0 specials too: `cycleSeMap`), and skipped quietly when its
-  name has no season and episode (`tvshow.nfo`, a pack's own nfo). An `.nfo`
-  is taken only beside its own video: its name starts with the video's name
-  less the extension, compared without case, as tv-srvr's sidecar cleanup
-  (`oldFiles.js`) reads it. Another release's nfo never lands.
+  name has no season and episode.
 - Before a torrent goes to qbt, the tor pane's Send, Hold and Force (tv-api's
   download request, stage `skipped-files`) list its files tv-down will not
   download, and the usb pane's Force lists them in its confirm. Release
   extras (`isReleaseExtra`: sfv, srr, txt, xml, images, idx/sub, a rar's
-  parts, ...) are left out of the lists. Sent anyway, the listed files stay
+  parts, nfo, ...) are left out of the lists. Sent anyway, the listed files stay
   on usb.
 
 ## Subtitles
